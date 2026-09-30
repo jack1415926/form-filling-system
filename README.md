@@ -6,13 +6,36 @@
 
 启动、演示账号和测试方法见 [本机开发与演示](docs/DEVELOPMENT.md)，表单来源和字段对应关系见 [字段说明](docs/FIELD_MAP.md)。
 
-阶段一的测试证据、代码复查、修复过程和后续验证缺口见 [测试复查与开发记录](docs/REVIEW-2026-09-30.md)。
+阶段一的测试证据、代码复查、修复过程和后续验证缺口见 [测试复查与开发记录](docs/testing/REVIEW-2026-09-30.md)。
+
+## 目录导航
+
+```text
+表单填报系统/
+├─ README.md                 项目入口和目录导航
+├─ backend/                  Django 后端、迁移和测试
+├─ frontend/                 React 前端
+├─ scripts/                  启动脚本
+├─ docs/
+│  ├─ MVP.md                 已确认范围与待完成项
+│  ├─ DEVELOPMENT.md         安装、启动和验证
+│  ├─ FIELD_MAP.md           Excel 字段对应关系
+│  ├─ design/                Word 技术方案和设计图
+│  └─ testing/
+│     ├─ REVIEW-2026-09-30.md 测试复查与开发记录
+│     └─ manual/             人工反馈和 images 截图（仅本机）
+├─ reference/                原始 Excel 等业务资料（仅本机）
+├─ .local/                   本机配置、密码及临时验收产物（不提交）
+└─ .venv/                    Python 虚拟环境（不提交）
+```
+
+日常开发从 `frontend`、`backend` 开始，查方案进入 `docs`，人工测试反馈放入 `docs/testing/manual`，截图放入其中的 `images`。`node_modules`、构建目录和虚拟环境由工具管理，不手动混入业务资料。
 
 ## 方案与范围
 
-- [现有技术方案 1.4](表单填报系统_技术方案1.4.docx)：保留原文件、版式和图片。
+- [现有技术方案 1.4](docs/design/表单填报系统_技术方案1.4.docx)：保留原文件、版式和图片。
 - [两周 MVP 确认范围](docs/MVP.md)：记录 2026-09-30 确认的流程、实现边界和验收要求。
-- [陈氏 ER 图](ER图新.png)与[序列图](序列图.png)：现有图展示基础填报部分，审批和留言由 MVP 补充文字说明。
+- [陈氏 ER 图](docs/design/images/ER图新.png)与[序列图](docs/design/images/序列图.png)：现有图展示基础填报部分，审批和留言由 MVP 补充文字说明。
 
 技术方案 1.4 中“暂不实现审核流程、审核留痕”、将基本审批列为后续扩展以及原实施安排，与本次确认范围存在差异。开发范围以 `docs/MVP.md` 为准。根据 2026-09-30 确认的调整，数据库改为 MySQL；其他技术选型、八张工作表内容及既有规则沿用技术方案。原 Word 中的 PostgreSQL 选型作为历史参考，不再作为开发依据。
 
@@ -45,6 +68,6 @@ Windows 开发环境安装 [MySQL Community Server 8.4 LTS](https://dev.mysql.co
 
 以下两张图原样保留，展示基础填报数据与交互，不代表审批及留言的完整模型。序列图中的 PostgreSQL 标签为原方案标注，实际实现按当前选型使用 MySQL；网页、后端与数据库之间的基础交互关系继续适用。
 
-![陈氏 ER 图](ER图新.png)
+![陈氏 ER 图](docs/design/images/ER图新.png)
 
-![基础填报序列图](序列图.png)
+![基础填报序列图](docs/design/images/序列图.png)

@@ -28,3 +28,6 @@ graphify-out/
 *.xls
 *.xlsx
 *.xlsm
+# Business source files and manual test screenshots stay on this computer.
+/reference/
+/docs/testing/manual/

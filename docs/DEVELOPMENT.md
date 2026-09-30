@@ -89,3 +89,5 @@ npm.cmd run build
 ## 字段与边界
 
 概述字段依据 `docs/FIELD_MAP.md` 对应原表。页面按填写任务组织，不复制 Excel 的合并单元格布局；本批不会导入、导出或运行 Excel 宏。原始填写实例留在本机，用于核对，不加入代码提交。
+
+目录位置：Word 和设计图在 `docs/design`，复查记录在 `docs/testing`，人工反馈与截图在 `docs/testing/manual`，原始 Excel 在 `reference`。本机密码文件仍位于 `.local`，启动脚本位置不变。
