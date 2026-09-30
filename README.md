@@ -10,14 +10,18 @@
 - [两周 MVP 确认范围](docs/MVP.md)：记录 2026-09-30 确认的流程、实现边界和验收要求。
 - [陈氏 ER 图](ER图新.png)与[序列图](序列图.png)：现有图展示基础填报部分，审批和留言由 MVP 补充文字说明。
 
-技术方案 1.4 中“暂不实现审核流程、审核留痕”、将基本审批列为后续扩展以及原实施安排，与本次确认范围存在差异。开发范围以 `docs/MVP.md` 为准，技术选型、八张工作表内容及既有规则沿用技术方案。
+技术方案 1.4 中“暂不实现审核流程、审核留痕”、将基本审批列为后续扩展以及原实施安排，与本次确认范围存在差异。开发范围以 `docs/MVP.md` 为准。根据 2026-09-30 确认的调整，数据库改为 MySQL；其他技术选型、八张工作表内容及既有规则沿用技术方案。原 Word 中的 PostgreSQL 选型作为历史参考，不再作为开发依据。
 
 ## 技术选型
 
 - 前端：React、TypeScript、Vite、Ant Design；TanStack Query 管理接口数据和保存状态。
 - 后端：Django、Django REST Framework。
-- 数据库：PostgreSQL。
+- 数据库：MySQL Community Server 8.4 LTS，采用 InnoDB 和 `utf8mb4`。
 - 部署：公司内网，以电脑端为主要使用场景；开发开始时确认演示环境及公司 IT 要求。
+
+Django 使用内置 MySQL 后端和 `mysqlclient` 驱动连接数据库。通过数据库事务、行锁和唯一约束实现提交锁定、重复批准保护及同时批准时的状态判断。本仓库尚无应用代码和业务数据库，无需迁移现有业务数据；以上配置将在项目初始化时落实。
+
+Windows 开发环境安装 [MySQL Community Server 8.4 LTS](https://dev.mysql.com/downloads/mysql/8.4.html)，选择 Windows 64 位 MSI 安装包，并运行随附的 MySQL Configurator 完成配置；本机默认端口为 3306。Django 和 `mysqlclient` 在项目 Python 虚拟环境中安装。兼容性与配置要求见 [Django MySQL 文档](https://docs.djangoproject.com/en/5.2/ref/databases/#mysql-notes)。
 
 ## 八张工作表
 
@@ -35,7 +39,7 @@
 
 ## 原有图示
 
-以下两张图原样保留，展示基础填报数据与交互，不代表审批及留言的完整模型。
+以下两张图原样保留，展示基础填报数据与交互，不代表审批及留言的完整模型。序列图中的 PostgreSQL 标签为原方案标注，实际实现按当前选型使用 MySQL；网页、后端与数据库之间的基础交互关系继续适用。
 
 ![陈氏 ER 图](ER图新.png)
 
