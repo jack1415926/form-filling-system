@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App as AntApp, Button, ConfigProvider, Empty, Form, Input, Spin, Table, Tag } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -39,16 +39,22 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving }: {
   const [form] = Form.useForm<Overview>()
   const [savedAt, setSavedAt] = useState(record.updated_at)
   const [dirty, setDirty] = useState(false)
+  const changedFields = useRef(new Set<keyof Overview>())
   const { message } = AntApp.useApp()
   const locked = record.status !== 'draft'
   const save = useMutation({
     onMutate: () => onBusy(true),
     onSettled: () => onBusy(false),
-    mutationFn: (values: Overview) => api<ChangeRequest>('/api/changes/' + record.id + '/', 'PATCH', { ...values, planned_eco_date: values.planned_eco_date || null }),
+    mutationFn: (values: Overview) => {
+      const patch: Partial<Overview> = Object.fromEntries([...changedFields.current].map((key) => [key, values[key] ?? '']))
+      if ('planned_eco_date' in patch) patch.planned_eco_date = patch.planned_eco_date || null
+      return api<ChangeRequest>('/api/changes/' + record.id + '/', 'PATCH', patch)
+    },
     onSuccess: (result) => {
-      form.setFieldsValue(result)
+      form.setFieldsValue({ ...result, planned_eco_date: result.planned_eco_date ?? '' })
       setSavedAt(result.updated_at)
       setDirty(false)
+      changedFields.current.clear()
       onDirty(false)
       onSaved(result)
       message.success('草稿已保存')
@@ -61,7 +67,11 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving }: {
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [dirty, save.isPending])
-  const changed = () => { setDirty(true); onDirty(true) }
+  const changed = (values: Partial<Overview>) => {
+    for (const key of Object.keys(values) as (keyof Overview)[]) changedFields.current.add(key)
+    setDirty(true)
+    onDirty(true)
+  }
   const fields: { key: keyof Overview; label: string; placeholder?: string }[] = [
     { key: 'ecr_no', label: 'ECR 编号', placeholder: '手动填写，例如 ECR-26010601' },
     { key: 'eco_no', label: 'ECO 编号', placeholder: '可稍后补充' },

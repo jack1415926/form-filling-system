@@ -27,6 +27,9 @@ export async function api<T>(path: string, method = 'GET', body?: unknown): Prom
     const message = data?.detail ?? (data ? Object.values(data).flat().join('；') : '请求验证失败，请重新登录后重试。')
     throw new ApiError(response.status, String(message))
   }
+  if (data === null || typeof data !== 'object') {
+    throw new ApiError(response.status, '服务器返回格式异常，未能确认操作结果。请保留填写内容后重试。')
+  }
   if (data?.csrfToken) csrfToken = data.csrfToken
   return data as T
 }
