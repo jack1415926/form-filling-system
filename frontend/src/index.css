@@ -1,0 +1,7 @@
+:root { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; color: #243731; background: #f3f6f4; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 360px; }
+button, input, textarea { font: inherit; }
+h1, h2, p { margin-top: 0; }
+h1 { font-size: 30px; line-height: 1.4; margin-bottom: 10px; font-weight: 650; letter-spacing: -.5px; }
+h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }

@@ -23,3 +23,8 @@ Thumbs.db
 .vscode/
 .codex/
 graphify-out/
+.local/
+*.sqlite3
+*.xls
+*.xlsx
+*.xlsm
