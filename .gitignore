@@ -1,0 +1,25 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.log
+
+# Local files
+.DS_Store
+Thumbs.db
+~$*
+.idea/
+.vscode/
+.codex/
+graphify-out/
