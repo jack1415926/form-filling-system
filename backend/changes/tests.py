@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from threading import Barrier, Event
 
@@ -135,6 +136,36 @@ class DraftFlowTests(TestCase):
             ChangeRequest.objects.filter(pk=record.pk).update(status="unexpected")
         record.refresh_from_db()
         self.assertEqual(record.status, "draft")
+
+    def test_new_login_invalidates_previous_session(self):
+        previous_key = self.client.cookies["sessionid"].value
+        new_client = APIClient(enforce_csrf_checks=True)
+        token = new_client.get("/api/auth/csrf/").json()["csrfToken"]
+        response = new_client.post("/api/auth/login/", {"username": "applicant", "password": "test-password-2026"}, format="json", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Session.objects.filter(session_key=previous_key).exists())
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+        self.assertEqual(self.client.get("/api/changes/").status_code, 403)
+        self.assertEqual(new_client.get("/api/auth/me/").status_code, 200)
+
+    def test_same_browser_relogin_rotates_session_without_breaking_writes(self):
+        previous_key = self.client.cookies["sessionid"].value
+        self.login()
+        self.assertNotEqual(self.client.cookies["sessionid"].value, previous_key)
+        self.assertFalse(Session.objects.filter(session_key=previous_key).exists())
+        self.assertEqual(self.client.post("/api/changes/", {}, format="json").status_code, 201)
+
+    def test_builtin_login_obeys_single_session_rule_and_other_users_keep_access(self):
+        previous_key = self.client.cookies["sessionid"].value
+        other_client = APIClient()
+        self.assertTrue(other_client.login(username="other", password="test-password-2026"))
+        # Django's built-in login is also used by its admin site.
+        builtin_client = APIClient()
+        self.assertTrue(builtin_client.login(username="applicant", password="test-password-2026"))
+        self.assertFalse(Session.objects.filter(session_key=previous_key).exists())
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+        self.assertEqual(builtin_client.get("/api/auth/me/").status_code, 200)
+        self.assertEqual(other_client.get("/api/auth/me/").status_code, 200)
 
 
 class ConcurrentDraftTests(TransactionTestCase):

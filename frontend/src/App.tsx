@@ -43,6 +43,7 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving }: {
   const { message } = AntApp.useApp()
   const locked = record.status !== 'draft'
   const save = useMutation({
+    onError: () => { message.error('保存失败，填写内容仍保留') },
     onMutate: () => onBusy(true),
     onSettled: () => onBusy(false),
     mutationFn: (values: Overview) => {
@@ -85,13 +86,13 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving }: {
     <section className="panel overview-panel">
       <div className="section-heading"><div><h2>概述基本信息</h2><p className="muted">申请者由登录账号确定，业务负责人单独填写。</p></div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.isPending ? '正在保存…' : dirty ? '有未保存的修改' : '已保存'}</span></div>
       {locked && <Alert type="info" title="申请已锁定，概述仅供查看。" className="form-alert" />}
-      {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
       <Form form={form} initialValues={{ ...record, planned_eco_date: record.planned_eco_date ?? '' }} layout="vertical" onValuesChange={changed} onFinish={(values) => save.mutate(values)} disabled={locked || save.isPending || leaving} requiredMark={false}>
         <Form.Item name="title" label="ECR/ECO 标题" rules={[{ max: 255, message: '标题最多 255 个字符' }]}><Input placeholder="填写这项设计变更的标题" maxLength={255} /></Form.Item>
         <Form.Item name="affected_products" label="受影响产品和型号"><Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="填写涉及的产品及型号" /></Form.Item>
         <div className="form-grid">{fields.map((field) => <Form.Item key={field.key} name={field.key} label={field.label} rules={[{ max: field.key.endsWith('_no') ? 64 : 255, message: '内容超过允许长度' }]}><Input placeholder={field.placeholder} /></Form.Item>)}</div>
         <div className="form-grid"><Form.Item name="affected_factories" label="受影响工厂"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item><Form.Item name="planned_eco_date" label="ECO 计划完成时间"><Input type="date" /></Form.Item></div>
         <Form.Item name="change_reason" label="变更原因"><Input.TextArea autoSize={{ minRows: 4, maxRows: 12 }} placeholder="说明变更来源、原因分析和解决措施" /></Form.Item>
+        {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
         <div className="form-footer"><span className="muted">最近保存：{dateTime(savedAt)}</span><Button type="primary" htmlType="submit" size="large" loading={save.isPending} disabled={locked || leaving}>保存草稿</Button></div>
       </Form>
     </section>
