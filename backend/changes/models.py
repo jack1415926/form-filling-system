@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import NullIf
 
 
 class ChangeRequest(models.Model):
@@ -13,6 +14,16 @@ class ChangeRequest(models.Model):
     title = models.CharField(max_length=255, blank=True)
     ecr_no = models.CharField(max_length=64, blank=True)
     eco_no = models.CharField(max_length=64, blank=True)
+    ecr_no_unique = models.GeneratedField(
+        expression=NullIf(models.F("ecr_no"), models.Value("")),
+        output_field=models.CharField(max_length=64),
+        db_persist=True,
+    )
+    eco_no_unique = models.GeneratedField(
+        expression=NullIf(models.F("eco_no"), models.Value("")),
+        output_field=models.CharField(max_length=64),
+        db_persist=True,
+    )
     affected_products = models.TextField(blank=True)
     affected_region = models.CharField(max_length=255, blank=True)
     initiating_factory = models.CharField(max_length=255, blank=True)
@@ -28,6 +39,8 @@ class ChangeRequest(models.Model):
         db_table = "change_request"
         ordering = ["-updated_at", "-id"]
         constraints = [
+            models.UniqueConstraint(fields=["ecr_no_unique"], name="change_request_ecr_no_unique"),
+            models.UniqueConstraint(fields=["eco_no_unique"], name="change_request_eco_no_unique"),
             models.CheckConstraint(
                 condition=models.Q(status__in=["draft", "pending", "approved"]),
                 name="change_request_valid_status",
