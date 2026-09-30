@@ -94,7 +94,7 @@ DATABASES = {
     }
 }
 
-if DATABASES["default"]["TEST"]["NAME"] == DATABASES["default"]["NAME"]:
+if DATABASES["default"]["TEST"]["NAME"].casefold() == DATABASES["default"]["NAME"].casefold():
     raise ImproperlyConfigured("测试数据库必须与开发数据库不同。")
 
 
