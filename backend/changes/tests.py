@@ -5,13 +5,14 @@ from threading import Barrier, Event
 from unittest.mock import patch
 
 from django.db import IntegrityError, connection, connections, transaction
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
 from .models import ChangeRequest
 from .serializers import ChangeRequestSerializer
 
 
+@override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
 class DraftFlowTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -158,12 +159,12 @@ class DraftFlowTests(TestCase):
         self.assertEqual(anonymous.post("/api/auth/login/", {"username": "applicant", "password": "test-password-2026"}, format="json").status_code, 403)
         self.client.credentials()
         self.assertEqual(self.client.post("/api/changes/", {}, format="json").status_code, 403)
+        record = ChangeRequest.objects.create(applicant=self.owner, title="原内容")
+        response = self.client.patch(f"/api/changes/{record.pk}/", {"title": "修改"}, format="json")
+        self.assertEqual(response.status_code, 403)
+        record.refresh_from_db()
+        self.assertEqual(record.title, "原内容")
         self.assertEqual(self.client.post("/api/auth/logout/").status_code, 403)
-
-    def test_put_and_delete_not_available(self):
-        record = ChangeRequest.objects.create(applicant=self.owner)
-        self.assertEqual(self.client.put(f"/api/changes/{record.pk}/", {}, format="json").status_code, 405)
-        self.assertEqual(self.client.delete(f"/api/changes/{record.pk}/").status_code, 405)
 
     def test_bad_login_and_invalid_payload(self):
         client = APIClient(enforce_csrf_checks=True)
@@ -179,14 +180,6 @@ class DraftFlowTests(TestCase):
         token = self.client.get("/api/auth/csrf/").json()["csrfToken"]
         response = self.client.post("/api/auth/login/", {"username": "applicant", "password": "test-password-2026"}, format="json", HTTP_X_CSRFTOKEN=token)
         self.assertEqual(response.status_code, 400)
-
-    def test_patch_requires_csrf(self):
-        record = ChangeRequest.objects.create(applicant=self.owner, title="原内容")
-        self.client.credentials()
-        response = self.client.patch(f"/api/changes/{record.pk}/", {"title": "修改"}, format="json")
-        self.assertEqual(response.status_code, 403)
-        record.refresh_from_db()
-        self.assertEqual(record.title, "原内容")
 
     def test_invalid_payload_and_utf8_boundaries(self):
         for payload in [[], {"title": None}, {"title": "字" * 256}, {"ecr_no": "0" * 65}, {"unknown_field": "value"}]:

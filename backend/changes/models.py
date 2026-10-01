@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.db.models.functions import NullIf
+from .dispositions import LOCATIONS, DISPOSITIONS
 
 
 class ChangeRequest(models.Model):
@@ -45,4 +46,57 @@ class ChangeRequest(models.Model):
                 condition=models.Q(status__in=["draft", "pending", "approved"]),
                 name="change_request_valid_status",
             )
+        ]
+
+
+class MaterialChange(models.Model):
+    class Category(models.TextChoices):
+        REVISION = "revision", "升版"
+        ADDITION = "addition", "新增"
+        DISCONTINUATION = "discontinuation", "停用"
+
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="materials")
+    category = models.CharField(max_length=20, choices=Category.choices)
+    request_id = models.UUIDField(null=True, editable=False)
+    material_no = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
+    material_class = models.CharField(max_length=255, blank=True)
+    spare_part = models.CharField(max_length=1, blank=True, choices=[("Y", "Y"), ("N", "N")])
+    optional_part = models.CharField(max_length=1, blank=True, choices=[("Y", "Y"), ("N", "N")])
+    old_revision = models.CharField(max_length=255, blank=True)
+    new_revision = models.CharField(max_length=255, blank=True)
+    revision = models.CharField(max_length=255, blank=True)
+    detailed_class = models.CharField(max_length=255, blank=True)
+    discontinued_project = models.CharField(max_length=255, blank=True)
+    change_description = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "material_change"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(fields=["change", "request_id"], name="material_unique_request"),
+            models.CheckConstraint(condition=models.Q(category__in=["revision", "addition", "discontinuation"]), name="material_valid_category"),
+            models.CheckConstraint(condition=models.Q(spare_part__in=["", "Y", "N"]), name="material_valid_spare_part"),
+            models.CheckConstraint(condition=models.Q(optional_part__in=["", "Y", "N"]), name="material_valid_optional_part"),
+        ]
+
+
+class MaterialDisposition(models.Model):
+    material = models.ForeignKey(MaterialChange, on_delete=models.CASCADE, related_name="dispositions")
+    location_group = models.CharField(max_length=16)
+    location_item = models.CharField(max_length=32)
+    disposition = models.CharField(max_length=20, blank=True, choices=[(value, value) for value in DISPOSITIONS])
+    remark = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "material_disposition"
+        ordering = ["location_item"]
+        constraints = [
+            models.UniqueConstraint(fields=["material", "location_item"], name="disposition_unique_location"),
+            models.CheckConstraint(condition=models.Q(disposition__in=DISPOSITIONS), name="disposition_valid_value"),
+            models.CheckConstraint(condition=(
+                models.Q(location_group="company", location_item__in=[key for key, group in LOCATIONS.items() if group == "company"])
+                | models.Q(location_group="supplier", location_item__in=[key for key, group in LOCATIONS.items() if group == "supplier"])
+                | models.Q(location_group="customer", location_item__in=[key for key, group in LOCATIONS.items() if group == "customer"])
+            ), name="disposition_valid_location"),
         ]

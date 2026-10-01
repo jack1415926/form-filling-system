@@ -18,7 +18,8 @@ class NumberMigrationTests(TransactionTestCase):
     def tearDown(self):
         # Restore the latest schema even when the assertion fails.
         self.old_model.objects.all().delete()
-        MigrationExecutor(connection).migrate(self.after)
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
         super().tearDown()
 
     def test_existing_data_forward_and_backward_migration(self):
