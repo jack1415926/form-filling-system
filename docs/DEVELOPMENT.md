@@ -6,6 +6,8 @@
 
 技术基线：Node.js 24、Python 3.14、MySQL 8.4；依赖固定在 `backend/requirements.txt` 和 `frontend/package-lock.json`。当前机器已安装，无需重建环境。MySQL 服务为手动启动，重启电脑后如未运行，用服务管理器启动 `MySQL`。
 
+当前项目目录为 `F:\codex_project\form_file_system`。虚拟环境含解释器的绝对路径，项目改名或移动后如 Python 启动失败，需重新定位环境，不能只移动目录。
+
 后端从 `.local/development.json` 加载进程配置，已有同名环境变量优先。其他设备自行配置，不复制本机密码：
 
 ```json
@@ -38,6 +40,17 @@ cd frontend
 npm.cmd ci --cache ..\.local\npm-cache --proxy http://127.0.0.1:7890 --https-proxy http://127.0.0.1:7890
 cd ..
 ```
+
+### 改名后修复虚拟环境
+
+本机已用下列命令完成修复。在新项目根目录执行，沿用上方 uv 缓存目录设置；解释器路径以实际安装为准。若沙箱拒绝访问现有缓存，在普通用户 PowerShell 中执行，不修改缓存 ACL。
+
+```powershell
+uv venv --allow-existing --python .local\python\cpython-3.14.6-windows-x86_64-none\python.exe .venv
+uv pip install --offline --reinstall --python .venv\Scripts\python.exe -r backend\requirements.txt
+```
+
+这会重新生成启动器并按原锁定版本重装依赖，保留 `.local` 配置和数据库。修复后执行下方 Django 检查，再用后端脚本的 `showmigrations changes` 确认迁移状态。
 
 ## 启动与账号
 
