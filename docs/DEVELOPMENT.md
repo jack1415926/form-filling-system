@@ -1,93 +1,101 @@
-# 本机开发与演示
+# 开发与演示
 
-本文记录本机安装、配置、启动和验证方法。当前进度及待办统一见 [README](../README.md#当前进度)，业务规则见 [MVP](MVP.md)。
+本文件只维护操作方法。进度见 [README](../README.md)，规则见 [MVP](MVP.md)，验收步骤见 [复查记录](testing/REVIEW-2026-09-30.md#人工复验流程)。
 
-## 环境和本地配置
+## 环境与配置
 
-当前使用 Node.js 24、Python 3.14、MySQL 8.4。后端版本固定于 `backend/requirements.txt`，前端由 `frontend/package-lock.json` 固定；保持已有项目版本。
+技术基线：Node.js 24、Python 3.14、MySQL 8.4；依赖固定在 `backend/requirements.txt` 和 `frontend/package-lock.json`。当前机器已安装，无需重建环境。MySQL 服务为手动启动，重启电脑后如未运行，用服务管理器启动 `MySQL`。
 
-已有数据库配置与密钥已迁至项目根目录的 `.local/development.json`，该文件不提交 Git。启动脚本读取文件并设置进程环境变量；已有同名环境变量优先。`.local` 中的密码只用于当前电脑，不会进入仓库。新电脑首次配置可以复制下述结构并填写自己的值：
+当前项目目录为 `F:\codex_project\form_file_system`。虚拟环境含解释器的绝对路径，项目改名或移动后如 Python 启动失败，需重新定位环境，不能只移动目录。
+
+后端从 `.local/development.json` 加载进程配置，已有同名环境变量优先。其他设备自行配置，不复制本机密码：
 
 ```json
 {
-  "DJANGO_SECRET_KEY": "替换为本机生成的随机密钥",
+  "DJANGO_SECRET_KEY": "本机随机密钥",
   "DJANGO_DEBUG": "1",
   "DB_NAME": "form_system",
-  "DB_USER": "本机MySQL用户",
-  "DB_PASSWORD": "本机MySQL密码",
+  "DB_USER": "本机数据库用户",
+  "DB_PASSWORD": "本机数据库密码",
   "DB_HOST": "127.0.0.1",
   "DB_PORT": "3306"
 }
 ```
 
-MySQL 数据库必须先存在并采用 `utf8mb4`；业务表采用 InnoDB。本机配置的数据库用户需要开发数据库的建表和读写权限，测试时还需独立测试库的创建和删除权限。
+数据库须采用 `utf8mb4`、InnoDB。应用账号需要开发库建表及读写权限；运行测试还需要独立测试库 `test_form_system` 的创建/删除权限，不应使用其他业务库或管理员账号。
 
-初次安装依赖，在项目根目录执行：
+后端及前端代理默认使用 8000。本机该端口被占用，因此 `.local/development.json` 增加 `"BACKEND_PORT": "8001"`，`frontend/.env.local` 写入 `BACKEND_PORT=8001`；两份配置不提交，其他设备没有覆盖配置时仍使用 8000。
+
+仅在缺少依赖时执行下列安装步骤；uv/Python/npm 缓存放在 F 盘项目 `.local`，代理设置仅对当前进程生效：
 
 ```powershell
-py -3.14 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+$env:UV_CACHE_DIR = Join-Path $PWD '.local\uv-cache'
+$env:UV_PYTHON_INSTALL_DIR = Join-Path $PWD '.local\python'
+$env:HTTPS_PROXY = 'http://127.0.0.1:7890'
+$env:HTTP_PROXY = 'http://127.0.0.1:7890'
+uv python install 3.14 --no-bin --no-registry
+uv venv --python 3.14 .venv
+uv pip install --python .venv\Scripts\python.exe -r backend\requirements.txt
 cd frontend
-npm.cmd ci
+npm.cmd ci --cache ..\.local\npm-cache --proxy http://127.0.0.1:7890 --https-proxy http://127.0.0.1:7890
 cd ..
 ```
 
-当前电脑这些依赖已安装，无需重复创建环境。
+### 改名后修复虚拟环境
 
-## 启动
-
-在项目根目录打开一个 PowerShell 窗口：
+本机已用下列命令完成修复。在新项目根目录执行，沿用上方 uv 缓存目录设置；解释器路径以实际安装为准。若沙箱拒绝访问现有缓存，在普通用户 PowerShell 中执行，不修改缓存 ACL。
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 migrate --noinput
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1
+uv venv --allow-existing --python .local\python\cpython-3.14.6-windows-x86_64-none\python.exe .venv
+uv pip install --offline --reinstall --python .venv\Scripts\python.exe -r backend\requirements.txt
 ```
 
-另开一个 PowerShell 窗口启动前端：
+这会重新生成启动器并按原锁定版本重装依赖，保留 `.local` 配置和数据库。修复后执行下方 Django 检查，再用后端脚本的 `showmigrations changes` 确认迁移状态。
+
+## 启动与账号
+
+在项目根目录用 MSI 安装的 PowerShell 7 启动后端：
 
 ```powershell
-cd frontend
-npm.cmd run dev
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1
 ```
 
-浏览器打开 **http://localhost:5173**。前端通过 `/api` 代理访问本机 Django，登录使用会话 Cookie，所有写入保留 CSRF 校验。不要混用 `localhost` 与 `127.0.0.1` 作为前端地址。
+另开窗口，在 `frontend/` 执行 `npm.cmd run dev`，打开 **http://localhost:5173**。前端通过 `/api` 代理访问后端，写入保留 CSRF 校验；不要混用 localhost 与 127.0.0.1。端口占用时先核对已有服务。`-ExecutionPolicy Bypass` 仅用于这一进程。
 
-同一账号新登录会使其他数据库登录会话失效，应用登录和 Django 管理后台登录均执行这一规则。首次更新后请重新登录一次；同一浏览器的多个窗口共享 Cookie，仍属于一个会话。旧端再次请求时会被拒绝，未保存输入不会被自动清除；可先保留或复制输入，再重新登录。自动测试使用独立数据库；浏览器会话测试使用专用临时账号，避免踢掉演示账号。
+物料处置从正式申请详情的“物料明细”进入；升版／停用编辑抽屉内切换“物料信息／处置建议”，统一保存到数据库。原型已移除，`?preview=disposition` 不再提供内存样例。
 
-`-ExecutionPolicy Bypass` 仅用于启动脚本的这一进程，不会修改电脑永久执行策略。任一服务提示端口占用时，检查已有终端；同一项目已运行的服务可直接使用，不需再启动第二份。
+演示账号保存在 `.local/demo-accounts.json`：`applicant` 用于填报，`other` 用于用户隔离检查，`admin` 用于 Django 管理后台。本机 `demo_applicant` 已有原始 Excel 概述样例 #8，新申请仍为空草稿。
 
-## 演示账号
+需要其他账号时，用同一后端脚本执行 `createsuperuser`，再访问后端 `/admin/` 创建普通用户（默认 `http://127.0.0.1:8000/admin/`，本机为 8001）。单账号新登录会使其他独立会话失效；旧端未保存输入仍保留，应先复制内容再重登。人工测试使用演示账号，技术回归应使用独立测试账号。
 
-演示账号的用户名和随机密码保存在 `.local/demo-accounts.json`。第一个账号用于申请，其他账号用于检查用户隔离；账号名称不代表对应业务功能已实现。
+## 同步与迁移
 
-需要自行准备账号时，通过 Django 自带管理后台创建，不开发账号管理页面：
+PR #1 的既有记录为尚未合并，本批未查询远端；本批物料与处置代码通过 `codex/enforce-unique-change-numbers` 分支交付，其他设备须同步包含本批实现的代码。同步时明确检出包含物料实现的提交，保留原设备的 `.local` 和前端本机配置，勿覆盖数据库。
+
+先备份开发数据库并停止 Django 写入服务，再在根目录执行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 createsuperuser
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 migrate --noinput
 ```
 
-然后在 **http://127.0.0.1:8000/admin/** 登录，创建普通用户。业务申请者来自登录账号，CCB 负责人及设计负责人保留 Excel 中的文字填写方式。
+`0002_unique_numbers` 先按数据库排序规则检查重复非空编号，冲突时在 DDL 前停止并列出编号和申请 ID。由业务确认修正后重试，不自动删数据或改号。迁移回退只移除生成列和约束，申请数据保留，但唯一性保护也会失效。迁移完成后运行下列检查，再启动服务。
 
-## 检查与验收
+`0003_materialchange` 只新增三类物料表、申请外键及类别／Y/N 检查约束，不修改或预填已有申请。本机已应用；其他设备仍须执行迁移。后端若以 `--noreload` 运行，代码更新后必须重启，否则旧进程不会加载新增路由。
+
+`0004_materialchange_request_id_and_more` 新增可空 UUID `request_id` 及申请／UUID 组合唯一约束，旧物料的 UUID 为 NULL，业务字段保留。本机已应用；更新前端去重逻辑前须先部署迁移及后端，再更新前端。
+
+## 检查
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 check
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 test changes --noinput
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 check
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 makemigrations --check --dry-run
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 test changes --noinput
 cd frontend
 npm.cmd run lint
+npm.cmd run test:api
 npm.cmd run build
 ```
 
-自动测试使用独立 MySQL 数据库 `test_form_system`，测试后销毁。可以使用环境变量 `DB_TEST_NAME` 指定其他测试库，但必须与开发数据库不同；不使用 SQLite 替代测试。
+后端测试使用真实 MySQL 独立库 `test_form_system`，结束后销毁。`DB_TEST_NAME` 可覆盖测试库名，但不得与开发库同名（忽略大小写）；不使用 SQLite 替代。测试结果不能代替原设备验证或用户业务验收。
 
-浏览器人工验收按 [复验流程](testing/REVIEW-2026-09-30.md#人工复验流程)执行；反馈保存在本机 `docs/testing/manual`，截图放入其 `images`，完成状态只更新在 README。
-
-输入允许留空，草稿不执行完整提交必填校验；非法日期或过长的短文本会被拒绝。申请者、状态和时间由后端管理，不能通过保存请求修改。前端后台刷新不覆盖正在编辑的内容。
-
-跨窗口操作时保持 Cookie 和 CSRF 校验；发现保存错误先保留输入并核对反馈。已确认编号规则见 MVP，验收前先核对 README 中的实现状态。
-
-## 字段与边界
-
-概述字段依据 `docs/FIELD_MAP.md` 对应原表。页面按填写任务组织，不复制 Excel 的合并单元格布局；本批不会导入、导出或运行 Excel 宏。原始填写实例留在本机，用于核对，不加入代码提交。
-
-完整 [目录导航](../README.md#目录导航)只在 README 维护；本机密码文件及启动脚本保持原位置。
+`0005_materialdisposition` 新增处置表、物料外键、位置唯一约束及位置／处置值 CHECK；原申请和物料字段不改，不预填 NA。先执行迁移并重启后端，再使用更新后的正式页面。本机已应用。

@@ -15,10 +15,12 @@
 .section-heading h2, .section-heading p { margin-bottom: 0; }
 .section-heading p { margin-top: 6px; }
 .list-panel { padding: 24px; }
+.material-section { margin-bottom: 24px; }
 .overview-panel { padding: 30px 32px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
 .form-alert { margin-bottom: 20px; }
 .form-footer { border-top: 1px solid #edf1ee; padding-top: 22px; display: flex; align-items: center; justify-content: space-between; }
+.form-actions { display: flex; gap: 12px; }
 .save-status { font-size: 13px; color: #176b5b; white-space: nowrap; }
 .unsaved { color: #aa6f13; }
 .record-title { padding: 0; height: auto; white-space: normal; text-align: left; }

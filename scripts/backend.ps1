@@ -13,7 +13,8 @@ $pythonExecutable = Join-Path $projectRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $pythonExecutable)) {
     throw 'Project virtual environment is missing. See docs/DEVELOPMENT.md.'
 }
-[string[]]$djangoArguments = if ($args.Count -eq 0) { @('runserver', '127.0.0.1:8000') } else { @($args) }
+$backendPort = if ($env:BACKEND_PORT) { $env:BACKEND_PORT } else { '8000' }
+[string[]]$djangoArguments = if ($args.Count -eq 0) { @('runserver', "127.0.0.1:$backendPort") } else { @($args) }
 Push-Location (Join-Path $projectRoot 'backend')
 try {
     & $pythonExecutable manage.py @djangoArguments
