@@ -27,5 +27,6 @@ urlpatterns = [
     path('api/changes/', views.ChangeList.as_view()),
     path('api/changes/<int:pk>/', views.ChangeDetail.as_view()),
     path('api/changes/<int:pk>/materials/', views.MaterialList.as_view()),
+    path('api/changes/<int:pk>/questions/', views.QuestionList.as_view()),
     path('api/changes/<int:pk>/materials/<int:material_pk>/', views.MaterialDetail.as_view()),
 ]

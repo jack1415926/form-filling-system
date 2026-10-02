@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from .models import ChangeRequest, MaterialChange, MaterialDisposition
 from .dispositions import LOCATIONS, DISPOSITIONS
+from .questions import QUESTIONS
 
 NUMBER_ERRORS = {"ecr_no": "ECR 编号已存在，请使用其他编号。", "eco_no": "ECO 编号已存在，请使用其他编号。"}
 
@@ -61,6 +62,38 @@ class DispositionValueSerializer(serializers.Serializer):
     def to_internal_value(self, data):
         if not isinstance(data, dict) or set(data) - {"disposition", "remark"}:
             raise serializers.ValidationError("处置仅接受处置方式和备注。")
+        return super().to_internal_value(data)
+
+
+class QuestionValueSerializer(serializers.Serializer):
+    answer = serializers.ChoiceField(choices=["", "Y", "N"], required=False)
+    remark = serializers.CharField(required=False, allow_blank=True)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("回答必须是对象。")
+        forbidden = set(data) - {"answer", "remark"}
+        if forbidden:
+            raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
+        # CharField normally coerces numbers to strings; remarks must be text.
+        if "remark" in data and data["remark"] is not None and not isinstance(data["remark"], str):
+            raise serializers.ValidationError({"remark": "备注必须是文本。"})
+        return super().to_internal_value(data)
+
+
+class QuestionPatchSerializer(serializers.Serializer):
+    responses = serializers.DictField(child=QuestionValueSerializer(), allow_empty=True)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"detail": "请求内容必须是对象。"})
+        forbidden = set(data) - {"responses"}
+        if forbidden:
+            raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
+        if isinstance(data.get("responses"), dict):
+            invalid = set(data["responses"]) - {str(question["number"]) for question in QUESTIONS}
+            if invalid:
+                raise serializers.ValidationError({"responses": {key: "题号不合法。" for key in invalid}})
         return super().to_internal_value(data)
 
 

@@ -7,6 +7,13 @@ export type Overview = {
 export type ChangeRequest = Overview & {
   id: number; applicant: number; status: 'draft' | 'pending' | 'approved'; created_at: string; updated_at: string
 }
+export type QuestionAnswer = '' | 'Y' | 'N'
+export type Question = {
+  number: number; function: string; text: string
+  remark_hint: { answer: QuestionAnswer; text: string } | null
+  answer: QuestionAnswer; remark: string
+}
+export type QuestionData = { updated_at: string; questions: Question[] }
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) { super(message); this.status = status }

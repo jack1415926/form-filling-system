@@ -16,6 +16,9 @@
 .section-heading p { margin-top: 6px; }
 .list-panel { padding: 24px; }
 .material-section { margin-bottom: 24px; }
+.question-section { margin-bottom: 24px; }
+.question-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.question-hint { color: #945d0b; font-size: 13px; line-height: 1.6; margin: 8px 0 0; }
 .overview-panel { padding: 30px 32px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
 .form-alert { margin-bottom: 20px; }

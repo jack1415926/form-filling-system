@@ -5,6 +5,7 @@ import zhCN from 'antd/locale/zh_CN'
 import { api, ApiError, type ChangeRequest, type Overview, type User } from './api'
 import './App.css'
 import MaterialEditor from './MaterialEditor'
+import QuestionEditor from './QuestionEditor'
 
 const stateLabels = { draft: '草稿', pending: '待审批', approved: '已批准' }
 const stateColors = { draft: 'default', pending: 'gold', approved: 'green' }
@@ -65,13 +66,6 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onN
       message.success('草稿已保存')
     },
   })
-  useEffect(() => {
-    const handleUnload = (event: BeforeUnloadEvent) => {
-      if (dirty || save.isPending) { event.preventDefault(); event.returnValue = '' }
-    }
-    window.addEventListener('beforeunload', handleUnload)
-    return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [dirty, save.isPending])
   const changed = (values: Partial<Overview>) => {
     for (const key of Object.keys(values) as (keyof Overview)[]) changedFields.current.add(key)
     setDirty(true)
@@ -107,19 +101,27 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0]) {
   const [tab, setTab] = useState('overview')
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [materialOpen, setMaterialOpen] = useState(false)
   const { modal } = AntApp.useApp()
+  useEffect(() => {
+    const handleUnload = (event: BeforeUnloadEvent) => {
+      if (dirty || busy) { event.preventDefault(); event.returnValue = '' }
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [dirty, busy])
   const editorProps = { ...props,
     onDirty: (value: boolean) => { setDirty(value); props.onDirty(value) },
     onBusy: (value: boolean) => { setBusy(value); props.onBusy(value) },
   }
   const switchTab = (key: string) => {
-    if (busy || props.leaving || key === tab) return
+    if (busy || materialOpen || props.leaving || key === tab) return
     const change = () => { setDirty(false); props.onDirty(false); setTab(key); window.scrollTo({ top: 0 }) }
     if (!dirty) { change(); return }
     modal.confirm({ title: '切换前放弃未保存的修改？', okText: '放弃修改并切换', cancelText: '继续填写', onOk: change })
   }
-  return <><Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述', disabled: busy || props.leaving }, { key: 'materials', label: '物料明细', disabled: busy || props.leaving }]} />
-    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : <MaterialEditor {...editorProps} />}
+  return <><Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }].map((item) => ({ ...item, disabled: busy || materialOpen || props.leaving }))} />
+    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setMaterialOpen} onNext={() => switchTab('questions')} /> : <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} />}
   </>
 }
 
@@ -167,6 +169,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
   const refreshAfterRemoval = (id: number) => {
     queryClient.removeQueries({ queryKey: ['change', user.id, id] })
     queryClient.removeQueries({ queryKey: ['materials', user.id, id] })
+    queryClient.removeQueries({ queryKey: ['questions', user.id, id] })
     void queryClient.invalidateQueries({ queryKey: ['changes', user.id] })
   }
   const remove = useMutation({
@@ -199,7 +202,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
         {detail.error && <Alert type="error" showIcon title="申请信息刷新失败，当前填写内容仍保留" description={detail.error.message} className="form-alert" action={<Button loading={detail.isFetching} disabled={saving || exit.isPending} onClick={() => void detail.refetch()}>重试</Button>} />}
         <ChangeEditor key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending} onReauthenticate={() => setReauthenticate(true)} onBack={() => navigate(() => { setDirty(false); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData(['change', user.id, record.id], record); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
       </> : detail.isPending ? <Spin tip="正在读取草稿…"><div className="loading-space" /></Spin> : <Alert type="error" title={detail.error?.message ?? '无法读取申请。'} action={<><Button loading={detail.isFetching} disabled={exit.isPending} onClick={() => void detail.refetch()}>重试</Button><Button disabled={exit.isPending} onClick={() => { setSelectedId(null); setDirty(false) }}>返回列表</Button></>} />}
-      <footer className="workspace-footer"><span className="muted">当前提供概述及三类物料明细填写与保存，其他表单内容将在后续阶段开放。</span></footer>
+      <footer className="workspace-footer"><span className="muted">当前提供概述、物料及处置、问题评估的填写与保存，其他表单内容将在后续阶段开放。</span></footer>
     </main>
     <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} maskClosable={false} keyboard={!reauthBusy} onCancel={() => setReauthenticate(false)}>
       <p className="muted">使用原账号可继续当前填写；切换账号会关闭原申请。</p>
@@ -209,6 +212,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
         setReauthenticate(false)
         void queryClient.invalidateQueries({ queryKey: ['change', currentUser.id] })
         void queryClient.invalidateQueries({ queryKey: ['materials', currentUser.id] })
+        void queryClient.invalidateQueries({ queryKey: ['questions', currentUser.id] })
       }} />
     </Modal>
   </div>

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test:api": "node --test tests/api.test.mjs",
+    "test:questions": "node --test tests/question-draft.test.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

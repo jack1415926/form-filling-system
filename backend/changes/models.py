@@ -100,3 +100,19 @@ class MaterialDisposition(models.Model):
                 | models.Q(location_group="customer", location_item__in=[key for key, group in LOCATIONS.items() if group == "customer"])
             ), name="disposition_valid_location"),
         ]
+
+
+class QuestionResponse(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="question_responses")
+    number = models.PositiveSmallIntegerField()
+    answer = models.CharField(max_length=1, blank=True, choices=[("Y", "是"), ("N", "否")])
+    remark = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "question_response"
+        ordering = ["number"]
+        constraints = [
+            models.UniqueConstraint(fields=["change", "number"], name="question_unique_number"),
+            models.CheckConstraint(condition=models.Q(number__gte=1, number__lte=27), name="question_valid_number"),
+            models.CheckConstraint(condition=models.Q(answer__in=["", "Y", "N"]), name="question_valid_answer"),
+        ]
