@@ -1,15 +1,18 @@
-import { useState } from 'react'
+import { useImperativeHandle, useState, type Ref } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Input, Select, Spin, Table } from 'antd'
 import { api, type ChangeRequest, type Question, type QuestionAnswer, type QuestionData } from './api'
 import { questionPatch, saveResultUnconfirmed, type QuestionPatch } from './questionDraft'
+import type { SaveHandle } from './SaveBeforeSwitch'
 
 type Props = {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void
   onBack: () => void; onPrevious: () => void; leaving: boolean
+  onNext: () => void
+  saveRef?: Ref<SaveHandle>
 }
 
-function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, leaving }: Props & { data: QuestionData }) {
+function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNext, saveRef, leaving }: Props & { data: QuestionData }) {
   const [state, setState] = useState({ baseline: data, values: data, seen: data })
   const [unconfirmed, setUnconfirmed] = useState<QuestionPatch>({})
   const queryClient = useQueryClient()
@@ -37,11 +40,16 @@ function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, leavi
       setUnconfirmed({})
       onDirty(false)
       queryClient.setQueryData(['questions', record.applicant, record.id], result)
+      void queryClient.invalidateQueries({ queryKey: ['ecr-actions', record.applicant, record.id] })
       queryClient.setQueryData<ChangeRequest>(['change', record.applicant, record.id], (current) => current ? { ...current, updated_at: result.updated_at } : current)
       void queryClient.invalidateQueries({ queryKey: ['changes', record.applicant] })
       message.success('问题评估草稿已保存')
     },
   })
+  useImperativeHandle(saveRef, () => ({ save: async () => {
+    if (locked || save.isPending || leaving) throw new Error('当前不能保存')
+    if (dirty) await save.mutateAsync(responses)
+  } }))
   // Observe each fetched result once. A dirty draft keeps both its values and baseline.
   if (data !== state.seen) {
     const older = new Date(data.updated_at).getTime() < new Date(state.baseline.updated_at).getTime()
@@ -55,7 +63,7 @@ function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, leavi
   }
   const groups = [...new Set(state.values.questions.map((row) => row.function))]
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>问题评估</h1><p className="muted">未回答与否分别保存；缺少条件性理由时会提示，仍可保存草稿。</p></div><Button disabled={busy} onClick={onBack}>返回我的申请</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>问题评估</h1><p className="muted">未回答与否分别保存；缺少条件性理由时会提示，仍可保存草稿。</p></div><div className="form-actions"><Button type="primary" loading={save.isPending} disabled={locked || busy || !dirty} onClick={() => save.mutate(responses)}>保存草稿</Button><Button disabled={busy} onClick={onBack}>返回我的申请</Button></div></div>
     {locked && <Alert type="info" title="申请已锁定，问题评估仅供查看。" className="form-alert" />}
     {groups.map((group) => <section className="panel list-panel question-section" key={group}>
       <div className="section-heading"><h2>{group}</h2></div>
@@ -67,7 +75,7 @@ function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, leavi
       ]} />
     </section>)}
     {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
-    <div className="form-footer"><div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.isPending ? '正在保存…' : Object.keys(unconfirmed).length ? '上次保存结果未确认，请重试' : dirty ? '有未保存的修改' : '已保存'}</span><p className="muted">最近保存：{new Date(state.baseline.updated_at).toLocaleString('zh-CN', { hour12: false })}</p></div><div className="form-actions"><Button disabled={busy} onClick={onPrevious}>上一页</Button><Button type="primary" loading={save.isPending} disabled={locked || busy || !dirty} onClick={() => save.mutate(responses)}>保存草稿</Button></div></div>
+    <div className="form-footer"><div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.isPending ? '正在保存…' : Object.keys(unconfirmed).length ? '上次保存结果未确认，请重试' : dirty ? '有未保存的修改' : '已保存'}</span><p className="muted">最近保存：{new Date(state.baseline.updated_at).toLocaleString('zh-CN', { hour12: false })}</p></div><div className="form-actions"><Button disabled={busy} onClick={onPrevious}>上一页</Button><Button type="primary" loading={save.isPending} disabled={locked || busy || !dirty} onClick={() => save.mutate(responses)}>保存草稿</Button><Button disabled={busy} onClick={onNext}>下一页</Button></div></div>
   </>
 }
 

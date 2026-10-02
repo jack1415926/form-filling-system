@@ -14,6 +14,9 @@ export type Question = {
   answer: QuestionAnswer; remark: string
 }
 export type QuestionData = { updated_at: string; questions: Question[] }
+export type EcrValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable'; date: string | null }
+export type EcrAction = EcrValues & { id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
+export type EcrData = { updated_at: string; actions: EcrAction[] }
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) { super(message); this.status = status }

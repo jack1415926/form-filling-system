@@ -19,6 +19,17 @@
 .question-section { margin-bottom: 24px; }
 .question-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .question-hint { color: #945d0b; font-size: 13px; line-height: 1.6; margin: 8px 0 0; }
+.ecr-preview { max-width: 1360px; }
+.preview-questions { margin: 24px 0; }
+.preview-question { display: flex; align-items: center; gap: 24px; padding: 14px 0; border-top: 1px solid #edf1ee; }
+.preview-question > div:first-child { flex: 1; }
+.preview-question p { margin: 6px 0 0; line-height: 1.7; }
+.preview-source { margin-top: 6px; }
+.preview-summary { line-height: 1.7; }
+.preview-summary p { margin: 6px 0 0; color: #65756d; overflow-wrap: anywhere; }
+.preview-drawer label { display: block; margin: 22px 0 8px; }
+.preview-footer { margin-top: 24px; }
+@media (max-width: 760px) { .preview-toolbar { flex-wrap: wrap; } .preview-question { gap: 12px; } }
 .overview-panel { padding: 30px 32px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
 .form-alert { margin-bottom: 20px; }

@@ -12,25 +12,26 @@
 
 ## 业务上目前走到了哪里
 
-目标是把指定八张表的内容搬到网页，最终支持多人并行审批和留言；完整目标在 [MVP](MVP.md)。当前“概述与物料处置”和“问题评估”的主要填写链路已落地，问题评估待业务复核。
+目标是把指定八张表的内容搬到网页，最终支持多人并行审批和留言；完整目标在 [MVP](MVP.md)。当前“概述与物料处置”“问题评估”和“ECR 评估行动”的主要填写链路已落地，当前版本待业务复核。
 
-当前操作：登录 → 我的申请 → 新建／打开草稿 → 填写概述 → 物料及处置 → 问题评估 → 保存 → 重开恢复。
+当前操作：登录 → 我的申请 → 新建／打开草稿 → 填写概述 → 物料及处置 → 问题评估 → ECR 评估 → 保存 → 重开恢复。
 
-**三个网页页签对应两张 Excel 表。** 概述与物料明细属于同一张原工作表，“问题评估”对应第二张“问题”表。
+**四个网页页签对应三张 Excel 表。** 概述与物料明细属于同一张原工作表，“问题评估”对应第二张“问题”表，第四页签对应第三张 ECR 表。
 
 原业务主线是概述与物料 → 问题筛查 → ECR 评估 → 执行计划 → ECO 执行确认；EMC 参考和实质性变更评估按适用条件参与。不能把 ECR 评估完成当作 ECO 行动完成，也不能自动代替人的法规结论。
 
 Model 中虽已有 draft／pending／approved 三个状态，但**当前没有提交或批准接口**。网页新建的是草稿；非草稿只读及后端拒绝修改是已有保护，不代表审批功能已经完成。
 
-当前本机样例：申请 #8，ECR-26010601，包含源表概述、33 条停用物料和 330 个处置值。新草稿仍为空；该样例是一次性补录，没有新增通用 Excel 导入功能，也不会随 Git 克隆到别的设备。
+当前本机样例：申请 #8，ECR-26010601，包含源表概述、33 条停用物料、330 个处置值，以及一次性补录的27题和31条ECR填写。用户后续可以继续修改，原Excel不是实时同步源。新草稿仍为空；没有通用导入功能，样例不会随 Git 克隆到别的设备。
 
-## 先理解四个业务表
+## 先理解五个业务表
 
 ```mermaid
 erDiagram
     CHANGE_REQUEST ||--o{ MATERIAL_CHANGE : contains
     MATERIAL_CHANGE ||--o{ MATERIAL_DISPOSITION : has
     CHANGE_REQUEST ||--o{ QUESTION_RESPONSE : has
+    CHANGE_REQUEST ||--o{ ECR_ACTION_RESPONSE : has
 ```
 
 | 实际表 | 保存什么 | 为什么分开 |
@@ -39,12 +40,13 @@ erDiagram
 | material_change | 三类物料、料号、版本、描述、分类、标记及变更内容 | 一项申请可以有很多条物料 |
 | material_disposition | 物料关联、位置分组、具体位置、处置方式及备注 | 同一物料在不同位置有不同处理方式 |
 | question_response | 申请关联、题号、回答和备注 | 固定题干统一配置，每项申请仅保存填写结果 |
+| ecr_action_response | 申请、稳定行动标识、负责人、结果、状态及日期 | 一题可对应多条行动，固定文字共用配置，不在申请中重复存储 |
 
 物料／位置组合唯一；三大分组不是三张表。网页的十个位置都能显示，但只有填了处置或备注的位置才需要一条记录；两个格都清空时删除该位置记录。“未填写”和明确选择 NA 是不同数据。
 
 编号和版本用文本保存，避免 `000003151` 变成数字后丢失前导零。ECR 与 ECO 分别全局唯一，空编号允许多个；物料号没有全局唯一规则，不能用它判断一次新增是否重复。
 
-申请删除会通过外键级联删除物料、处置及问题回答；只允许本人草稿，操作不可恢复。Django 的用户和会话表属于系统表，和这四个业务表职责不同。
+申请删除会通过外键级联删除物料、处置、问题回答及 ECR 填写；只允许本人草稿，操作不可恢复。Django 的用户和会话表属于系统表，和这五个业务表职责不同。
 
 ### Model、migration、serializer 各负责什么
 
@@ -53,7 +55,7 @@ erDiagram
 - **serializer**：HTTP 输入是否合法、哪些字段能改、怎样把对象转为 JSON，见 [serializers.py](../backend/changes/serializers.py)。接口校验不能替代数据库唯一约束。
 - **view**：谁能访问、申请状态是否允许操作、什么时候开启事务和拿行锁，见 [views.py](../backend/changes/views.py)。
 
-当前迁移链：0001 申请表 → 0002 编号唯一 → 0003 物料表 → 0004 新增请求 UUID → 0005 处置表 → 0006 问题回答表。不同设备必须执行各自的迁移；Git 同步不包含数据库升级。
+当前迁移链：0001 申请表 → 0002 编号唯一 → 0003 物料表 → 0004 新增请求 UUID → 0005 处置表 → 0006 问题回答表 → 0007 ECR 行动填写表。不同设备必须执行各自的迁移；Git 同步不包含数据库升级。
 
 ## 代码地图：想改什么，先找哪里
 
@@ -64,12 +66,15 @@ erDiagram
 | [frontend/src/MaterialEditor.tsx](../frontend/src/MaterialEditor.tsx) | 物料列表、筛选、新增／编辑／删除；内部 MaterialForm 管理表单、局部修改及统一保存 |
 | [frontend/src/DispositionFields.tsx](../frontend/src/DispositionFields.tsx) | 三组十位置的处置控件，不直接发请求 |
 | [frontend/src/QuestionEditor.tsx](../frontend/src/QuestionEditor.tsx) | 七组问题表格、局部保存、基线对比、失败与刷新保护 |
+| [frontend/src/EcrEditor.tsx](../frontend/src/EcrEditor.tsx)／[ecrDraft.ts](../frontend/src/ecrDraft.ts) | 正式 ECR 列表与单条抽屉；干净读取更新字段和基线，脏输入与待确认结果保持 |
+| [frontend/src/SaveBeforeSwitch.tsx](../frontend/src/SaveBeforeSwitch.tsx) | 保存并切换确认；保存成功才导航，等待时互斥，失败保留当前页 |
 | [frontend/src/api.ts](../frontend/src/api.ts) | TypeScript 数据类型、fetch、当前 Cookie 的 CSRF、预期账号头、错误转换和身份变化事件 |
 | [backend/backend/urls.py](../backend/backend/urls.py) | URL 对应哪个处理函数或 view |
 | [backend/backend/settings.py](../backend/backend/settings.py) | MySQL、SessionAuthentication、默认权限、本机环境变量 |
 | [backend/changes/permissions.py](../backend/changes/permissions.py) | 检查页面预期账号与当前认证账号是否一致；不授予额外权限 |
 | [backend/changes/dispositions.py](../backend/changes/dispositions.py) | 后端固定位置和处置选项 |
 | [backend/changes/questions.py](../backend/changes/questions.py) | 后端固定题号、题干、职能和条件性理由提示 |
+| [backend/changes/ecr_actions.json](../backend/changes/ecr_actions.json)／[ecr.py](../backend/changes/ecr.py) | 61 条固定行动、来源问题和职能；后端与演示共用定义 |
 | [backend/changes/signals.py](../backend/changes/signals.py) | 登录后使同账号的旧数据库会话失效；由 apps.py 注册 |
 | [scripts/backend.ps1](../scripts/backend.ps1) | 加载本机配置并调用 manage.py，启动或执行检查 |
 
@@ -140,8 +145,12 @@ sequenceDiagram
 | 测试精简 | 53 个方法合为 51 个，复用公共用户、仅测试快速哈希 | 保留业务断言，减少准备成本；[计时对照](testing/TEST-SIMPLIFICATION-2026-10-02.md) |
 | GitHub 合并 | 功能提交 356d590；PR #1 合并提交 3f62f00 | main 已含上述代码；合并不代表数据库同步、业务验收或生产部署 |
 | 问题评估 | 27 题、七个职能分组、局部保存恢复及条件提示 | 第 13 题保留综合回答，理由缺失不阻断草稿；[问题页验证](testing/QUESTIONS-2026-10-02.md)；分支交付及 main 合并状态见 README |
+| ECR 布局选择及接入 | A/B 比较后选 A，加入真实数据库与第四页签 | 布局选择和数据库接入分别验证；[预览历史](testing/ECR-PREVIEW-2026-10-02.md)、[正式接入](testing/ECR-INTEGRATION-2026-10-02.md) |
+| 两页源表补录与筛选调整 | #8 补录27题与31条ECR；默认仅当前触发 | 未触发时隐藏但保留内容，全部行动仍可查看；日期／状态保留源含义 |
+| 保存导航与顶部保存 | 概述／问题页保存并切换；问题页顶部保存 | 不增加自动保存；[导航验证](testing/SAVE-AND-SWITCH-2026-10-02.md) |
+| ECR 抽屉刷新修复 | 干净抽屉与列表一致，脏表单保留原基线 | 部分更新不把旧负责人误当成修改；[刷新验证](testing/ECR-DRAWER-REFRESH-2026-10-02.md) |
 
-历史日志中各批测试数量都是当时结果，不是互相矛盾。当前计数以 README 为准；问题页新增 10 项后端测试，本批已运行全量检查。
+历史日志中各批测试数量都是当时结果，不是互相矛盾。当前计数以 README 为准；问题页新增10项后端测试，ECR新增7项，当前后端68项、前端12项。
 
 ## 日常开发流程：一次只完成一小批
 
@@ -174,7 +183,7 @@ sequenceDiagram
 | 可填写内容 | 未回答／是／否和备注；未回答不能自动转成否；草稿可暂不填完整 |
 | 条件提示 | 第 5、13、14 题选否且备注为空时提示说明理由，允许保存草稿；第 13 题不拆分 |
 | 数据设计 | 沿用原设计的 question_response，与申请关联；题号、回答、备注，同申请／题号唯一；题干与职能固定配置，不逐申请重复存储 |
-| 导航 | 物料页增加下一页到问题评估，问题页提供上一页及保存；不提供指向尚未实现 ECR 页面的虚假入口 |
+| 导航 | 物料下一页到问题，问题上一页／下一页连接物料及真实ECR；概述和问题可保存并切换，问题顶部及底部都能保存 |
 | 保护 | 沿用预期账号、本人申请、非草稿只读、局部保存、申请锁、级联删除及失败保留输入 |
 | 不做 | ECR/ECO 行动生成、执行计划、EMC／F 页面、审批、留言、导出、模板版本及通用规则引擎 |
 
@@ -184,7 +193,15 @@ sequenceDiagram
 
 验收点：题目完整、三种回答状态有区别、备注正确恢复、单题改动不覆盖其他题、其他账号不能访问、非草稿不能修改、失败保留输入。27 题不需要机械增加 27 个测试方法，可用一项完整性检查加有意义的参数化场景；独立的权限／事务回归不能因此删除。
 
-完成并复核这一小批后，再单独开展 ECR 评估行动页；不要把问题回答为否直接解释成删除已填行动。
+ECR 已按选定的 A 版正式接入，技术验证见 [接入记录](testing/ECR-INTEGRATION-2026-10-02.md)，用户业务复核待完成；之后再单独规划 ECO。不要把问题回答为否直接解释成删除已填行动。
+
+## ECR 当前规则与后续待办
+
+正式页只使用已保存的问题答案。默认“当前触发”仅显示回答是的行动，否／未回答隐藏，不删除填写；全部行动可查看和编辑。每条固定行动有独立稳定标识，一题对应多条，不能按题号去重。负责人是业务文字，评估结果、完成／不适用状态及日期由人填写，不自动执行题干中的审批或法规步骤。
+
+干净抽屉在重登／读取刷新后同步最新字段及基线；未保存、保存中、结果未确认时保持输入和原基线。源表补录不属于通用导入。独立预览仍是内存演示，正式登录后的第四页签才会写数据库。
+
+先复核当前ECR联动、源字段和保存恢复，再分批规划ECO及其余工作表。自动保存已列入README待办，仍未启用；实施前确定页面范围、保存时机、请求串行、错误重试及联动时机，不将未保存提醒当作异常退出恢复。
 
 ## 以后怎样维护这些文档
 

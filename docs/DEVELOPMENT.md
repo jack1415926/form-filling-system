@@ -64,7 +64,7 @@ uv pip install --offline --reinstall --python .venv\Scripts\python.exe -r backen
 
 物料处置从正式申请详情的“物料明细”进入；升版／停用编辑抽屉内切换“物料信息／处置建议”，统一保存到数据库。原型已移除，`?preview=disposition` 不再提供内存样例。
 
-演示账号保存在 `.local/demo-accounts.json`：`applicant` 用于填报，`other` 用于用户隔离检查，`admin` 用于 Django 管理后台。本机 `demo_applicant` 的申请 #8 已有源表概述、33 条停用物料及 330 个处置值；这是一项本机样例，不是默认初始化数据，新申请仍为空草稿。
+演示账号保存在 `.local/demo-accounts.json`：`applicant` 用于填报，`other` 用于用户隔离检查，`admin` 用于 Django 管理后台。本机 `demo_applicant` 的申请 #8 已按要求补录源表概述、33 条物料、330 个处置值、27题及31条ECR填写；之后用户可继续修改，不与源Excel实时同步。样例及配置不随Git复制，新申请仍为空草稿。
 
 需要其他账号时，用同一后端脚本执行 `createsuperuser`，再访问后端 `/admin/` 创建普通用户（默认 `http://127.0.0.1:8000/admin/`，本机为 8001）。单账号新登录会使其他独立会话失效；旧端未保存输入仍保留，可在页头或物料抽屉点击重新登录；使用原账号继续填写，切换账号会关闭原申请。人工测试使用演示账号，技术回归应使用独立测试账号。
 
@@ -90,6 +90,8 @@ PR #1 已合并，其他设备可从 `main` 同步包含本批实现的代码；
 
 ## 检查
 
+`0007_ecractionresponse` 新增 ECR 行动填写表，申请／行动标识唯一及行动／状态 CHECK；不修改旧业务字段，不预填样例。本机已备份并应用，其他设备仍须备份、停写、迁移并重启后端。正式 ECR 在登录后的第四个页签，通过真实接口保存，不使用演示数据；局部测试为 `test changes.test_ecr`。MySQL 手动启动方式保留。
+
 ```powershell
 & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 check
 & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 makemigrations --check --dry-run
@@ -98,6 +100,8 @@ cd frontend
 npm.cmd run lint
 npm.cmd run test:api
 npm.cmd run test:questions
+npm.cmd run test:ecr-preview
+npm.cmd run test:ecr-draft
 npm.cmd run build
 ```
 
@@ -110,3 +114,7 @@ npm.cmd run build
 布局／文案改动主要运行前端 lint/build；接口、权限、事务和迁移改动运行受影响后端测试，一批交付或合并前再运行全量。保留独立 MySQL 库、CSRF 和权限检查，不以减少测试数量为目标。计时基准见 [测试精简记录](testing/TEST-SIMPLIFICATION-2026-10-02.md)。
 
 问题页保存状态修改还需运行 `test:questions`，使用 Node 原生测试检查局部 PATCH、结果未确认时恢复原值和失败分类；刷新／关闭与实际组件的重试流程另做浏览器回归，不能用这些纯逻辑测试代替。
+
+概述／问题页有未保存内容时切换页签，可选择“继续填写”“放弃修改并切换”或“保存并切换”；第三项复用当前页的校验及保存，成功才切页，失败留在原页。问题页顶部也可直接保存，无需滚到最底部。本次没有启用自动保存；刷新／关闭仍依靠未保存保护。
+
+ECR 内存演示仍可访问 `http://localhost:5173/?preview=ecr`，不需要登录、MySQL 或后端，刷新恢复初始场景。正式填写请使用无查询参数的网站入口并登录，进入申请的 ECR 评估页签。`test:ecr-preview` 检查共用固定行动、演示联动及单条保存逻辑；正式接口验证见 [接入记录](testing/ECR-INTEGRATION-2026-10-02.md)。

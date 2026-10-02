@@ -1,7 +1,7 @@
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
-from .models import ChangeRequest, MaterialChange, MaterialDisposition
+from .models import ChangeRequest, MaterialChange, MaterialDisposition, EcrActionResponse
 from .dispositions import LOCATIONS, DISPOSITIONS
 from .questions import QUESTIONS
 
@@ -78,6 +78,23 @@ class QuestionValueSerializer(serializers.Serializer):
         # CharField normally coerces numbers to strings; remarks must be text.
         if "remark" in data and data["remark"] is not None and not isinstance(data["remark"], str):
             raise serializers.ValidationError({"remark": "备注必须是文本。"})
+        return super().to_internal_value(data)
+
+
+class EcrActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EcrActionResponse
+        fields = ["owner", "result", "status", "date"]
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"detail": "请求内容必须是对象。"})
+        forbidden = set(data) - set(self.Meta.fields)
+        if forbidden:
+            raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
+        for field in ("owner", "result"):
+            if field in data and data[field] is not None and not isinstance(data[field], str):
+                raise serializers.ValidationError({field: "必须是文本。"})
         return super().to_internal_value(data)
 
 

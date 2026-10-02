@@ -90,6 +90,12 @@ PATCH 接受 `{"responses":{"5":{"answer":"N","remark":"理由"}}}`，题号键�
 
 ### 其他工作表关系（后续）
 
+ECR 已正式接入：固定定义存于 `backend/changes/ecr_actions.json`，61 条完整行动与源 ECR!A3:C63 及主清单一致，独立标识 ecr_001—ecr_061 与来源问题号分开。后端和演示共用该配置；数据库 `ecr_action_response` 仅保存所属申请、行动标识、owner、result、status、date。
+
+GET `/api/changes/{id}/ecr-actions/` 返回 `{updated_at, actions}`，每项含 id、number、function、text、question_answer 和四个填写字段。question_answer 从已保存问题回答计算，不由客户端填写；默认未回答、文字为空、日期 null。按用户最新选择，页面默认只显示来源问题为是的行动；否或未回答时隐藏，已有填写保留，再次触发时恢复显示。全部列表允许查看和填写未触发行动，不自动把否解释为不适用。
+
+PATCH `/api/changes/{id}/ecr-actions/{action_key}/` 仅允许 owner、result、status、date。负责人短文本最多 255，评估结果多行长文本；status 为空／completed／not_applicable，日期为 ISO 日期或 null。省略字段保持原值，文字空字符串及日期 null 用于清空；全部空时删填写记录，固定行动定义保留。无变化不更新申请时间。校验、归属、CSRF、预期账号及草稿状态沿用现有保护，读取及写入均在申请行锁事务中完成；返回完整列表，重复重试不增加记录。
+
 ECR/ECO 行动的负责人文字与系统审批人名单分别处理，不把原表负责人自动映射为账号。执行计划保持固定活动及填写结果分离；F 主子表保留题目标识、适用性、回答、原因、下一步和结论的对应关系。
 
 ## 隐藏辅助表与规则来源

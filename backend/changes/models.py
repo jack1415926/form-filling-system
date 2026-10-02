@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models.functions import NullIf
 from .dispositions import LOCATIONS, DISPOSITIONS
+from .ecr import ECR_ACTION_IDS
 
 
 class ChangeRequest(models.Model):
@@ -115,4 +116,21 @@ class QuestionResponse(models.Model):
             models.UniqueConstraint(fields=["change", "number"], name="question_unique_number"),
             models.CheckConstraint(condition=models.Q(number__gte=1, number__lte=27), name="question_valid_number"),
             models.CheckConstraint(condition=models.Q(answer__in=["", "Y", "N"]), name="question_valid_answer"),
+        ]
+
+
+class EcrActionResponse(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="ecr_responses")
+    action_key = models.CharField(max_length=7)
+    owner = models.CharField(max_length=255, blank=True)
+    result = models.TextField(blank=True)
+    status = models.CharField(max_length=16, blank=True, choices=[("completed", "完成"), ("not_applicable", "不适用")])
+    date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ecr_action_response"
+        constraints = [
+            models.UniqueConstraint(fields=["change", "action_key"], name="ecr_unique_action"),
+            models.CheckConstraint(condition=models.Q(action_key__in=ECR_ACTION_IDS), name="ecr_valid_action"),
+            models.CheckConstraint(condition=models.Q(status__in=["", "completed", "not_applicable"]), name="ecr_valid_status"),
         ]
