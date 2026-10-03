@@ -23,7 +23,7 @@
 
 当前检查记录：**86 项真实 MySQL 测试、24 项前端检查、lint/build 及迁移一致性通过**。后端全量结果来自 EMC 接入；本轮仅修改前端，未重复执行 MySQL 测试。两项早期审查问题已修复：不完整日期提示并阻止保存，明确清除才提交空日期；旧保存响应不覆盖新行动缓存或申请时间。最新四项状态同步问题也已修复，八组受控浏览器回归通过，见 [状态同步修复](docs/testing/STATE-SYNC-FIXES-2026-10-03.md)。EMC正式接入新增9项后端检查；演示检查替换为正式草稿检查，计数变化不表示业务断言被简单删除。独立 MySQL 测试库创建并销毁，接入时执行 16.223 秒；不把耗时当作固定保证。ECR 源表／主清单复核和 ECO 接入证据见 [本轮记录](docs/testing/ECR-ECO-2026-10-02.md)。ECR 干净抽屉刷新同步新字段和基线，脏输入／保存中／待确认状态仍受保护，见 [刷新修复](docs/testing/ECR-DRAWER-REFRESH-2026-10-02.md)。前端仍有包体积警告，本机已应用至 `0009_emc_reference`。真实接入验证见 [接入记录](docs/testing/ECR-INTEGRATION-2026-10-02.md)，技术检查不能代替业务复核。
 
-[PR #1](https://github.com/jack1415926/form-filling-system/pull/1) 已合并到 `main`，合并提交 `3f62f00`，功能提交 `356d590`。问题页批次提交为 `46058b4`。问题评估、ECR 正式接入、保存导航、ECO、EMC 正式填写及审查修复均通过 `codex/enforce-unique-change-numbers` 分支交付，**尚未合并到 `main`**，不属于上述 PR #1 的已合并代码。数据库、本机样例与配置不随代码推送。
+[PR #1](https://github.com/jack1415926/form-filling-system/pull/1) 已合并到 `main`，合并提交 `3f62f00`，功能提交 `356d590`。问题评估、ECR 正式接入、保存导航、ECO、EMC 正式填写及审查修复通过 [PR #2](https://github.com/jack1415926/form-filling-system/pull/2) 交付，合并状态以 PR 页面为准；不属于 PR #1 的交付范围。其他环境更新本批代码前须先备份、停写并应用 `0006`—`0009` 迁移，再重启后端并使用新版前端，详见 [开发说明](docs/DEVELOPMENT.md)。数据库、本机样例与配置不随代码推送。
 
 ## 下一步
 
