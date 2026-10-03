@@ -31,22 +31,40 @@ export function formatApiErrors(value: unknown, path = ''): string[] {
 }
 
 export async function api<T>(path: string, method = 'GET', body?: unknown, expectedUserId?: number): Promise<T> {
+  const controller = new AbortController()
+  const timeoutError = new ApiError(0, method === 'GET'
+    ? '读取超时，请检查连接后重试。'
+    : '请求超时，保存结果未确认。请保留填写内容后重试。')
+  let timer: ReturnType<typeof setTimeout>
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => { reject(timeoutError); controller.abort() }, 30_000)
+  })
+  try {
+    // The deadline also covers CSRF acquisition and a stalled response body.
+    return await Promise.race([request<T>(path, method, body, expectedUserId, controller.signal), deadline])
+  } finally { clearTimeout(timer!) }
+}
+
+async function request<T>(path: string, method: string, body: unknown, expectedUserId: number | undefined, signal: AbortSignal): Promise<T> {
   let csrfToken = ''
   if (method !== 'GET') {
     const cookie = document.cookie.split('; ').find((value) => value.startsWith('csrftoken='))
     csrfToken = cookie ? decodeURIComponent(cookie.slice('csrftoken='.length)) : ''
-    if (!csrfToken) csrfToken = (await api<{ csrfToken: string }>('/api/auth/csrf/')).csrfToken
+    if (!csrfToken) csrfToken = (await request<{ csrfToken: string }>('/api/auth/csrf/', 'GET', undefined, undefined, signal)).csrfToken
   }
+  signal.throwIfAborted()
   let response: Response
   try {
     response = await fetch(path, {
-      method, credentials: 'same-origin',
+      method, credentials: 'same-origin', signal,
       headers: { 'Content-Type': 'application/json', ...(method !== 'GET' ? { 'X-CSRFToken': csrfToken } : {}), ...(expectedUserId !== undefined ? { 'X-Expected-User': String(expectedUserId) } : {}) },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     })
   } catch { throw new ApiError(0, '无法连接服务器，请检查连接后重试。填写内容仍保留。') }
+  signal.throwIfAborted()
   if (method === 'DELETE' && response.status === 204) return undefined as T
   const data = await response.json().catch(() => null)
+  signal.throwIfAborted()
   if (!response.ok) {
     if (data?.code === 'account_changed') window.dispatchEvent(new Event('account-changed'))
     if (response.status === 401 || (response.status === 403 && data?.detail && !String(data.detail).includes('CSRF'))) {

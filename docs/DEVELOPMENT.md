@@ -90,7 +90,9 @@ PR #1 已合并，其他设备可从 `main` 同步包含本批实现的代码；
 
 `0008_ecoactionresponse` 新增独立 ECO 填写表及申请／行动唯一、合法行动与状态约束；不修改既有业务数据、不复制源实例。本机已备份、停写并应用，旧业务表逐字段保持。其他设备仍须先备份、停写、迁移、重启后端再更新页面。第五个页签为 ECO 执行，ECR 下一页进入；新状态为“在实施阶段完成”，局部测试 `test changes.test_eco`。
 
-`0009_emc_reference` 新增EMC参考、行、测试列、交叉格四表及归属约束；没有数据预填。本机已备份、停写并应用，六张旧业务表逐字段保持。其他设备先备份、停写、迁移、重启后端再使用第六页签。当前只有本人填写，管理员维护与审核待办；局部测试 `test changes.test_emc`。不执行早期A/B SQL草案来重复建表，实际SQL导出见 `docs/design/sql/emc-current.sql`。
+`0009_emc_reference` 新增EMC参考、行、测试列、交叉格四表及归属约束；没有数据预填。本机已备份、停写并应用，六张旧业务表逐字段保持。其他设备先备份、停写、迁移、重启后端再使用第六页签。当前只有本人填写，全站审核员功能纳入后续 MVP，管理员定义与规则维护暂不纳入 MVP；局部测试 `test changes.test_emc`。不执行早期A/B SQL草案来重复建表，实际SQL导出见 `docs/design/sql/emc-current.sql`。
+
+`0010_executionplanresponse` 新增执行计划填写表、申请／活动唯一、二进制活动标识及日期顺序约束，没有预填或修改旧业务数据。本机已备份、停写并应用，旧十张表逐字段一致；其他设备仍须备份、停写、迁移并重启后端。第七页签在 EMC 后，通过 EMC 下一页进入；专项 `test changes.test_execution_plan`，记录见 [执行计划](testing/EXECUTION-PLAN-2026-10-03.md)。
 
 ## 检查
 
@@ -103,6 +105,9 @@ PR #1 已合并，其他设备可从 `main` 同步包含本批实现的代码；
 cd frontend
 npm.cmd run lint
 npm.cmd run test:api
+npm.cmd run test:form-draft
+npm.cmd run test:autosave
+npm.cmd run test:execution-plan
 npm.cmd run test:questions
 npm.cmd run test:ecr-preview
 npm.cmd run test:ecr-draft
@@ -122,6 +127,6 @@ npm.cmd run build
 
 问题页保存状态修改还需运行 `test:questions`，使用 Node 原生测试检查局部 PATCH、结果未确认时恢复原值和失败分类；刷新／关闭与实际组件的重试流程另做浏览器回归，不能用这些纯逻辑测试代替。
 
-概述／问题页有未保存内容时切换页签，可选择“继续填写”“放弃修改并切换”或“保存并切换”；第三项复用当前页的校验及保存，成功才切页，失败留在原页。问题页顶部也可直接保存，无需滚到最底部。本次没有启用自动保存；刷新／关闭仍依靠未保存保护。
+概述／问题页有未保存内容时切换页签，可选择“继续填写”“放弃修改并切换”或“保存并切换”；第三项复用当前页的校验及保存，成功才切页，失败留在原页。问题页顶部也可直接保存，无需滚到最底部。七页自动保存现已启用，范围、2 秒停顿、失败重试与首次物料手动创建见 [README](../README.md#待办)；刷新／关闭仍保留未保存保护，不具备本地异常退出恢复。
 
 ECR 内存演示仍可访问 `http://localhost:5173/?preview=ecr`，不需要登录、MySQL 或后端，刷新恢复初始场景。正式填写请使用无查询参数的网站入口并登录，进入申请的 ECR 评估或 ECO 执行页签。`test:ecr-preview` 检查共用固定行动、演示联动及单条保存逻辑；正式接口验证见 [接入记录](testing/ECR-INTEGRATION-2026-10-02.md)。

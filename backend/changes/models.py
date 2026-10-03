@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from .execution_plan import PLAN_ACTIVITY_IDS
 from django.db.models.functions import NullIf
 from .dispositions import LOCATIONS, DISPOSITIONS
 from .ecr import ECR_ACTION_IDS
@@ -151,6 +152,23 @@ class EcoActionResponse(models.Model):
             models.UniqueConstraint(fields=["change", "action_key"], name="eco_unique_action"),
             models.CheckConstraint(condition=models.Q(action_key__in=ECO_ACTION_IDS), name="eco_valid_action"),
             models.CheckConstraint(condition=models.Q(status__in=["", "completed", "not_applicable", "implementation_stage"]), name="eco_valid_status"),
+        ]
+
+
+class ExecutionPlanResponse(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="execution_plan_responses")
+    activity_key = models.CharField(max_length=8, db_collation="utf8mb4_bin")
+    owner = models.CharField(max_length=255, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    remark = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "execution_plan_response"
+        constraints = [
+            models.UniqueConstraint(fields=["change", "activity_key"], name="plan_unique_activity"),
+            models.CheckConstraint(condition=models.Q(activity_key__in=PLAN_ACTIVITY_IDS), name="plan_valid_activity"),
+            models.CheckConstraint(condition=models.Q(start_date__isnull=True) | models.Q(end_date__isnull=True) | models.Q(end_date__gte=models.F("start_date")), name="plan_date_order"),
         ]
 
 

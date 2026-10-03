@@ -11,8 +11,11 @@ import EcrPreview from './EcrPreview'
 import EmcEditor from './EmcEditor'
 import EcrEditor from './EcrEditor'
 import EcoEditor from './EcoEditor'
+import ExecutionPlanEditor from './ExecutionPlanEditor'
 import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
-import { newestResponse, refreshBaseline } from './latestResponse'
+import { newestResponse } from './latestResponse'
+import useAutosave, { discardSavedWarning } from './useAutosave'
+import { overviewFields } from './autosaveFields'
 
 const stateLabels = { draft: '草稿', pending: '待审批', approved: '已批准' }
 const stateColors = { draft: 'default', pending: 'gold', approved: 'green' }
@@ -45,54 +48,33 @@ function Login({ onLogin, compact = false, onBusy }: { onLogin: (user: User) => 
   </div>
 }
 
-function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onNext, saveRef }: {
+function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onNext, saveRef, paused = false }: {
   record: ChangeRequest; onDirty: (dirty: boolean) => void; onSaved: (record: ChangeRequest) => void; onBack: () => void; onBusy: (busy: boolean) => void; leaving: boolean; onReauthenticate: () => void; onNext?: () => void
-  saveRef?: Ref<SaveHandle>
+  saveRef?: Ref<SaveHandle>; paused?: boolean
 }) {
   const [form] = Form.useForm<Overview>()
-  const [baseline, setBaseline] = useState(record)
-  const [dirty, setDirty] = useState(false)
   const [dateInvalid, setDateInvalid] = useState(false)
-  const changedFields = useRef(new Set<keyof Overview>())
   const queryClient = useQueryClient()
-  const { message } = AntApp.useApp()
   const locked = record.status !== 'draft'
-  const save = useMutation({
-    onError: () => { message.error('保存失败，填写内容仍保留') },
-    onMutate: () => onBusy(true),
-    onSettled: () => onBusy(false),
-    mutationFn: (values: Overview) => {
-      const patch: Partial<Overview> = Object.fromEntries([...changedFields.current].map((key) => [key, values[key] ?? '']))
-      if ('planned_eco_date' in patch) patch.planned_eco_date = patch.planned_eco_date || null
-      return api<ChangeRequest>('/api/changes/' + record.id + '/', 'PATCH', patch, record.applicant)
-    },
-    onSuccess: (result) => {
+  const save = useAutosave({
+    fields: overviewFields(record), enabled: !locked && !leaving, valid: !dateInvalid, paused, onDirty, onBusy,
+    send: async (patch) => {
+      try { await form.validateFields() } catch { throw new ApiError(400, '请修正表单校验提示后保存') }
+      const result = await api<ChangeRequest>('/api/changes/' + record.id + '/', 'PATCH', patch, record.applicant)
       const latest = newestResponse(queryClient.getQueryData<ChangeRequest>(['change', record.applicant, record.id]), result)
-      setBaseline(latest)
-      setDirty(false)
-      changedFields.current.clear()
-      onDirty(false)
-      onSaved(latest)
-      message.success('草稿已保存')
+      if (save.queue.active) onSaved(latest)
+      return overviewFields(latest)
     },
   })
-  const refreshed = refreshBaseline(baseline, record, dirty || dateInvalid || save.isPending)
-  if (refreshed !== baseline) {
-    setBaseline(refreshed)
-  }
+  const dirty = save.dirty
+  const valuesKey = JSON.stringify(save.values)
   useEffect(() => {
-    form.setFieldsValue({ ...baseline, planned_eco_date: baseline.planned_eco_date ?? '' })
-  }, [baseline, form])
-  useImperativeHandle(saveRef, () => ({ save: async () => {
-    if (locked || save.isPending || leaving || dateInvalid) throw new Error('当前不能保存')
-    const values = await form.validateFields()
-    await save.mutateAsync(values)
-  } }))
-  const changed = (values: Partial<Overview>) => {
-    for (const key of Object.keys(values) as (keyof Overview)[]) changedFields.current.add(key)
-    setDirty(true)
-    onDirty(true)
-  }
+    const values = { ...save.values, planned_eco_date: save.values.planned_eco_date ?? '' }
+    if (dateInvalid) delete (values as Partial<Overview>).planned_eco_date
+    form.setFieldsValue(values)
+  }, [valuesKey, form, dateInvalid, save.values])
+  useImperativeHandle(saveRef, () => ({ save: save.manualSave }))
+  const changed = (_changed: Partial<Overview>, values: Overview) => save.update(overviewFields(values))
   const fields: { key: keyof Overview; label: string; placeholder?: string }[] = [
     { key: 'ecr_no', label: 'ECR 编号', placeholder: '手动填写，例如 ECR-26010601' },
     { key: 'eco_no', label: 'ECO 编号', placeholder: '可稍后补充' },
@@ -102,18 +84,18 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onN
     { key: 'change_owner', label: '设计负责人／变更发起人' },
   ]
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{stateLabels[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div><Button onClick={onBack} disabled={save.isPending || leaving}>返回我的申请</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{stateLabels[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div><Button onClick={onBack} disabled={(save.pending || save.manual) || leaving}>返回我的申请</Button></div>
     <section className="panel overview-panel">
-      <div className="section-heading"><div><h2>概述基本信息</h2><p className="muted">申请者由登录账号确定，业务负责人单独填写。</p></div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.isPending ? '正在保存…' : dirty ? '有未保存的修改' : '已保存'}</span></div>
+      <div className="section-heading"><div><h2>概述基本信息</h2><p className="muted">申请者由登录账号确定，业务负责人单独填写。</p></div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.status}</span></div>
       {locked && <Alert type="info" title="申请已锁定，概述仅供查看。" className="form-alert" />}
-      <Form form={form} initialValues={{ ...record, planned_eco_date: record.planned_eco_date ?? '' }} layout="vertical" onValuesChange={changed} onFinish={(values) => save.mutate(values)} disabled={locked || save.isPending || leaving} requiredMark={false}>
+      <Form form={form} initialValues={{ ...record, planned_eco_date: record.planned_eco_date ?? '' }} layout="vertical" onValuesChange={changed} onFinish={save.clickSave} disabled={locked || save.manual || leaving} {...save.composition} requiredMark={false}>
         <Form.Item name="title" label="ECR/ECO 标题" rules={[{ max: 255, message: '标题最多 255 个字符' }]}><Input placeholder="填写这项设计变更的标题" maxLength={255} /></Form.Item>
         <Form.Item name="affected_products" label="受影响产品和型号"><Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="填写涉及的产品及型号" /></Form.Item>
         <div className="form-grid">{fields.map((field) => <Form.Item key={field.key} name={field.key} label={field.label} rules={[{ max: field.key.endsWith('_no') ? 64 : 255, message: '内容超过允许长度' }]}><Input placeholder={field.placeholder} /></Form.Item>)}</div>
-        <div className="form-grid"><Form.Item name="affected_factories" label="受影响工厂"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item><Form.Item name="planned_eco_date" label="ECO 计划完成时间" getValueFromEvent={(event) => { const invalid = event.target.validity.badInput; setDateInvalid(invalid); if (invalid) { setDirty(true); onDirty(true); return form.getFieldValue('planned_eco_date') } return event.target.value }} rules={[{ validator: () => dateInvalid ? Promise.reject(new Error('请补全日期或清空全部日期部分')) : Promise.resolve() }]}><DateInput /></Form.Item></div>
+        <div className="form-grid"><Form.Item name="affected_factories" label="受影响工厂"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item><Form.Item name="planned_eco_date" label="ECO 计划完成时间" getValueFromEvent={(event) => { const invalid = event.target.validity.badInput; setDateInvalid(invalid); const value = invalid ? form.getFieldValue('planned_eco_date') : event.target.value; if (!invalid) save.update({ planned_eco_date: value || null }); return value }} rules={[{ validator: () => dateInvalid ? Promise.reject(new Error('请补全日期或清空全部日期部分')) : Promise.resolve() }]}><DateInput /></Form.Item></div>
         <Form.Item name="change_reason" label="变更原因"><Input.TextArea autoSize={{ minRows: 4, maxRows: 12 }} placeholder="说明变更来源、原因分析和解决措施" /></Form.Item>
         {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
-        <div className="form-footer"><span className="muted">最近保存：{dateTime(baseline.updated_at)}</span><div className="form-actions"><Button type="primary" htmlType="submit" size="large" loading={save.isPending} disabled={locked || leaving || dateInvalid}>保存草稿</Button><Button htmlType="button" size="large" disabled={save.isPending || leaving} onClick={onNext}>下一页</Button></div></div>
+        <div className="form-footer"><span className="muted">最近保存：{dateTime(record.updated_at)}</span><div className="form-actions"><Button type="primary" htmlType="submit" size="large" loading={save.manual} disabled={locked || leaving || save.manual || dateInvalid}>保存草稿</Button><Button htmlType="button" size="large" disabled={save.pending || save.manual || leaving} onClick={onNext}>下一页</Button></div></div>
       </Form>
     </section>
   </>
@@ -124,6 +106,7 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0]) {
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const saveRef = useRef<SaveHandle>(null)
   const { modal } = AntApp.useApp()
   useEffect(() => {
@@ -135,6 +118,7 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0]) {
   }, [dirty, busy])
   const editorProps = { ...props,
     saveRef,
+    paused: confirming,
     onDirty: (value: boolean) => { setDirty(value); props.onDirty(value) },
     onBusy: (value: boolean) => { setBusy(value); props.onBusy(value) },
   }
@@ -142,17 +126,18 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0]) {
     if (busy || editorOpen || props.leaving || key === tab) return
     const change = () => { setDirty(false); props.onDirty(false); setTab(key); window.scrollTo({ top: 0 }) }
     if (!dirty) { change(); return }
+    setConfirming(true)
     if (!saveRef.current) {
-      modal.confirm({ title: '切换前放弃未保存的修改？', okText: '放弃修改并切换', cancelText: '继续填写', onOk: change })
+      modal.confirm({ title: '切换前放弃未保存的修改？', okText: '放弃修改并切换', cancelText: '继续填写', content: discardSavedWarning, onOk: () => { setConfirming(false); change() }, onCancel: () => setConfirming(false) })
       return
     }
-    const dialog = modal.confirm({ title: '切换前有未保存的修改', keyboard: false, maskClosable: false, footer: () => <SaveBeforeSwitch
+    const dialog = modal.confirm({ title: '切换前有未保存的修改', content: discardSavedWarning, keyboard: false, maskClosable: false, footer: () => <SaveBeforeSwitch
       save={async () => { if (!saveRef.current) throw new Error('编辑页面已关闭'); await saveRef.current.save() }}
-      switchPage={change} discard={() => { change(); dialog.destroy() }} close={() => dialog.destroy()}
+      switchPage={change} discard={() => { setConfirming(false); change(); dialog.destroy() }} close={() => { setConfirming(false); dialog.destroy() }}
     /> })
   }
-  return <><Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }].map((item) => ({ ...item, disabled: busy || editorOpen || props.leaving }))} />
-    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setEditorOpen} onNext={() => switchTab('questions')} /> : tab === 'questions' ? <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} onNext={() => switchTab('ecr')} /> : tab === 'ecr' ? <EcrEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('questions')} onNext={() => switchTab('eco')} /> : tab === 'eco' ? <EcoEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('ecr')} onNext={() => switchTab('emc')} /> : <EmcEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('eco')} />}
+  return <><Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }, { key: 'execution-plan', label: '执行计划' }].map((item) => ({ ...item, disabled: busy || editorOpen || props.leaving }))} />
+    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setEditorOpen} onNext={() => switchTab('questions')} /> : tab === 'questions' ? <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} onNext={() => switchTab('ecr')} /> : tab === 'ecr' ? <EcrEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('questions')} onNext={() => switchTab('eco')} /> : tab === 'eco' ? <EcoEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('ecr')} onNext={() => switchTab('emc')} /> : tab === 'emc' ? <EmcEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('eco')} onNext={() => switchTab('execution-plan')} /> : <ExecutionPlanEditor {...editorProps} onPrevious={() => switchTab('emc')} />}
   </>
 }
 
@@ -187,6 +172,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
   const [saving, setSaving] = useState(false)
   const [reauthenticate, setReauthenticate] = useState(false)
   const [reauthBusy, setReauthBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const records = useQuery({ queryKey: ['changes', user.id], queryFn: () => api<ChangeRequest[]>('/api/changes/', 'GET', undefined, user.id), enabled: !!user })
   const detail = useQuery({ queryKey: ['change', user.id, selectedId], queryFn: async () => {
     const result = await api<ChangeRequest>('/api/changes/' + selectedId + '/', 'GET', undefined, user.id)
@@ -207,6 +193,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
     queryClient.removeQueries({ queryKey: ['ecr-actions', user.id, id] })
     queryClient.removeQueries({ queryKey: ['eco-actions', user.id, id] })
     queryClient.removeQueries({ queryKey: ['emc', user.id, id] })
+    queryClient.removeQueries({ queryKey: ['execution-plan', user.id, id] })
     void queryClient.invalidateQueries({ queryKey: ['changes', user.id] })
   }
   const remove = useMutation({
@@ -217,7 +204,9 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
   const listBusy = create.isPending || exit.isPending || remove.isPending || reauthBusy
   const navigate = (action: () => void) => {
     if (!dirty) { action(); return }
-    modal.confirm({ title: '离开前放弃未保存的修改？', content: '当前填写内容还没有保存。选择“继续填写”可返回保存。', okText: '放弃修改并离开', cancelText: '继续填写', onOk: action })
+    if (saving) return
+    setConfirming(true)
+    modal.confirm({ title: '离开前放弃未保存的修改？', content: discardSavedWarning, okText: '放弃修改并离开', cancelText: '继续填写', onOk: () => { setConfirming(false); action() }, onCancel: () => setConfirming(false) })
   }
   return <div className="app-shell">
     <header className="topbar"><div className="brand"><span className="brand-mark">变</span><div><strong>表单填报系统</strong><span>设计变更工作台</span></div></div>{user && <div className="user-menu"><span>{user.display_name}</span><Button disabled={saving || listBusy} onClick={() => setReauthenticate(true)}>重新登录</Button><Button type="text" loading={exit.isPending} disabled={saving || listBusy} onClick={() => navigate(() => exit.mutate())}>退出登录</Button></div>}</header>
@@ -237,9 +226,9 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
         ]} /></section>}
       </> : detail.data ? <>
         {detail.error && <Alert type="error" showIcon title="申请信息刷新失败，当前填写内容仍保留" description={detail.error.message} className="form-alert" action={<Button loading={detail.isFetching} disabled={saving || exit.isPending} onClick={() => void detail.refetch()}>重试</Button>} />}
-        <ChangeEditor key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending} onReauthenticate={() => setReauthenticate(true)} onBack={() => navigate(() => { setDirty(false); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
+        <ChangeEditor key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={() => setReauthenticate(true)} onBack={() => navigate(() => { setDirty(false); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
       </> : detail.isPending ? <Spin tip="正在读取草稿…"><div className="loading-space" /></Spin> : <Alert type="error" title={detail.error?.message ?? '无法读取申请。'} action={<><Button loading={detail.isFetching} disabled={exit.isPending} onClick={() => void detail.refetch()}>重试</Button><Button disabled={exit.isPending} onClick={() => { setSelectedId(null); setDirty(false) }}>返回列表</Button></>} />}
-      <footer className="workspace-footer"><span className="muted">当前提供概述、物料及处置、问题评估、ECR、ECO及EMC的填写与保存，其他表单内容将在后续阶段开放。</span></footer>
+      <footer className="workspace-footer"><span className="muted">当前提供概述、物料及处置、问题评估、ECR、ECO、EMC及执行计划的填写与保存，其他表单内容将在后续阶段开放。</span></footer>
     </main>
     <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} maskClosable={false} keyboard={!reauthBusy} onCancel={() => setReauthenticate(false)}>
       <p className="muted">使用原账号可继续当前填写；切换账号会关闭原申请。</p>
@@ -247,12 +236,14 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
         if (currentUser.id !== user.id) queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' })
         queryClient.setQueryData(['me'], currentUser)
         setReauthenticate(false)
+        if (currentUser.id === user.id) window.dispatchEvent(new Event('editor-reauthenticated'))
         void queryClient.invalidateQueries({ queryKey: ['change', currentUser.id] })
         void queryClient.invalidateQueries({ queryKey: ['materials', currentUser.id] })
         void queryClient.invalidateQueries({ queryKey: ['questions', currentUser.id] })
         void queryClient.invalidateQueries({ queryKey: ['ecr-actions', currentUser.id] })
         void queryClient.invalidateQueries({ queryKey: ['eco-actions', currentUser.id] })
         void queryClient.invalidateQueries({ queryKey: ['emc', currentUser.id] })
+        void queryClient.invalidateQueries({ queryKey: ['execution-plan', currentUser.id] })
       }} />
     </Modal>
   </div>

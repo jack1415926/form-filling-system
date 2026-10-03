@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from changes import views
 from changes.emc_views import EmcDetail
+from changes.execution_plan_views import ExecutionPlanDetail
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,6 +27,7 @@ urlpatterns = [
     path('api/auth/logout/', views.logout_view),
     path('api/auth/me/', views.me_view),
     path('api/changes/<int:pk>/emc/', EmcDetail.as_view()),
+    path('api/changes/<int:pk>/execution-plan/', ExecutionPlanDetail.as_view()),
     path('api/changes/', views.ChangeList.as_view()),
     path('api/changes/<int:pk>/', views.ChangeDetail.as_view()),
     path('api/changes/<int:pk>/materials/', views.MaterialList.as_view()),

@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:execution-plan": "node --test tests/execution-plan.test.mjs",
+    "test:autosave": "node --test tests/autosave.test.mjs",
+    "test:form-draft": "node --test tests/form-draft.test.mjs",
     "test:api": "node --test tests/api.test.mjs",
     "test:questions": "node --test tests/question-draft.test.mjs",
     "test:ecr-preview": "node --test tests/ecr-preview.test.mjs",
