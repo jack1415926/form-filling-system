@@ -60,3 +60,11 @@
   .overview-panel { padding: 24px; }
   .form-footer { gap: 16px; flex-wrap: wrap; }
 }
+
+.emc-section { margin-bottom: 24px; }
+.emc-section label { display: block; margin: 18px 0 8px; }
+.emc-section .form-footer { margin-top: 24px; }
+.emc-test-edit { padding: 16px 0; border-bottom: 1px solid #edf1ee; display: grid; gap: 12px; }
+.emc-section .ant-collapse { margin-bottom: 20px; }
+
+.emc-group-title { width: max-content; max-width: 100%; margin: 0 auto; position: sticky; left: 300px; }

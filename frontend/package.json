@@ -11,7 +11,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:eco-draft": "node --test tests/eco-draft.test.mjs",
+    "test:latest-response": "node --test tests/latest-response.test.mjs",
+    "test:emc-draft": "node --test tests/emc-draft.test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",

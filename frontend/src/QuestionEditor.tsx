@@ -4,6 +4,7 @@ import { Alert, App, Button, Input, Select, Spin, Table } from 'antd'
 import { api, type ChangeRequest, type Question, type QuestionAnswer, type QuestionData } from './api'
 import { questionPatch, saveResultUnconfirmed, type QuestionPatch } from './questionDraft'
 import type { SaveHandle } from './SaveBeforeSwitch'
+import { newestResponse, refreshBaseline } from './latestResponse'
 
 type Props = {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void
@@ -13,7 +14,7 @@ type Props = {
 }
 
 function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNext, saveRef, leaving }: Props & { data: QuestionData }) {
-  const [state, setState] = useState({ baseline: data, values: data, seen: data })
+  const [state, setState] = useState({ baseline: data, values: data })
   const [unconfirmed, setUnconfirmed] = useState<QuestionPatch>({})
   const queryClient = useQueryClient()
   const { message } = App.useApp()
@@ -36,12 +37,15 @@ function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNex
       message.error('保存失败，填写内容仍保留')
     },
     onSuccess: (result) => {
-      setState({ baseline: result, values: result, seen: result })
+      const key = ['questions', record.applicant, record.id]
+      const latest = newestResponse(queryClient.getQueryData<QuestionData>(key), result)
+      setState({ baseline: latest, values: latest })
       setUnconfirmed({})
       onDirty(false)
-      queryClient.setQueryData(['questions', record.applicant, record.id], result)
+      queryClient.setQueryData(key, latest)
       void queryClient.invalidateQueries({ queryKey: ['ecr-actions', record.applicant, record.id] })
-      queryClient.setQueryData<ChangeRequest>(['change', record.applicant, record.id], (current) => current ? { ...current, updated_at: result.updated_at } : current)
+      void queryClient.invalidateQueries({ queryKey: ['eco-actions', record.applicant, record.id] })
+      queryClient.setQueryData<ChangeRequest>(['change', record.applicant, record.id], (current) => current ? newestResponse(current, { ...current, updated_at: latest.updated_at }) : current)
       void queryClient.invalidateQueries({ queryKey: ['changes', record.applicant] })
       message.success('问题评估草稿已保存')
     },
@@ -50,10 +54,10 @@ function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNex
     if (locked || save.isPending || leaving) throw new Error('当前不能保存')
     if (dirty) await save.mutateAsync(responses)
   } }))
-  // Observe each fetched result once. A dirty draft keeps both its values and baseline.
-  if (data !== state.seen) {
-    const older = new Date(data.updated_at).getTime() < new Date(state.baseline.updated_at).getTime()
-    setState(dirty || save.isPending || older ? { ...state, seen: data } : { baseline: data, values: data, seen: data })
+  // A refresh deferred while editing is adopted as soon as the draft becomes clean.
+  const refreshed = refreshBaseline(state.baseline, data, dirty || save.isPending)
+  if (refreshed !== state.baseline) {
+    setState({ baseline: refreshed, values: refreshed })
   }
   const busy = save.isPending || leaving
   const update = (number: number, fields: Partial<Pick<Question, 'answer' | 'remark'>>) => {
@@ -87,9 +91,8 @@ export default function QuestionEditor(props: Props) {
     queryKey,
     queryFn: async () => {
       const result = await api<QuestionData>(`/api/changes/${record.id}/questions/`, 'GET', undefined, record.applicant)
-      const current = queryClient.getQueryData<QuestionData>(queryKey)
       // A delayed read must not regress the cache after a newer save either.
-      return current && new Date(current.updated_at).getTime() > new Date(result.updated_at).getTime() ? current : result
+      return newestResponse(queryClient.getQueryData<QuestionData>(queryKey), result)
     },
     refetchOnWindowFocus: false,
   })

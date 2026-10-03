@@ -67,7 +67,7 @@
 | 问题 | 27 个问题的回答和备注，固定问题文字及职能 |
 | ECR | 固定评估行动、负责人、评估结果、完成／不适用状态及日期 |
 | ECO | 固定行动、负责人、完成情况、完成／不适用／在实施阶段完成状态及日期 |
-| EMC reference | 原表参考内容、典型变更与测试对应关系，只读展示 |
+| EMC reference | 参考定义只读；本人申请填写测试标记与说明，已正式接入B版；管理员维护待办 |
 | 设计变更执行计划 | 固定活动、责任人、开始与结束日期及备注 |
 | 实质性变更评估表 | 主表适用性回答、原因、下一步及评估结论 |
 | 实质性变更评估子表 | 子问题回答、原因和规则引导 |
@@ -88,13 +88,19 @@
 
 PATCH 接受 `{"responses":{"5":{"answer":"N","remark":"理由"}}}`，题号键只接受 `"1"`—`"27"`，省略格保持原值，空字符串清空；不接受 null、未知字段或客户端改题干。空 responses、空单题及与当前值相同的请求不改更新时间。全部输入先校验，回答及申请更新时间在申请行锁事务中保存；权限、预期账号、CSRF 及非草稿只读沿用现有保护。交付边界见 [项目开发梳理](PROJECT_GUIDE.md#问题评估已实现待业务复核)。
 
-### 其他工作表关系（后续）
+### ECR 与 ECO（已实现）
 
 ECR 已正式接入：固定定义存于 `backend/changes/ecr_actions.json`，61 条完整行动与源 ECR!A3:C63 及主清单一致，独立标识 ecr_001—ecr_061 与来源问题号分开。后端和演示共用该配置；数据库 `ecr_action_response` 仅保存所属申请、行动标识、owner、result、status、date。
 
 GET `/api/changes/{id}/ecr-actions/` 返回 `{updated_at, actions}`，每项含 id、number、function、text、question_answer 和四个填写字段。question_answer 从已保存问题回答计算，不由客户端填写；默认未回答、文字为空、日期 null。按用户最新选择，页面默认只显示来源问题为是的行动；否或未回答时隐藏，已有填写保留，再次触发时恢复显示。全部列表允许查看和填写未触发行动，不自动把否解释为不适用。
 
 PATCH `/api/changes/{id}/ecr-actions/{action_key}/` 仅允许 owner、result、status、date。负责人短文本最多 255，评估结果多行长文本；status 为空／completed／not_applicable，日期为 ISO 日期或 null。省略字段保持原值，文字空字符串及日期 null 用于清空；全部空时删填写记录，固定行动定义保留。无变化不更新申请时间。校验、归属、CSRF、预期账号及草稿状态沿用现有保护，读取及写入均在申请行锁事务中完成；返回完整列表，重复重试不增加记录。
+
+ECO 固定定义存于 `backend/changes/eco_actions.json`，61 条行动逐项对应 ECO!A3:C63 和主清单 G:I，标识 eco_001—eco_061。D:G 为 owner（负责人）、result（行动完成情况）、status（状态）、date（日期）；完成情况提示保留“需要注明变动文件编号、ECO相对ECR变化点等”。数据库 `eco_action_response` 仅保存申请、稳定行动标识和四个填写字段，同申请／行动唯一、合法行动及状态 CHECK，删除申请级联。
+
+GET `/api/changes/{id}/eco-actions/` 与 PATCH `/api/changes/{id}/eco-actions/{action_key}/` 沿用 ECR 的返回结构和局部清空语义；ECO status 允许空／completed／not_applicable／implementation_stage，对应未填写／完成／不适用／在实施阶段完成，字段长度24。负责人最多255，完成情况为多行文本，日期为 ISO 或 null。问题回答为只读计算值，不接受客户端改写定义或映射。
+
+ECO 独立按已保存问题联动，不以 ECR 状态为前置条件；默认仅是时显示，否／未回答隐藏但保留填写，全部行动仍可查看编辑。新申请四字段均空；本机源表 ECO!D3:G63 全空，因此 #8 不创建样例记录。源文件和 ECR／ECO／主清单逐项核对见 [本轮记录](testing/ECR-ECO-2026-10-02.md)。
 
 ECR/ECO 行动的负责人文字与系统审批人名单分别处理，不把原表负责人自动映射为账号。执行计划保持固定活动及填写结果分离；F 主子表保留题目标识、适用性、回答、原因、下一步和结论的对应关系。
 
@@ -105,3 +111,11 @@ ECR/ECO 行动的负责人文字与系统审批人名单分别处理，不把原
 - “实质性变更主清单”：子问题的 Y/N 分支、下一题和结束结论，作为固定规则来源。
 
 后续实现前需逐项登记完整字段、固定项标识和规则分支，尤其核对条件性备注、主子表跳转及结束条件。原实例中的回答与行动填写内容分别保留，不因问题回答“否”而自动删除已填行动。旧表中的宏、隐藏区域和公式用于技术核对，不构成 MVP 的 Excel 导入／导出功能。
+
+## EMC reference：B版仅填写者（已接入）
+
+原表介绍／图例／定义、12类典型变更及11个测试列保留，三层表头显示抗干扰性7列和发射4列，IEC 1000-3／CISPR11各跨2列。填写格mark为`""`／`"X"`／`"(X)"`，remark为多行说明；空白不是无需测试。用户选择B版后以本次范围替代原只读方案，暂不接入定义维护。
+
+GET/PATCH `/api/changes/{id}/emc/` 返回矩阵、updated_at、initialized和can_fill。PATCH结构为 `{"cells":{"emc_change_001/emc_test_001":{"mark":"X","remark":"说明"}}}`；省略保持、空字符串清空。只允许本人申请，metadata、行列、角色等字段拒绝；超级用户也不开放跨申请维护。
+
+四张表为emc_reference、emc_reference_row、emc_reference_test、emc_reference_cell。稳定行／列键与物理主键分开，交叉格通过行和测试外键关联，同格唯一及复合归属约束。GET返回默认配置但不写库，首次实际填写保存本单副本；空格不创建记录，清空两格删除记录但保留参考。旧申请未补录EMC结果，问题7改变不删除填写。来源与限制见[接入记录](testing/EMC-INTEGRATION-2026-10-03.md)。

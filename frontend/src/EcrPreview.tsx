@@ -1,3 +1,4 @@
+import DateInput from './DateInput'
 import { useEffect, useState } from 'react'
 import { Alert, App, Button, Drawer, Empty, Input, Select, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -12,12 +13,13 @@ const answerOptions = [{ value: '', label: '未回答' }, { value: 'Y', label: '
 export default function EcrPreview() {
   const { modal, message } = App.useApp()
   const [all, setAll] = useState(false)
+  const [dateInvalid, setDateInvalid] = useState(false)
   const [answers, setAnswers] = useState(initialAnswers)
   const [answerDraft, setAnswerDraft] = useState(initialAnswers)
   const [saved, setSaved] = useState(initialActions)
   const [editor, setEditor] = useState<{ action: ActionDefinition; values: ActionValues } | null>(null)
   const patch = actionPatch(saved, editor ? { [editor.action.id]: editor.values } : {})
-  const actionDirty = Object.keys(patch).length > 0
+  const actionDirty = Object.keys(patch).length > 0 || (!!editor && dateInvalid)
   const questionDirty = DEMO_QUESTIONS.some((question) => answerDraft[question.number] !== answers[question.number])
   const dirty = actionDirty || questionDirty
   // Filter against saved results: editing a field must not hide its row mid-input.
@@ -51,7 +53,7 @@ export default function EcrPreview() {
       const value = saved[row.id] ?? EMPTY_ACTION
       return <div className="preview-summary"><div>{value.owner || '未填负责人'} · {statusLabels[value.status]} · {value.date || '未填日期'}</div><p title={value.result}>{value.result ? value.result.slice(0, 100) : '未填写评估结果'}</p></div>
     } },
-    { title: '操作', width: 90, render: (_, row) => <Button type="link" onClick={() => setEditor({ action: row, values: { ...(saved[row.id] ?? EMPTY_ACTION) } })}>编辑</Button> },
+    { title: '操作', width: 90, render: (_, row) => <Button type="link" onClick={() => { setDateInvalid(false); setEditor({ action: row, values: { ...(saved[row.id] ?? EMPTY_ACTION) } }) }}>编辑</Button> },
   ]
   return <div className="app-shell">
     <header className="topbar"><div className="brand"><span className="brand-mark">变</span><div><strong>ECR 行动演示</strong><span>独立交互演示</span></div></div></header>
@@ -69,11 +71,11 @@ export default function EcrPreview() {
       </section>
       <p className="muted preview-footer">未触发时隐藏，不删除已有填写；触发后重新出现。全部行动中可查看和编辑未触发内容。</p>
     </main>
-    <Drawer open={!!editor} title={editor && `问题 ${editor.action.number} · 评估行动`} size={720} onClose={() => discardActions(() => {})} footer={editor && <div className="form-footer"><span className={actionDirty ? 'save-status unsaved' : 'save-status'}>{actionDirty ? '有未保存的修改' : '无未保存修改'}</span><Button type="primary" disabled={!actionDirty} onClick={saveAction}>模拟保存这条行动</Button></div>}>
+    <Drawer open={!!editor} title={editor && `问题 ${editor.action.number} · 评估行动`} size={720} onClose={() => discardActions(() => {})} footer={editor && <div className="form-footer"><span className={actionDirty ? 'save-status unsaved' : 'save-status'}>{actionDirty ? '有未保存的修改' : '无未保存修改'}</span><Button type="primary" disabled={!actionDirty || dateInvalid} onClick={saveAction}>模拟保存这条行动</Button></div>}>
       {editor && <div className="preview-drawer"><Tag>{editor.action.function}</Tag>{source(editor.action)}<p className="question-text">{editor.action.text}</p>
         <label htmlFor="preview-owner">负责人</label><Input id="preview-owner" maxLength={255} value={editor.values.owner} onChange={(event) => setEditor({ ...editor, values: { ...editor.values, owner: event.target.value } })} />
         <label htmlFor="preview-result">评估结果</label><Input.TextArea id="preview-result" value={editor.values.result} autoSize={{ minRows: 5, maxRows: 12 }} onChange={(event) => setEditor({ ...editor, values: { ...editor.values, result: event.target.value } })} />
-        <div className="form-grid"><div><label htmlFor="preview-status">评估状态</label><Select id="preview-status" aria-label="评估状态" style={{ width: '100%' }} value={editor.values.status} options={statusOptions} onChange={(status: ActionValues['status']) => setEditor({ ...editor, values: { ...editor.values, status } })} /></div><div><label htmlFor="preview-date">日期</label><Input id="preview-date" type="date" value={editor.values.date} onChange={(event) => setEditor({ ...editor, values: { ...editor.values, date: event.target.value } })} /></div></div>
+        <div className="form-grid"><div><label htmlFor="preview-status">评估状态</label><Select id="preview-status" aria-label="评估状态" style={{ width: '100%' }} value={editor.values.status} options={statusOptions} onChange={(status: ActionValues['status']) => setEditor({ ...editor, values: { ...editor.values, status } })} /></div><div><label htmlFor="preview-date">日期</label><DateInput id="preview-date" value={editor.values.date} onChange={(event) => { const invalid = event.target.validity.badInput; setDateInvalid(invalid); if (!invalid) setEditor({ ...editor, values: { ...editor.values, date: event.target.value } }) }} /></div></div>
       </div>}
     </Drawer>
   </div>

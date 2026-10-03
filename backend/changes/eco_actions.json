@@ -1,0 +1,368 @@
+[
+  {
+    "id": "eco_001",
+    "number": 1,
+    "function": "研发，法规",
+    "text": "更新、评审并存档新的铭牌或标签"
+  },
+  {
+    "id": "eco_002",
+    "number": 2,
+    "function": "研发，法规",
+    "text": "更新文档，视需要向监管或安规机构提交"
+  },
+  {
+    "id": "eco_003",
+    "number": 3,
+    "function": "法规",
+    "text": "获得变更批件、备案批件或完成重大事项报告"
+  },
+  {
+    "id": "eco_004",
+    "number": 3,
+    "function": "研发",
+    "text": "完成附录F的实质性变更评估表，并获取最终结论，是否是一个实质性变更。"
+  },
+  {
+    "id": "eco_005",
+    "number": 4,
+    "function": "法规",
+    "text": "提交更新的WEEE Passport"
+  },
+  {
+    "id": "eco_006",
+    "number": 4,
+    "function": "法规",
+    "text": "更新MD或SDoC文件\n必要时更新用户手册"
+  },
+  {
+    "id": "eco_007",
+    "number": 5,
+    "function": "研发",
+    "text": "更新RAC或DFMEA文件。"
+  },
+  {
+    "id": "eco_008",
+    "number": 5,
+    "function": "研发",
+    "text": "完成受影响的风险缓和措施的验证。"
+  },
+  {
+    "id": "eco_009",
+    "number": 6,
+    "function": "研发",
+    "text": "如有必要，对新旧设计的相互兼容性进行设计验证或技术评估。"
+  },
+  {
+    "id": "eco_010",
+    "number": 6,
+    "function": "售后",
+    "text": "如有必要，更新维修手册，并制定新旧维修备件的物料储备计划。"
+  },
+  {
+    "id": "eco_011",
+    "number": 6,
+    "function": "研发，生产",
+    "text": "如果对成品、半成品和原料的处理方法是返工，须提供返工指导书。"
+  },
+  {
+    "id": "eco_012",
+    "number": 6,
+    "function": "研发",
+    "text": "完成材料的化学兼容性测试。"
+  },
+  {
+    "id": "eco_013",
+    "number": 6,
+    "function": "研发",
+    "text": "完成软件设计变更影响分析。\n更新软件文档，必要时更新软件安全分级。"
+  },
+  {
+    "id": "eco_014",
+    "number": 6,
+    "function": "研发",
+    "text": "提供生物相容性测试结果。\n提供清洁度验证结果。"
+  },
+  {
+    "id": "eco_015",
+    "number": 6,
+    "function": "采购",
+    "text": "提供供应商资质的核实结果。"
+  },
+  {
+    "id": "eco_016",
+    "number": 6,
+    "function": "生产",
+    "text": "完成试产计划。"
+  },
+  {
+    "id": "eco_017",
+    "number": 6,
+    "function": "研发",
+    "text": "提供安装和售后过程确认已完成并通过的报告。"
+  },
+  {
+    "id": "eco_018",
+    "number": 6,
+    "function": "SQE，研发",
+    "text": "提供供应商过程确认已完成并通过的报告。"
+  },
+  {
+    "id": "eco_019",
+    "number": 6,
+    "function": "法规",
+    "text": "必要时更新Technical File或通知公告机构。"
+  },
+  {
+    "id": "eco_020",
+    "number": 7,
+    "function": "研发",
+    "text": "存档EMC测试结果或技术评估。"
+  },
+  {
+    "id": "eco_021",
+    "number": 8,
+    "function": "市场",
+    "text": "更新产品配置表。"
+  },
+  {
+    "id": "eco_022",
+    "number": 8,
+    "function": "注册",
+    "text": "ECO批准后，RA同事上传UDI信息至当地数据库"
+  },
+  {
+    "id": "eco_023",
+    "number": 9,
+    "function": "研发",
+    "text": "添加市场代表为ECO审核人。"
+  },
+  {
+    "id": "eco_024",
+    "number": 10,
+    "function": "市场",
+    "text": "如有必要，更新产品彩页或产品数据手册。"
+  },
+  {
+    "id": "eco_025",
+    "number": 11,
+    "function": "研发",
+    "text": "更新用户手册"
+  },
+  {
+    "id": "eco_026",
+    "number": 11,
+    "function": "市场",
+    "text": "保证已添加市场代表为ECO审核人"
+  },
+  {
+    "id": "eco_027",
+    "number": 12,
+    "function": "研发",
+    "text": "确保设计验证、设计确认或技术评估的范围包含了所有被影响的产品。"
+  },
+  {
+    "id": "eco_028",
+    "number": 12,
+    "function": "研发",
+    "text": "添加受影响的其他产品项目负责人为ECO审核人"
+  },
+  {
+    "id": "eco_029",
+    "number": 13,
+    "function": "研发",
+    "text": "完成相关DHF文件的更新及评审。"
+  },
+  {
+    "id": "eco_030",
+    "number": 13,
+    "function": "研发",
+    "text": "存档设计评审材料和记录到DHF。"
+  },
+  {
+    "id": "eco_031",
+    "number": 14,
+    "function": "研发",
+    "text": "完成设计验证并附上验证结果。"
+  },
+  {
+    "id": "eco_032",
+    "number": 15,
+    "function": "研发",
+    "text": "完成设计确认并附上确认结果。"
+  },
+  {
+    "id": "eco_033",
+    "number": 16,
+    "function": "生产",
+    "text": "更新可追溯零部件清单。更新SOP和DHR模板。"
+  },
+  {
+    "id": "eco_034",
+    "number": 16,
+    "function": "SQE",
+    "text": "与供应商沟通并落实关键特性的变更。"
+  },
+  {
+    "id": "eco_035",
+    "number": 17,
+    "function": "研发",
+    "text": "如有必要，更新供应商处的生产资料。"
+  },
+  {
+    "id": "eco_036",
+    "number": 17,
+    "function": "供应商质量",
+    "text": "如有必要，更新供应商处的工装，并保证供应商进行过程确认和SOP更新。"
+  },
+  {
+    "id": "eco_037",
+    "number": 17,
+    "function": "研发",
+    "text": "向采购沟通具体落实的变更内容。"
+  },
+  {
+    "id": "eco_038",
+    "number": 17,
+    "function": "采购",
+    "text": "向供应商沟通半成品和在途物料的处理方法。"
+  },
+  {
+    "id": "eco_039",
+    "number": 17,
+    "function": "研发、QA",
+    "text": "完成产品的灭菌评估或灭菌确认"
+  },
+  {
+    "id": "eco_040",
+    "number": 17,
+    "function": "采购",
+    "text": "更新ERP系统中的价格和交期"
+  },
+  {
+    "id": "eco_041",
+    "number": 18,
+    "function": "研发，生产，QC",
+    "text": "完成进货检验、SOP、DHR、测试规格书或标签数据库的更新。"
+  },
+  {
+    "id": "eco_042",
+    "number": 18,
+    "function": "研发，工艺",
+    "text": "完成质量控制计划的更新"
+  },
+  {
+    "id": "eco_043",
+    "number": 18,
+    "function": "研发，生产",
+    "text": "如有必要，完成生产工装/仪器设备的IQ/OQ/PQ。"
+  },
+  {
+    "id": "eco_044",
+    "number": 18,
+    "function": "工艺，生产",
+    "text": "如有必要，完成关键工序或特殊过程的确认。"
+  },
+  {
+    "id": "eco_045",
+    "number": 18,
+    "function": "生产",
+    "text": "更新工时和产品成本。"
+  },
+  {
+    "id": "eco_046",
+    "number": 18,
+    "function": "生产",
+    "text": "如有必要，完成生产操作员的培训。"
+  },
+  {
+    "id": "eco_047",
+    "number": 19,
+    "function": "研发",
+    "text": "如有必要，完成包装、运输、搬运或存储的测试报告。"
+  },
+  {
+    "id": "eco_048",
+    "number": 19,
+    "function": "生产",
+    "text": "货架期如有明显变化，完成物料处置和排产策略的评估。"
+  },
+  {
+    "id": "eco_049",
+    "number": 19,
+    "function": "研发",
+    "text": "如有必要，确保已经更新包装上的运输或存储标签。"
+  },
+  {
+    "id": "eco_050",
+    "number": 20,
+    "function": "研发",
+    "text": "发布停止发货或让步接收的文件。"
+  },
+  {
+    "id": "eco_051",
+    "number": 20,
+    "function": "研发",
+    "text": "添加质量体系总监为ECO审批人"
+  },
+  {
+    "id": "eco_052",
+    "number": 21,
+    "function": "EHS，生产",
+    "text": "解决EHS问题并完成培训。"
+  },
+  {
+    "id": "eco_053",
+    "number": 22,
+    "function": "研发，工艺，售后",
+    "text": "如果要对库存维修备件进行返工，提供返工作业指导书。"
+  },
+  {
+    "id": "eco_054",
+    "number": 23,
+    "function": "售后",
+    "text": "附上现场变更指令文件号码。"
+  },
+  {
+    "id": "eco_055",
+    "number": 24,
+    "function": "研发",
+    "text": "更新维修手册"
+  },
+  {
+    "id": "eco_056",
+    "number": 24,
+    "function": "售后",
+    "text": "更新维修工具。更新维修工时模型。"
+  },
+  {
+    "id": "eco_057",
+    "number": 25,
+    "function": "售后",
+    "text": "完成确认后发布技术公告。"
+  },
+  {
+    "id": "eco_058",
+    "number": 26,
+    "function": "QA",
+    "text": "ECO批准完成后，将完成的行动事项和批准的ECO发送给委托方（注册人）进行批准"
+  },
+  {
+    "id": "eco_059",
+    "number": 26,
+    "function": "QA",
+    "text": "ECO批准完成后，将影响受托方（受托生产企业）的文档进行转移"
+  },
+  {
+    "id": "eco_060",
+    "number": 27,
+    "function": "QA",
+    "text": "列出受托研发方完成的变更活动及输出物，ECO批准后，注册人对受托研发方完成的文件进行评审"
+  },
+  {
+    "id": "eco_061",
+    "number": 27,
+    "function": "QA",
+    "text": "列出注册人需要完成的变更文件，完成评审及发布"
+  }
+]

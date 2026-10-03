@@ -68,7 +68,7 @@ class EcrFlowTests(TestCase):
             self.assertEqual(self.write(values).status_code, 200)
             self.change.refresh_from_db()
             self.assertEqual(self.change.updated_at, previous)
-        for invalid in [{'owner': 1}, {'owner': None}, {'owner': '字' * 256}, {'result': None}, {'status': 'Y'}, {'date': ''}, {'date': 'bad'}, {'question_answer': 'Y'}, {'action_key': 'ecr_001'}, []]:
+        for invalid in [{'owner': 1}, {'owner': None}, {'owner': '字' * 256}, {'result': None}, {'status': 'Y'}, {'date': ''}, {'date': 'bad'}, {'date': '10000-02-04'}, {'question_answer': 'Y'}, {'action_key': 'ecr_001'}, []]:
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.write(invalid).status_code, 400)
                 self.assertEqual(EcrActionResponse.objects.count(), 0)

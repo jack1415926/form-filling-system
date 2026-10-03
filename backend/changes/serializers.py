@@ -1,7 +1,7 @@
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
-from .models import ChangeRequest, MaterialChange, MaterialDisposition, EcrActionResponse
+from .models import ChangeRequest, MaterialChange, MaterialDisposition, EcrActionResponse, EcoActionResponse
 from .dispositions import LOCATIONS, DISPOSITIONS
 from .questions import QUESTIONS
 
@@ -169,3 +169,20 @@ class MaterialChangeSerializer(serializers.ModelSerializer):
                 else:
                     MaterialDisposition.objects.update_or_create(material=instance, location_item=key, defaults={"location_group": LOCATIONS[key], "disposition": disposition, "remark": remark})
             return instance
+
+
+class EcoActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EcoActionResponse
+        fields = ["owner", "result", "status", "date"]
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"detail": "请求内容必须是对象。"})
+        forbidden = set(data) - set(self.Meta.fields)
+        if forbidden:
+            raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
+        for field in ("owner", "result"):
+            if field in data and data[field] is not None and not isinstance(data[field], str):
+                raise serializers.ValidationError({field: "必须是文本。"})
+        return super().to_internal_value(data)

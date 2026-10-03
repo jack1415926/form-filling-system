@@ -149,10 +149,12 @@ class DraftFlowTests(TestCase):
 
     def test_invalid_date_does_not_partially_save(self):
         record = ChangeRequest.objects.create(applicant=self.owner, title="原内容")
-        response = self.client.patch(f"/api/changes/{record.pk}/", {"title": "修改", "planned_eco_date": "2026-02-30"}, format="json")
-        self.assertEqual(response.status_code, 400)
-        record.refresh_from_db()
-        self.assertEqual(record.title, "原内容")
+        for date in ["2026-02-30", "10000-02-04"]:
+            with self.subTest(date=date):
+                response = self.client.patch(f"/api/changes/{record.pk}/", {"title": "修改", "planned_eco_date": date}, format="json")
+                self.assertEqual(response.status_code, 400)
+                record.refresh_from_db()
+                self.assertEqual(record.title, "原内容")
 
     def test_csrf_required_for_login_logout_and_writes(self):
         anonymous = APIClient(enforce_csrf_checks=True)

@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models.functions import NullIf
 from .dispositions import LOCATIONS, DISPOSITIONS
 from .ecr import ECR_ACTION_IDS
+from .eco import ECO_ACTION_IDS
 
 
 class ChangeRequest(models.Model):
@@ -133,4 +134,83 @@ class EcrActionResponse(models.Model):
             models.UniqueConstraint(fields=["change", "action_key"], name="ecr_unique_action"),
             models.CheckConstraint(condition=models.Q(action_key__in=ECR_ACTION_IDS), name="ecr_valid_action"),
             models.CheckConstraint(condition=models.Q(status__in=["", "completed", "not_applicable"]), name="ecr_valid_status"),
+        ]
+
+
+class EcoActionResponse(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="eco_responses")
+    action_key = models.CharField(max_length=7)
+    owner = models.CharField(max_length=255, blank=True)
+    result = models.TextField(blank=True)
+    status = models.CharField(max_length=24, blank=True, choices=[("completed", "完成"), ("not_applicable", "不适用"), ("implementation_stage", "在实施阶段完成")])
+    date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = "eco_action_response"
+        constraints = [
+            models.UniqueConstraint(fields=["change", "action_key"], name="eco_unique_action"),
+            models.CheckConstraint(condition=models.Q(action_key__in=ECO_ACTION_IDS), name="eco_valid_action"),
+            models.CheckConstraint(condition=models.Q(status__in=["", "completed", "not_applicable", "implementation_stage"]), name="eco_valid_status"),
+        ]
+
+
+class EmcReference(models.Model):
+    change = models.OneToOneField(ChangeRequest, on_delete=models.CASCADE, related_name="emc_reference")
+    title = models.CharField(max_length=255, blank=True)
+    introduction = models.TextField(blank=True)
+    legend = models.TextField(blank=True)
+    definitions = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "emc_reference"
+
+
+class EmcReferenceRow(models.Model):
+    reference = models.ForeignKey(EmcReference, on_delete=models.CASCADE, related_name="rows")
+    key = models.CharField(max_length=64, db_collation="utf8mb4_bin")
+    label = models.TextField(blank=True)
+    sort_order = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "emc_reference_row"
+        ordering = ["sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["reference", "key"], name="emc_row_unique_key"),
+            models.UniqueConstraint(fields=["reference", "id"], name="emc_row_owner"),
+            models.CheckConstraint(condition=models.Q(sort_order__gt=0), name="emc_row_valid_order"),
+        ]
+
+
+class EmcReferenceTest(models.Model):
+    reference = models.ForeignKey(EmcReference, on_delete=models.CASCADE, related_name="tests")
+    key = models.CharField(max_length=64, db_collation="utf8mb4_bin")
+    label = models.TextField(blank=True)
+    group_label = models.CharField(max_length=255, blank=True)
+    standard_reference = models.CharField(max_length=255, blank=True)
+    sort_order = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "emc_reference_test"
+        ordering = ["sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["reference", "key"], name="emc_test_unique_key"),
+            models.UniqueConstraint(fields=["reference", "id"], name="emc_test_owner"),
+            models.CheckConstraint(condition=models.Q(sort_order__gt=0), name="emc_test_valid_order"),
+        ]
+
+
+class EmcReferenceCell(models.Model):
+    reference = models.ForeignKey(EmcReference, on_delete=models.CASCADE, related_name="cells")
+    row = models.ForeignKey(EmcReferenceRow, on_delete=models.CASCADE)
+    test = models.ForeignKey(EmcReferenceTest, on_delete=models.CASCADE)
+    mark = models.CharField(max_length=3, blank=True, db_collation="utf8mb4_bin", choices=[("X", "需要测试"), ("(X)", "需要分析")])
+    remark = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "emc_reference_cell"
+        constraints = [
+            models.UniqueConstraint(fields=["row", "test"], name="emc_unique_cell"),
+            models.CheckConstraint(condition=models.Q(mark__in=["", "X", "(X)"]), name="emc_valid_mark"),
         ]

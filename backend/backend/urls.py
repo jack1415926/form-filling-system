@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from changes import views
+from changes.emc_views import EmcDetail
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,11 +25,14 @@ urlpatterns = [
     path('api/auth/login/', views.login_view),
     path('api/auth/logout/', views.logout_view),
     path('api/auth/me/', views.me_view),
+    path('api/changes/<int:pk>/emc/', EmcDetail.as_view()),
     path('api/changes/', views.ChangeList.as_view()),
     path('api/changes/<int:pk>/', views.ChangeDetail.as_view()),
     path('api/changes/<int:pk>/materials/', views.MaterialList.as_view()),
     path('api/changes/<int:pk>/questions/', views.QuestionList.as_view()),
     path('api/changes/<int:pk>/ecr-actions/', views.EcrActionList.as_view()),
     path('api/changes/<int:pk>/ecr-actions/<str:action_key>/', views.EcrActionDetail.as_view()),
+    path('api/changes/<int:pk>/eco-actions/', views.EcoActionList.as_view()),
+    path('api/changes/<int:pk>/eco-actions/<str:action_key>/', views.EcoActionDetail.as_view()),
     path('api/changes/<int:pk>/materials/<int:material_pk>/', views.MaterialDetail.as_view()),
 ]

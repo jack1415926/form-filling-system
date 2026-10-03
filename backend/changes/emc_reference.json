@@ -1,0 +1,124 @@
+{
+  "title": "EMC 文档",
+  "introduction": "The following table list typical design changes and show EMC retest is required. When the design team proposes a change the testing requirements can be easily determined. For some tests an EMC analysis will be required to determine the risks.\n下表列出了一些典型的设计变更，并指出了EMC需要重新测试的项目。当设计团队计划做一些设计变更时，可以很方便的决定需要进行哪些测试。有些测试需要一份分析报告来评估风险性。",
+  "legend": " X= This EMC Test is definitely required. “X”=需要测试的项目\n(X)= An EMC analysis is necessary to determine if this test is required. “（X）”=需要做一份分析报告来评估是否需要做这项测试",
+  "definitions": "Equipment: a previously certified component, sub assembly, subsystem, or system.\n设备：以前曾经认证过的零件，子部件，子系统，或系统",
+  "rows": [
+    {
+      "id": "emc_change_001",
+      "label": "Power Supplies电源"
+    },
+    {
+      "id": "emc_change_002",
+      "label": "Power Filters (cdt. emissions)\n电源滤波器"
+    },
+    {
+      "id": "emc_change_003",
+      "label": "Data line Filters & ferrite Beads on data lines数据线上的滤波器以及铁氧体磁珠"
+    },
+    {
+      "id": "emc_change_004",
+      "label": "Data cables (redesign)\n数据(同步)传输线（重新设计）"
+    },
+    {
+      "id": "emc_change_005",
+      "label": "Data Cable (shields)\n数据(同步)传输线（屏蔽）"
+    },
+    {
+      "id": "emc_change_006",
+      "label": "EMC Gaskets (changes and cost reductions)\nEMC衬垫（变更以及成本降低)"
+    },
+    {
+      "id": "emc_change_007",
+      "label": "Cabinets and shielding (material changes)\n外壳以及屏蔽（材料变更）涉及金属的"
+    },
+    {
+      "id": "emc_change_008",
+      "label": "Cabinets, Covers, and Bulkheads (redesign)\n外壳，盖子以及隔板（重新设计）"
+    },
+    {
+      "id": "emc_change_009",
+      "label": "PCB (electronics changes)\n电路板（电路变更）"
+    },
+    {
+      "id": "emc_change_010",
+      "label": "Grounding changes\n接地更改"
+    },
+    {
+      "id": "emc_change_011",
+      "label": "Heat Sinks\n散热片"
+    },
+    {
+      "id": "emc_change_012",
+      "label": "Other changes (technology)\n其他更改（工艺）"
+    }
+  ],
+  "tests": [
+    {
+      "id": "emc_test_001",
+      "label": "ESD\n静电放电抗扰度",
+      "group": "Immunity Tests IEC1000-4\n抗干扰性测试",
+      "standard": "IEC1000-4-2"
+    },
+    {
+      "id": "emc_test_002",
+      "label": "E-Field\n辐射抗扰度",
+      "group": "Immunity Tests IEC1000-4\n抗干扰性测试",
+      "standard": "IEC1000-4-3"
+    },
+    {
+      "id": "emc_test_003",
+      "label": "EFT\n电快速瞬变脉冲群抗扰度",
+      "group": "Immunity Tests IEC1000-4\n抗干扰性测试",
+      "standard": "IEC1000-4-4"
+    },
+    {
+      "id": "emc_test_004",
+      "label": "Surge\n浪涌（冲击）抗扰度",
+      "group": "Immunity Tests IEC1000-4\n抗干扰性测试",
+      "standard": "IEC1000-4-5"
+    },
+    {
+      "id": "emc_test_005",
+      "label": "RF cond\n传导抗扰度",
+      "group": "Immunity Tests IEC1000-4\n抗干扰性测试",
+      "standard": "IEC1000-4-6"
+    },
+    {
+      "id": "emc_test_006",
+      "label": "Magn. Field\n工频磁场抗扰度",
+      "group": "Immunity Tests IEC1000-4\n抗干扰性测试",
+      "standard": "IEC1000-4-8"
+    },
+    {
+      "id": "emc_test_007",
+      "label": "Volt. Dips\n电压暂降、短时中断和电压变化的抗扰度",
+      "group": "Immunity Tests IEC1000-4\n抗干扰性测试",
+      "standard": "IEC1000-4-11"
+    },
+    {
+      "id": "emc_test_008",
+      "label": "_ 2 harm\n电源谐波",
+      "group": "Emission Tests\n 发射测试",
+      "standard": "IEC 1000-3"
+    },
+    {
+      "id": "emc_test_009",
+      "label": "_3\nFlickers\n电源波动及闪烁",
+      "group": "Emission Tests\n 发射测试",
+      "standard": "IEC 1000-3"
+    },
+    {
+      "id": "emc_test_010",
+      "label": "Rad.\n辐射",
+      "group": "Emission Tests\n 发射测试",
+      "standard": "CISPR11"
+    },
+    {
+      "id": "emc_test_011",
+      "label": "Cond.\n传导",
+      "group": "Emission Tests\n 发射测试",
+      "standard": "CISPR11"
+    }
+  ]
+}

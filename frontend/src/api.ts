@@ -17,6 +17,9 @@ export type QuestionData = { updated_at: string; questions: Question[] }
 export type EcrValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable'; date: string | null }
 export type EcrAction = EcrValues & { id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
 export type EcrData = { updated_at: string; actions: EcrAction[] }
+export type EcoValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable' | 'implementation_stage'; date: string | null }
+export type EcoAction = EcoValues & { id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
+export type EcoData = { updated_at: string; actions: EcoAction[] }
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) { super(message); this.status = status }
