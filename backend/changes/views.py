@@ -12,8 +12,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 
-from .models import ChangeRequest, MaterialChange
-from .serializers import ChangeRequestSerializer, MaterialChangeSerializer
+from .models import ChangeRequest, MaterialChange, QuestionResponse, EcrActionResponse, EcoActionResponse
+from .serializers import ChangeRequestSerializer, MaterialChangeSerializer, QuestionPatchSerializer, EcrActionSerializer, EcoActionSerializer
+from .ecr import ECR_ACTIONS, ECR_ACTION_IDS
+from .eco import ECO_ACTIONS, ECO_ACTION_IDS
+from .questions import QUESTIONS
 from .dispositions import LOCATIONS
 from .permissions import account_changed
 
@@ -146,3 +149,144 @@ class MaterialDetail(MaterialList):
 
     def delete(self, request, pk, material_pk):
         return self.write(request, pk, material_pk)
+
+
+class QuestionList(APIView):
+    http_method_names = ["get", "patch", "head", "options"]
+
+    @staticmethod
+    def data(record):
+        values = {row.number: row for row in record.question_responses.all()}
+        return {
+            "updated_at": record.updated_at.isoformat(),
+            "questions": [
+                {**question,
+                 "answer": values[question["number"]].answer if question["number"] in values else "",
+                 "remark": values[question["number"]].remark if question["number"] in values else ""}
+                for question in QUESTIONS
+            ],
+        }
+
+    def get(self, request, pk):
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            return Response(self.data(record))
+
+    def patch(self, request, pk):
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            if record.status != ChangeRequest.Status.DRAFT:
+                return Response({"detail": "申请已锁定，不能修改问题回答。"}, status=status.HTTP_409_CONFLICT)
+            serializer = QuestionPatchSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            changed = False
+            for key, fields in serializer.validated_data["responses"].items():
+                if not fields:
+                    continue
+                number = int(key)
+                existing = record.question_responses.filter(number=number).first()
+                answer = fields.get("answer", existing.answer if existing else "")
+                remark = fields.get("remark", existing.remark if existing else "")
+                if (answer, remark) == (existing.answer if existing else "", existing.remark if existing else ""):
+                    continue
+                if not answer and not remark:
+                    existing.delete()
+                else:
+                    QuestionResponse.objects.update_or_create(change=record, number=number, defaults={"answer": answer, "remark": remark})
+                changed = True
+            if changed:
+                record.updated_at = timezone.now()
+                record.save(update_fields=["updated_at"])
+            return Response(self.data(record))
+
+
+class EcrActionList(APIView):
+    http_method_names = ["get", "head", "options"]
+
+    @staticmethod
+    def data(record):
+        answers = dict(record.question_responses.values_list("number", "answer"))
+        responses = {row.action_key: row for row in record.ecr_responses.all()}
+        return {"updated_at": record.updated_at.isoformat(), "actions": [
+            {**definition, "question_answer": answers.get(definition["number"], ""),
+             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "result": "", "status": "", "date": None})}
+            for definition in ECR_ACTIONS
+        ]}
+
+    def get(self, request, pk):
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            return Response(self.data(record))
+
+
+class EcrActionDetail(APIView):
+    http_method_names = ["patch", "options"]
+
+    def patch(self, request, pk, action_key):
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            if action_key not in ECR_ACTION_IDS:
+                return Response({"detail": "行动不存在。"}, status=404)
+            if record.status != ChangeRequest.Status.DRAFT:
+                return Response({"detail": "申请已锁定，不能修改 ECR 评估。"}, status=409)
+            existing = record.ecr_responses.filter(action_key=action_key).first()
+            instance = existing or EcrActionResponse(change=record, action_key=action_key)
+            serializer = EcrActionSerializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            fields = serializer.validated_data
+            if any(getattr(instance, key) != value for key, value in fields.items()):
+                for key, value in fields.items():
+                    setattr(instance, key, value)
+                if not (instance.owner or instance.result or instance.status or instance.date):
+                    instance.delete()
+                else:
+                    instance.save()
+                record.updated_at = timezone.now()
+                record.save(update_fields=["updated_at"])
+            return Response(EcrActionList.data(record))
+
+
+class EcoActionList(APIView):
+    http_method_names = ["get", "head", "options"]
+
+    @staticmethod
+    def data(record):
+        answers = dict(record.question_responses.values_list("number", "answer"))
+        responses = {row.action_key: row for row in record.eco_responses.all()}
+        return {"updated_at": record.updated_at.isoformat(), "actions": [
+            {**definition, "question_answer": answers.get(definition["number"], ""),
+             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "result": "", "status": "", "date": None})}
+            for definition in ECO_ACTIONS
+        ]}
+
+    def get(self, request, pk):
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            return Response(self.data(record))
+
+
+class EcoActionDetail(APIView):
+    http_method_names = ["patch", "options"]
+
+    def patch(self, request, pk, action_key):
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            if action_key not in ECO_ACTION_IDS:
+                return Response({"detail": "行动不存在。"}, status=404)
+            if record.status != ChangeRequest.Status.DRAFT:
+                return Response({"detail": "申请已锁定，不能修改 ECO 执行。"}, status=409)
+            existing = record.eco_responses.filter(action_key=action_key).first()
+            instance = existing or EcoActionResponse(change=record, action_key=action_key)
+            serializer = EcoActionSerializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            fields = serializer.validated_data
+            if any(getattr(instance, key) != value for key, value in fields.items()):
+                for key, value in fields.items():
+                    setattr(instance, key, value)
+                if not (instance.owner or instance.result or instance.status or instance.date):
+                    instance.delete()
+                else:
+                    instance.save()
+                record.updated_at = timezone.now()
+                record.save(update_fields=["updated_at"])
+            return Response(EcoActionList.data(record))

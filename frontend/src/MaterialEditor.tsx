@@ -25,7 +25,6 @@ function MaterialForm({ material, category, path, ownerId, locked, leaving, onDi
   onDirty: (value: boolean) => void; onBusy: (value: boolean) => void; onSaved: () => void
 }) {
   const [form] = Form.useForm<MaterialValues>()
-  const [dirty, setDirty] = useState(false)
   const [requestId] = useState(() => crypto.randomUUID())
   const changedFields = useRef(new Set<keyof MaterialValues>())
   const changedDispositions = useRef<Record<string, Set<'disposition' | 'remark'>>>({})
@@ -42,15 +41,8 @@ function MaterialForm({ material, category, path, ownerId, locked, leaving, onDi
     },
     onMutate: () => onBusy(true),
     onSettled: () => onBusy(false),
-    onSuccess: () => { setDirty(false); onDirty(false); onSaved() },
+    onSuccess: () => { onDirty(false); onSaved() },
   })
-  useEffect(() => {
-    const handleUnload = (event: BeforeUnloadEvent) => {
-      if (dirty || save.isPending) { event.preventDefault(); event.returnValue = '' }
-    }
-    window.addEventListener('beforeunload', handleUnload)
-    return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [dirty, save.isPending])
   const materialFields = <>
     {fields.map((field) => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.long ? [] : [{ max: 255, message: '最多 255 个字符' }]}>
       {field.long ? <Input.TextArea autoSize={{ minRows: 3, maxRows: 10 }} /> : <Input maxLength={255} />}
@@ -67,7 +59,7 @@ function MaterialForm({ material, category, path, ownerId, locked, leaving, onDi
         const changed = changedDispositions.current[key] ??= new Set()
         Object.keys(fields).forEach((field) => changed.add(field as 'disposition' | 'remark'))
       }
-      setDirty(true); onDirty(true)
+      onDirty(true)
     }}>
     {category === 'addition' ? materialFields : <Tabs items={[
       { key: 'material', label: '物料信息', forceRender: true, children: materialFields },
@@ -77,8 +69,9 @@ function MaterialForm({ material, category, path, ownerId, locked, leaving, onDi
   </Form>
 }
 
-export default function MaterialEditor({ record, onDirty, onBusy, onBack, leaving, onReauthenticate }: {
+export default function MaterialEditor({ record, onDirty, onBusy, onBack, leaving, onReauthenticate, onNext, onEditorOpen }: {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void; onBack: () => void; leaving: boolean; onReauthenticate: () => void
+  onNext: () => void; onEditorOpen: (value: boolean) => void
 }) {
   const { modal, message } = App.useApp()
   const queryClient = useQueryClient()
@@ -87,6 +80,7 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<MaterialCategory | ''>('')
+  useEffect(() => { onEditorOpen(!!editor); return () => onEditorOpen(false) }, [editor, onEditorOpen])
   const locked = record.status !== 'draft'
   const materials = useQuery({ queryKey: ['materials', record.applicant, record.id], queryFn: () => api<Material[]>(path, 'GET', undefined, record.applicant), refetchOnWindowFocus: false })
   const refresh = () => {
@@ -121,6 +115,7 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
       ]} />
     </section>}
     {deletion.error && <Alert type="error" showIcon title="删除失败" description={deletion.error.message} className="form-alert" />}
+    <div className="form-footer"><span className="muted">继续填写变更问题评估。</span><Button disabled={busy || !!editor} onClick={onNext}>下一页</Button></div>
     <Drawer open={!!editor} title={editor && `${editor.material ? locked ? '查看' : '编辑' : '新增'}：${categories.find((item) => item.key === editor.category)?.label}`} onClose={close} closable={!busy} maskClosable={!busy} keyboard={!busy} size={720} footer={editor && <div className="form-footer"><span className={dirty ? 'save-status unsaved' : 'save-status'}>{dirty ? '有未保存的修改' : editor.material ? '已保存' : '尚未保存'}</span>{!locked && <Button type="primary" htmlType="submit" form="material-form" loading={saving} disabled={busy}>{editor.category === 'addition' ? '保存物料' : '保存物料及处置'}</Button>}</div>} extra={<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button>}>
       {editor && <MaterialForm key={editor.material?.id ?? editor.category} {...editor} path={path} ownerId={record.applicant} locked={locked} leaving={leaving}
         onDirty={(value) => { setDirty(value); onDirty(value) }} onBusy={(value) => { setSaving(value); onBusy(value) }}

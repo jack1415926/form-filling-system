@@ -1,8 +1,9 @@
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
-from .models import ChangeRequest, MaterialChange, MaterialDisposition
+from .models import ChangeRequest, MaterialChange, MaterialDisposition, EcrActionResponse, EcoActionResponse
 from .dispositions import LOCATIONS, DISPOSITIONS
+from .questions import QUESTIONS
 
 NUMBER_ERRORS = {"ecr_no": "ECR 编号已存在，请使用其他编号。", "eco_no": "ECO 编号已存在，请使用其他编号。"}
 
@@ -64,6 +65,55 @@ class DispositionValueSerializer(serializers.Serializer):
         return super().to_internal_value(data)
 
 
+class QuestionValueSerializer(serializers.Serializer):
+    answer = serializers.ChoiceField(choices=["", "Y", "N"], required=False)
+    remark = serializers.CharField(required=False, allow_blank=True)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("回答必须是对象。")
+        forbidden = set(data) - {"answer", "remark"}
+        if forbidden:
+            raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
+        # CharField normally coerces numbers to strings; remarks must be text.
+        if "remark" in data and data["remark"] is not None and not isinstance(data["remark"], str):
+            raise serializers.ValidationError({"remark": "备注必须是文本。"})
+        return super().to_internal_value(data)
+
+
+class EcrActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EcrActionResponse
+        fields = ["owner", "result", "status", "date"]
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"detail": "请求内容必须是对象。"})
+        forbidden = set(data) - set(self.Meta.fields)
+        if forbidden:
+            raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
+        for field in ("owner", "result"):
+            if field in data and data[field] is not None and not isinstance(data[field], str):
+                raise serializers.ValidationError({field: "必须是文本。"})
+        return super().to_internal_value(data)
+
+
+class QuestionPatchSerializer(serializers.Serializer):
+    responses = serializers.DictField(child=QuestionValueSerializer(), allow_empty=True)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"detail": "请求内容必须是对象。"})
+        forbidden = set(data) - {"responses"}
+        if forbidden:
+            raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
+        if isinstance(data.get("responses"), dict):
+            invalid = set(data["responses"]) - {str(question["number"]) for question in QUESTIONS}
+            if invalid:
+                raise serializers.ValidationError({"responses": {key: "题号不合法。" for key in invalid}})
+        return super().to_internal_value(data)
+
+
 class MaterialChangeSerializer(serializers.ModelSerializer):
     dispositions = serializers.DictField(child=DispositionValueSerializer(), required=False, write_only=True)
     request_id = serializers.UUIDField(write_only=True, required=False)
@@ -119,3 +169,20 @@ class MaterialChangeSerializer(serializers.ModelSerializer):
                 else:
                     MaterialDisposition.objects.update_or_create(material=instance, location_item=key, defaults={"location_group": LOCATIONS[key], "disposition": disposition, "remark": remark})
             return instance
+
+
+class EcoActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EcoActionResponse
+        fields = ["owner", "result", "status", "date"]
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"detail": "请求内容必须是对象。"})
+        forbidden = set(data) - set(self.Meta.fields)
+        if forbidden:
+            raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
+        for field in ("owner", "result"):
+            if field in data and data[field] is not None and not isinstance(data[field], str):
+                raise serializers.ValidationError({field: "必须是文本。"})
+        return super().to_internal_value(data)

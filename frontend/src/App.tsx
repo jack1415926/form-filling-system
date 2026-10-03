@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import DateInput from './DateInput'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App as AntApp, Button, ConfigProvider, Empty, Form, Input, Spin, Table, Tabs, Tag, Modal } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { api, ApiError, type ChangeRequest, type Overview, type User } from './api'
 import './App.css'
 import MaterialEditor from './MaterialEditor'
+import QuestionEditor from './QuestionEditor'
+import EcrPreview from './EcrPreview'
+import EmcEditor from './EmcEditor'
+import EcrEditor from './EcrEditor'
+import EcoEditor from './EcoEditor'
+import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
+import { newestResponse, refreshBaseline } from './latestResponse'
 
 const stateLabels = { draft: '草稿', pending: '待审批', approved: '已批准' }
 const stateColors = { draft: 'default', pending: 'gold', approved: 'green' }
@@ -37,13 +45,16 @@ function Login({ onLogin, compact = false, onBusy }: { onLogin: (user: User) => 
   </div>
 }
 
-function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onNext }: {
+function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onNext, saveRef }: {
   record: ChangeRequest; onDirty: (dirty: boolean) => void; onSaved: (record: ChangeRequest) => void; onBack: () => void; onBusy: (busy: boolean) => void; leaving: boolean; onReauthenticate: () => void; onNext?: () => void
+  saveRef?: Ref<SaveHandle>
 }) {
   const [form] = Form.useForm<Overview>()
-  const [savedAt, setSavedAt] = useState(record.updated_at)
+  const [baseline, setBaseline] = useState(record)
   const [dirty, setDirty] = useState(false)
+  const [dateInvalid, setDateInvalid] = useState(false)
   const changedFields = useRef(new Set<keyof Overview>())
+  const queryClient = useQueryClient()
   const { message } = AntApp.useApp()
   const locked = record.status !== 'draft'
   const save = useMutation({
@@ -56,22 +67,27 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onN
       return api<ChangeRequest>('/api/changes/' + record.id + '/', 'PATCH', patch, record.applicant)
     },
     onSuccess: (result) => {
-      form.setFieldsValue({ ...result, planned_eco_date: result.planned_eco_date ?? '' })
-      setSavedAt(result.updated_at)
+      const latest = newestResponse(queryClient.getQueryData<ChangeRequest>(['change', record.applicant, record.id]), result)
+      setBaseline(latest)
       setDirty(false)
       changedFields.current.clear()
       onDirty(false)
-      onSaved(result)
+      onSaved(latest)
       message.success('草稿已保存')
     },
   })
+  const refreshed = refreshBaseline(baseline, record, dirty || dateInvalid || save.isPending)
+  if (refreshed !== baseline) {
+    setBaseline(refreshed)
+  }
   useEffect(() => {
-    const handleUnload = (event: BeforeUnloadEvent) => {
-      if (dirty || save.isPending) { event.preventDefault(); event.returnValue = '' }
-    }
-    window.addEventListener('beforeunload', handleUnload)
-    return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [dirty, save.isPending])
+    form.setFieldsValue({ ...baseline, planned_eco_date: baseline.planned_eco_date ?? '' })
+  }, [baseline, form])
+  useImperativeHandle(saveRef, () => ({ save: async () => {
+    if (locked || save.isPending || leaving || dateInvalid) throw new Error('当前不能保存')
+    const values = await form.validateFields()
+    await save.mutateAsync(values)
+  } }))
   const changed = (values: Partial<Overview>) => {
     for (const key of Object.keys(values) as (keyof Overview)[]) changedFields.current.add(key)
     setDirty(true)
@@ -94,10 +110,10 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onN
         <Form.Item name="title" label="ECR/ECO 标题" rules={[{ max: 255, message: '标题最多 255 个字符' }]}><Input placeholder="填写这项设计变更的标题" maxLength={255} /></Form.Item>
         <Form.Item name="affected_products" label="受影响产品和型号"><Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="填写涉及的产品及型号" /></Form.Item>
         <div className="form-grid">{fields.map((field) => <Form.Item key={field.key} name={field.key} label={field.label} rules={[{ max: field.key.endsWith('_no') ? 64 : 255, message: '内容超过允许长度' }]}><Input placeholder={field.placeholder} /></Form.Item>)}</div>
-        <div className="form-grid"><Form.Item name="affected_factories" label="受影响工厂"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item><Form.Item name="planned_eco_date" label="ECO 计划完成时间"><Input type="date" /></Form.Item></div>
+        <div className="form-grid"><Form.Item name="affected_factories" label="受影响工厂"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item><Form.Item name="planned_eco_date" label="ECO 计划完成时间" getValueFromEvent={(event) => { const invalid = event.target.validity.badInput; setDateInvalid(invalid); if (invalid) { setDirty(true); onDirty(true); return form.getFieldValue('planned_eco_date') } return event.target.value }} rules={[{ validator: () => dateInvalid ? Promise.reject(new Error('请补全日期或清空全部日期部分')) : Promise.resolve() }]}><DateInput /></Form.Item></div>
         <Form.Item name="change_reason" label="变更原因"><Input.TextArea autoSize={{ minRows: 4, maxRows: 12 }} placeholder="说明变更来源、原因分析和解决措施" /></Form.Item>
         {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
-        <div className="form-footer"><span className="muted">最近保存：{dateTime(savedAt)}</span><div className="form-actions"><Button type="primary" htmlType="submit" size="large" loading={save.isPending} disabled={locked || leaving}>保存草稿</Button><Button htmlType="button" size="large" disabled={save.isPending || leaving} onClick={onNext}>下一页</Button></div></div>
+        <div className="form-footer"><span className="muted">最近保存：{dateTime(baseline.updated_at)}</span><div className="form-actions"><Button type="primary" htmlType="submit" size="large" loading={save.isPending} disabled={locked || leaving || dateInvalid}>保存草稿</Button><Button htmlType="button" size="large" disabled={save.isPending || leaving} onClick={onNext}>下一页</Button></div></div>
       </Form>
     </section>
   </>
@@ -107,19 +123,36 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0]) {
   const [tab, setTab] = useState('overview')
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const saveRef = useRef<SaveHandle>(null)
   const { modal } = AntApp.useApp()
+  useEffect(() => {
+    const handleUnload = (event: BeforeUnloadEvent) => {
+      if (dirty || busy) { event.preventDefault(); event.returnValue = '' }
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [dirty, busy])
   const editorProps = { ...props,
+    saveRef,
     onDirty: (value: boolean) => { setDirty(value); props.onDirty(value) },
     onBusy: (value: boolean) => { setBusy(value); props.onBusy(value) },
   }
   const switchTab = (key: string) => {
-    if (busy || props.leaving || key === tab) return
+    if (busy || editorOpen || props.leaving || key === tab) return
     const change = () => { setDirty(false); props.onDirty(false); setTab(key); window.scrollTo({ top: 0 }) }
     if (!dirty) { change(); return }
-    modal.confirm({ title: '切换前放弃未保存的修改？', okText: '放弃修改并切换', cancelText: '继续填写', onOk: change })
+    if (!saveRef.current) {
+      modal.confirm({ title: '切换前放弃未保存的修改？', okText: '放弃修改并切换', cancelText: '继续填写', onOk: change })
+      return
+    }
+    const dialog = modal.confirm({ title: '切换前有未保存的修改', keyboard: false, maskClosable: false, footer: () => <SaveBeforeSwitch
+      save={async () => { if (!saveRef.current) throw new Error('编辑页面已关闭'); await saveRef.current.save() }}
+      switchPage={change} discard={() => { change(); dialog.destroy() }} close={() => dialog.destroy()}
+    /> })
   }
-  return <><Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述', disabled: busy || props.leaving }, { key: 'materials', label: '物料明细', disabled: busy || props.leaving }]} />
-    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : <MaterialEditor {...editorProps} />}
+  return <><Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }].map((item) => ({ ...item, disabled: busy || editorOpen || props.leaving }))} />
+    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setEditorOpen} onNext={() => switchTab('questions')} /> : tab === 'questions' ? <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} onNext={() => switchTab('ecr')} /> : tab === 'ecr' ? <EcrEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('questions')} onNext={() => switchTab('eco')} /> : tab === 'eco' ? <EcoEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('ecr')} onNext={() => switchTab('emc')} /> : <EmcEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('eco')} />}
   </>
 }
 
@@ -155,7 +188,10 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
   const [reauthenticate, setReauthenticate] = useState(false)
   const [reauthBusy, setReauthBusy] = useState(false)
   const records = useQuery({ queryKey: ['changes', user.id], queryFn: () => api<ChangeRequest[]>('/api/changes/', 'GET', undefined, user.id), enabled: !!user })
-  const detail = useQuery({ queryKey: ['change', user.id, selectedId], queryFn: () => api<ChangeRequest>('/api/changes/' + selectedId + '/', 'GET', undefined, user.id), enabled: !!user && selectedId !== null, refetchOnWindowFocus: false })
+  const detail = useQuery({ queryKey: ['change', user.id, selectedId], queryFn: async () => {
+    const result = await api<ChangeRequest>('/api/changes/' + selectedId + '/', 'GET', undefined, user.id)
+    return newestResponse(queryClient.getQueryData<ChangeRequest>(['change', user.id, selectedId]), result)
+  }, enabled: !!user && selectedId !== null, refetchOnWindowFocus: false })
   const create = useMutation({
     mutationFn: () => api<ChangeRequest>('/api/changes/', 'POST', {}, user.id),
     onSuccess: (record) => { queryClient.setQueryData(['change', user.id, record.id], record); setSelectedId(record.id); setDirty(false); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) },
@@ -167,6 +203,10 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
   const refreshAfterRemoval = (id: number) => {
     queryClient.removeQueries({ queryKey: ['change', user.id, id] })
     queryClient.removeQueries({ queryKey: ['materials', user.id, id] })
+    queryClient.removeQueries({ queryKey: ['questions', user.id, id] })
+    queryClient.removeQueries({ queryKey: ['ecr-actions', user.id, id] })
+    queryClient.removeQueries({ queryKey: ['eco-actions', user.id, id] })
+    queryClient.removeQueries({ queryKey: ['emc', user.id, id] })
     void queryClient.invalidateQueries({ queryKey: ['changes', user.id] })
   }
   const remove = useMutation({
@@ -197,9 +237,9 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
         ]} /></section>}
       </> : detail.data ? <>
         {detail.error && <Alert type="error" showIcon title="申请信息刷新失败，当前填写内容仍保留" description={detail.error.message} className="form-alert" action={<Button loading={detail.isFetching} disabled={saving || exit.isPending} onClick={() => void detail.refetch()}>重试</Button>} />}
-        <ChangeEditor key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending} onReauthenticate={() => setReauthenticate(true)} onBack={() => navigate(() => { setDirty(false); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData(['change', user.id, record.id], record); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
+        <ChangeEditor key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending} onReauthenticate={() => setReauthenticate(true)} onBack={() => navigate(() => { setDirty(false); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
       </> : detail.isPending ? <Spin tip="正在读取草稿…"><div className="loading-space" /></Spin> : <Alert type="error" title={detail.error?.message ?? '无法读取申请。'} action={<><Button loading={detail.isFetching} disabled={exit.isPending} onClick={() => void detail.refetch()}>重试</Button><Button disabled={exit.isPending} onClick={() => { setSelectedId(null); setDirty(false) }}>返回列表</Button></>} />}
-      <footer className="workspace-footer"><span className="muted">当前提供概述及三类物料明细填写与保存，其他表单内容将在后续阶段开放。</span></footer>
+      <footer className="workspace-footer"><span className="muted">当前提供概述、物料及处置、问题评估、ECR、ECO及EMC的填写与保存，其他表单内容将在后续阶段开放。</span></footer>
     </main>
     <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} maskClosable={false} keyboard={!reauthBusy} onCancel={() => setReauthenticate(false)}>
       <p className="muted">使用原账号可继续当前填写；切换账号会关闭原申请。</p>
@@ -209,11 +249,15 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
         setReauthenticate(false)
         void queryClient.invalidateQueries({ queryKey: ['change', currentUser.id] })
         void queryClient.invalidateQueries({ queryKey: ['materials', currentUser.id] })
+        void queryClient.invalidateQueries({ queryKey: ['questions', currentUser.id] })
+        void queryClient.invalidateQueries({ queryKey: ['ecr-actions', currentUser.id] })
+        void queryClient.invalidateQueries({ queryKey: ['eco-actions', currentUser.id] })
+        void queryClient.invalidateQueries({ queryKey: ['emc', currentUser.id] })
       }} />
     </Modal>
   </div>
 }
 
 export default function App() {
-  return <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#176b5b', borderRadius: 8, fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif', controlHeight: 40 } }}><AntApp><Workspace /></AntApp></ConfigProvider>
+  return <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#176b5b', borderRadius: 8, fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif', controlHeight: 40 } }}><AntApp>{new URLSearchParams(window.location.search).get('preview') === 'ecr' ? <EcrPreview /> : <Workspace />}</AntApp></ConfigProvider>
 }

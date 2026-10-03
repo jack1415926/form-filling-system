@@ -5,10 +5,16 @@
   "type": "module",
   "scripts": {
     "test:api": "node --test tests/api.test.mjs",
+    "test:questions": "node --test tests/question-draft.test.mjs",
+    "test:ecr-preview": "node --test tests/ecr-preview.test.mjs",
+    "test:ecr-draft": "node --test tests/ecr-draft.test.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:eco-draft": "node --test tests/eco-draft.test.mjs",
+    "test:latest-response": "node --test tests/latest-response.test.mjs",
+    "test:emc-draft": "node --test tests/emc-draft.test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",
