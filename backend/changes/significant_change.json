@@ -1,0 +1,540 @@
+{
+  "source_sha256": "f51eca7b13a7ca46e2b424529b9af25dd64ddf32ac314bfbced7468ffe630626",
+  "title": "Evaluation Process of Medical Device Significant Change",
+  "charts": [
+    {
+      "id": "0",
+      "text": "是否是MDCG 2020-3中已知的Corrective Action？\n（详见已知Significant or Non-significant变更清单 0.1~0.4）",
+      "source": "实质性变更评估表!B6:F6",
+      "next_steps": {
+        "Y": "在本页结论出填写结论“Non-significant Change",
+        "N": "按照流程图回答ChartA~E"
+      },
+      "next_formula": "IF(C6=\"适用\",\"在本页结论出填写结论“Non-significant Change\",IF(C6=\"不适用\",\"按照流程图回答ChartA~E\",\"\"))",
+      "result_options": [],
+      "validation_hint": ""
+    },
+    {
+      "id": "A",
+      "text": "Change of the Intended purpose?\n是否预期用途发生变化?",
+      "source": "实质性变更评估表!B7:F7",
+      "next_steps": {
+        "Y": "点击进入子评估表回答Chart A的问题",
+        "N": "回答Chart B的问题"
+      },
+      "next_formula": "IF(C7=\"\",\"\",IF(C7=\"适用\",HYPERLINK(\"#实质性变更评估子表!A3\",\"点击进入子评估表回答Chart A的问题\"),\"回答Chart B的问题\"))",
+      "result_options": [
+        {
+          "value": "not_applicable",
+          "label": "N/A"
+        },
+        {
+          "value": "significant",
+          "label": "Significant Change"
+        },
+        {
+          "value": "continue",
+          "label": "回答Chart B的问题"
+        }
+      ],
+      "validation_hint": "当C列评估结果为\"适用\"时：请根据评估子表的结论选择“Significant Change”or“回答Chart B的问题”。\n当C列评估结果为\"不适用\"时：请选择N/A。"
+    },
+    {
+      "id": "B",
+      "text": "Change of the design and performance specification?\n是否设计发生变化?（内置控制机制，设备的操作原理，能源来源， 警报系统，包装运输，有效期，产品性能）",
+      "source": "实质性变更评估表!B8:F8",
+      "next_steps": {
+        "Y": "点击进入子评估表回答Chart B的问题",
+        "N": "在本页结论出填写结论“Non-significant change\""
+      },
+      "next_formula": "IF(C8=\"\",\"\",IF(C8=\"适用\",HYPERLINK(\"#实质性变更评估子表!A7\",\"点击进入子评估表回答Chart B的问题\"),\"在本页结论出填写结论“Non-significant change\"\"\"))",
+      "result_options": [
+        {
+          "value": "not_applicable",
+          "label": "N/A"
+        },
+        {
+          "value": "significant",
+          "label": "Significant Change"
+        },
+        {
+          "value": "continue",
+          "label": "回答Chart C的问题"
+        }
+      ],
+      "validation_hint": "当C列评估结果为\"适用\"时：请根据评估子表的结论选择“Significant Change”or“回答Chart B的问题”。\n当C列评估结果为\"不适用\"时：请选择N/A。"
+    },
+    {
+      "id": "C",
+      "text": "Change to the software?\n软件的变化",
+      "source": "实质性变更评估表!B9:F9",
+      "next_steps": {
+        "Y": "点击进入子评估表回答Chart C的问题",
+        "N": "回答Chart D的问题"
+      },
+      "next_formula": "IF(C9=\"\",\"\",IF(C9=\"适用\",HYPERLINK(\"#实质性变更评估子表!A17\",\"点击进入子评估表回答Chart C的问题\"),\"回答Chart D的问题\"))",
+      "result_options": [
+        {
+          "value": "not_applicable",
+          "label": "N/A"
+        },
+        {
+          "value": "significant",
+          "label": "Significant Change"
+        },
+        {
+          "value": "continue",
+          "label": "回答Chart D的问题"
+        }
+      ],
+      "validation_hint": "当C列评估结果为\"适用\"时：请根据评估子表的结论选择“Significant Change”or“回答Chart B的问题”。\n当C列评估结果为\"不适用\"时：请选择N/A。"
+    },
+    {
+      "id": "D",
+      "text": "Change of a substance or material?\n物质或材料的变化？",
+      "source": "实质性变更评估表!B10:F10",
+      "next_steps": {
+        "Y": "点击进入子评估表回答Chart D的问题",
+        "N": "回答Chart E的问题"
+      },
+      "next_formula": "IF(C10=\"\",\"\",IF(C10=\"适用\",HYPERLINK(\"#实质性变更评估子表!A25\",\"点击进入子评估表回答Chart D的问题\"),\"回答Chart E的问题\"))",
+      "result_options": [
+        {
+          "value": "not_applicable",
+          "label": "N/A"
+        },
+        {
+          "value": "significant",
+          "label": "Significant Change"
+        },
+        {
+          "value": "continue",
+          "label": "回答Chart E的问题"
+        }
+      ],
+      "validation_hint": "当C列评估结果为\"适用\"时：请根据评估子表的结论选择“Significant Change”or“回答Chart B的问题”。\n当C列评估结果为\"不适用\"时：请选择N/A。"
+    },
+    {
+      "id": "E",
+      "text": "Change of terminal sterilisation method of device or packaging design with impact to the sterilisation?\n设备或包装设计的终端灭菌方法的改变会对灭菌效果产生影响吗？",
+      "source": "实质性变更评估表!B11:F11",
+      "next_steps": {
+        "Y": "点击进入子评估表回答Chart E的问题",
+        "N": "点击此处在结论出输出评估结果"
+      },
+      "next_formula": "IF(C11=\"\",\"\",IF(C11=\"适用\",HYPERLINK(\"#实质性变更评估子表!A31\",\"点击进入子评估表回答Chart E的问题\"),HYPERLINK(\"#C14\",\"点击此处在结论出输出评估结果\")))",
+      "result_options": [
+        {
+          "value": "not_applicable",
+          "label": "N/A"
+        },
+        {
+          "value": "significant",
+          "label": "Significant Change"
+        },
+        {
+          "value": "non_significant",
+          "label": "Non-significant Change"
+        }
+      ],
+      "validation_hint": "当C列评估结果为\"适用\"时：请根据评估子表的结论选择“Significant Change”or“回答Chart B的问题”。\n当C列评估结果为\"不适用\"时：请选择N/A。"
+    }
+  ],
+  "questions": [
+    {
+      "id": "sub_a_1",
+      "number": "A-1",
+      "chart": "A",
+      "source_title": "Chart A Change to the intended purpose",
+      "text": "Limitation of the Intended Purpose?\n预期用途的局限性？\n-Restriction or deletion of certain indications;\n-Restriction or deletion of certain applications, e.g. anatomical site, delivery pathway or deployment method;\n-Restricting the target population.\n限制或删除某些适应症；限制或删除某些应用，例如解剖部位、给药途径或部署方法；限制目标人群。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to A-2\n转向A-2",
+      "source": "实质性变更主清单!C3:J3"
+    },
+    {
+      "id": "sub_a_2",
+      "number": "A-2",
+      "chart": "A",
+      "source_title": "Chart A Change to the intended purpose",
+      "text": "Extension of the Intended Purpose?\n预期用途的扩展？\n-additional or new indications;\n-additional or new clinical conditions.\n额外或新的适应症；额外或新的临床情况。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to A-3\n转向A-3",
+      "source": "实质性变更主清单!C4:J4"
+    },
+    {
+      "id": "sub_a_3",
+      "number": "A-3",
+      "chart": "A",
+      "source_title": "Chart A Change to the intended purpose",
+      "text": "New user or patient population?\n新用户或新患者群体？\n-additional or new target population;\n-additional or new user (e.g. change from professional use to layman use)\n新增或新的目标人群；新增或新的用户（例如，从专业使用转为普通用户使用）",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to A-4\n转向A-4",
+      "source": "实质性变更主清单!C5:J5"
+    },
+    {
+      "id": "sub_a_4",
+      "number": "A-4",
+      "chart": "A",
+      "source_title": "Chart A Change to the intended purpose",
+      "text": "New way of clinical application?\n新的临床应用方式？\nadditional or new applications (different stage or severity of disease);\n-additional or new anatomical site;\n-new delivery pathway or deployment method.\n额外或新的适应症（疾病的不同阶段或严重程度）；额外或新的解剖部位；新的递送途径或施用方法。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Return to Main Chart Question Chart B\n返回主表并回答Chart B",
+      "source": "实质性变更主清单!C6:J6"
+    },
+    {
+      "id": "sub_b_1",
+      "number": "B-1",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Change of the design that alter:\n-the built-in control mechanism,\n-the device’s operating principle,\n-the change of the source of energy, or\n-the alarms systems and\nwhich does not adversely affect the safety, performance or usability and negatively affect the risk/benefit ratio of the device.\n\n设计的变更包括： 内置控制机制， 设备的操作原理， 能源来源的变化，或  警报系统的变更，以及不会对设备的安全性、性能或可用性产生不利影响，也不会对设备的风险/收益比产生负面影响的变更。",
+      "yes_result": "Turn to B-1.1\n转向B-1.1",
+      "no_result": "Turn to B-2\n转向B-2",
+      "source": "实质性变更主清单!C7:J7"
+    },
+    {
+      "id": "sub_b_1_1",
+      "number": "B-1.1",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Change in Specification/Labelling, \nchanges that may adversely affect the safety or performance and negatively affect the risk/benefit ratio of the device.\n规格/标签变更\n可能会对设备的安全性或性能产生不利影响，并且会负面影响设备的风险/收益比的更改。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to B-1.2\n转向B-1.2",
+      "source": "实质性变更主清单!C8:J8"
+    },
+    {
+      "id": "sub_b_1_2",
+      "number": "B-1.2",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Change of a component of a device (in particular electronics):\nchanges that may adversely affect the safety or performance and negatively affect the risk/benefit ratio of the device.\n更换设备的组件（尤其是电子设备）\n可能会对设备的安全性或性能产生不利影响，并且会负面影响设备的风险/收益比的更改。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to B-1.3\n转向B-1.3",
+      "source": "实质性变更主清单!C9:J9"
+    },
+    {
+      "id": "sub_b_1_3",
+      "number": "B-1.3",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Change to the source of energy\nchanges that may adversely affect the safety or performance and negatively affect the risk/benefit ratio of the device\n改变能源来源\n可能会对设备的安全性或性能产生不利影响，并且会负面影响设备的风险/收益比的更改。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to B-2\n转向B-2",
+      "source": "实质性变更主清单!C10:J10"
+    },
+    {
+      "id": "sub_b_2",
+      "number": "B-2",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Product packaging and transportation change？\n产品包装运输的变更？",
+      "yes_result": "Turn to B-2.1\n转向B-2.1",
+      "no_result": "Turn to B-3\n转向B-3",
+      "source": "实质性变更主清单!C11:J11"
+    },
+    {
+      "id": "sub_b_2_1",
+      "number": "B-2.1",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Change in packaging design which affects, stability or micro biological state of the device, incl. seal integrity?\n包装设计的变更是否会影响设备的稳定性或微生物状态，包括密封的完整性？并产生不利影响，且会负面影响设备的风险/收益比的更改。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to B-3\n转向B-3",
+      "source": "实质性变更主清单!C12:J12"
+    },
+    {
+      "id": "sub_b_3",
+      "number": "B-3",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Shelf-life extension?\n有效期延长？",
+      "yes_result": "Turn to B-3.1\n转向B-3.1",
+      "no_result": "Turn to B-4\n转向B-4",
+      "source": "实质性变更主清单!C13:J13"
+    },
+    {
+      "id": "sub_b_3_1",
+      "number": "B-3.1",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "extension of the (labelled) shelf life which is not validated against protocols approved by the notified body.\n未依据公告机构批准的方案进行验证的有效期（标签上的）延长情况。（或有效期延长方案未经过公告机构的批准）",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to B-4\n转向B-4",
+      "source": "实质性变更主清单!C14:J14"
+    },
+    {
+      "id": "sub_b_4",
+      "number": "B-4",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Does the change affect the performance of the medical device?(e.g., a reduction in performance indicators)\n变更是否影响了器械的性能?（如降低了性能指标）",
+      "yes_result": "Turn to B-4.1\n转向B-4.1",
+      "no_result": "Return to Main Chart Question Chart C\n返回主表并回答Chart C",
+      "source": "实质性变更主清单!C15:J15"
+    },
+    {
+      "id": "sub_b_4_1",
+      "number": "B-4.1",
+      "chart": "B",
+      "source_title": "Chart B Change of the design",
+      "text": "Does the change affect the safety or perform according to the design verification or validation. and negatively affect the benefit/risk ratio of the device?\n根据设计验证和确认过程中进行的风险分析及验证结果，该变更是否会影响设备的安全性或有效性，并且对设备的受益/风险比产生不利影响？",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Return to Main Chart Question Chart C\n返回主表并回答Chart C",
+      "source": "实质性变更主清单!C16:J16"
+    },
+    {
+      "id": "sub_c_1",
+      "number": "C-1",
+      "chart": "C",
+      "source_title": "Chart C Change of the software",
+      "text": "New or major change of operating system or any component? (beyond minor changes) (e.g. Linux to Windows or iOS or Android) or new version of an operating system Windows 10 to Windows 11) if modification to the device software is required.\n操作系统或其任何组件的新增或重大变更（超出微小变更的范围），例如：\n从Linux更改为Windows、iOS或Android；\n操作系统版本升级（如从Windows 10更改为Windows 11），且该变更需要对器械软件进行修改。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to C-2\n转向C-2",
+      "source": "实质性变更主清单!C17:J17"
+    },
+    {
+      "id": "sub_c_2",
+      "number": "C-2",
+      "chart": "C",
+      "source_title": "Chart C Change to materials",
+      "text": "New or modification of architecture or database structure, change of an algorithm?\n新的架构或数据库结构的修改，算法的变更？",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to C-3\n转向C-3",
+      "source": "实质性变更主清单!C18:J18"
+    },
+    {
+      "id": "sub_c_3",
+      "number": "C-3",
+      "chart": "C",
+      "source_title": "Chart C Change of the software",
+      "text": "change of an algorithm which impact the operating principles or impact the control of the device and may alter the diagnosis or therapy delivered;\n更改算法，这种更改会影响设备的操作原理或控制，并可能改变所提供的诊断或治疗；",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to C-4\n转向C-4",
+      "source": "实质性变更主清单!C19:J19"
+    },
+    {
+      "id": "sub_c_4",
+      "number": "C-4",
+      "chart": "C",
+      "source_title": "Chart C Change of the software",
+      "text": "Required user input replaced by closed loop algorithm?\n所需用户输入是否被闭环算法所取代？",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to C-5\n转向C-5",
+      "source": "实质性变更主清单!C20:J20"
+    },
+    {
+      "id": "sub_c_5",
+      "number": "C-5",
+      "chart": "C",
+      "source_title": "Chart C Change of the software",
+      "text": "New user interface, such as:\n-presentation of medical data in a new format or by a new dimension or measuring unit;\n-keyboard input to touchscreen;\n-keyboard to wireless remote control;\n-software changes that impacts the way data is read or interpreted by the user, such that the treatment of the patient may be altered when compared to previous version of software;\n新的用户界面，例如：- 以新的格式或新的维度或测量单位呈现医疗数据；- 键盘输入改为触摸屏输入；- 键盘改为无线遥控；- 软件更改影响用户读取或解释数据的方式，从而可能导致与软件先前版本相比患者治疗发生变化；",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to C-6\n转向C-6",
+      "source": "实质性变更主清单!C21:J21"
+    },
+    {
+      "id": "sub_c_6",
+      "number": "C-6",
+      "chart": "C",
+      "source_title": "Chart C Change of the software",
+      "text": "New medical feature or functionality that may change the diagnosis or the therapy delivered to the patient; \n可能改变患者诊断或治疗的新医疗功能或特性；",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to C-7\n转向C-7",
+      "source": "实质性变更主清单!C22:J22"
+    },
+    {
+      "id": "sub_c_7",
+      "number": "C-7",
+      "chart": "C",
+      "source_title": "Chart C Change of the software",
+      "text": "New channel of interoperability (e.g. software changes that allow for wireless communication with compatible -continuous- blood glucose monitors).\n新的互操作性通道（例如，软件方面的改动，能够实现与兼容的连续式血糖监测仪的无线通信）。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to C-8\n转向C-8",
+      "source": "实质性变更主清单!C23:J23"
+    },
+    {
+      "id": "sub_c_8",
+      "number": "C-8",
+      "chart": "C",
+      "source_title": "Chart C Change of the software",
+      "text": "Does the change negatively affect the benefit/risk ratio of the device?\n这种变化是否会对该设备的收益/风险比产生负面影响？",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Return to Main Chart Question Chart D\n返回主表并回答Chart D",
+      "source": "实质性变更主清单!C24:J24"
+    },
+    {
+      "id": "sub_d_1",
+      "number": "D-1",
+      "chart": "D",
+      "source_title": "Chart D Change of a substance or material",
+      "text": "Change to or addition of a new material of human/animal origin?\n材料是动物或者人类来源?",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to D-2\n转向D-2",
+      "source": "实质性变更主清单!C25:J25"
+    },
+    {
+      "id": "sub_d_2",
+      "number": "D-2",
+      "chart": "D",
+      "source_title": "Chart D Change of a substance or material",
+      "text": "Change to the excipient of an MS(substance which, if used separately, would be considered to be a medicinal substance) or to the MS itself?\n是改变 MS（药用物质，该物质若单独使用，将被视为一种药用物质）的辅料，还是改变 MS 本身？",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to D-3\n转向D-3",
+      "source": "实质性变更主清单!C26:J26"
+    },
+    {
+      "id": "sub_d_3",
+      "number": "D-3",
+      "chart": "D",
+      "source_title": "Chart D Change of a substance or material",
+      "text": "Is the material or substance in contact ›30d with patient tissue or fluidor absorbed(Surgically invasive devices only)?\n器械是否会被人体吸收或在人体内时间>30天，并且改变的材料和人体接触?",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to D-4\n转向D-4",
+      "source": "实质性变更主清单!C27:J27"
+    },
+    {
+      "id": "sub_d_4",
+      "number": "D-4",
+      "chart": "D",
+      "source_title": "Chart D Change of a substance or material",
+      "text": "Change from a material with a low toxicological or biological risk to a material with a higher one;\n从毒性或生物风险较低的材料转变为毒性或生物风险较高的材料；",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估",
+      "no_result": "Turn to D-5\n转向D-5",
+      "source": "实质性变更主清单!C28:J28"
+    },
+    {
+      "id": "sub_d_5",
+      "number": "D-5",
+      "chart": "D",
+      "source_title": "Chart D Change of a substance or material",
+      "text": "The changes in the materials do not meet the current acceptable standards and require a reduction in the acceptance criteria.\n材料的变化不满足现有可接受标准，且需要降低接受准则。",
+      "yes_result": "Turn to D-5.1\n转向D-5.1",
+      "no_result": "Return to Main Chart Question Chart E\n返回主表并回答Chart E",
+      "source": "实质性变更主清单!C29:J29"
+    },
+    {
+      "id": "sub_d_5_1",
+      "number": "D-5.1",
+      "chart": "D",
+      "source_title": "Chart D Change of a substance or material",
+      "text": "Does the change negatively affect the benefit/risk ratio of the device?\n该变更是否对器械的利益/风险比产生负面影响？",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "Return to Main Chart Question Chart E\n返回主表并回答Chart E",
+      "source": "实质性变更主清单!C30:J30"
+    },
+    {
+      "id": "sub_e_1",
+      "number": "E-1",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "Change of the terminal sterilisation method\n终端灭菌方法的变更",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "Turn to E-2\n转向E-2",
+      "source": "实质性变更主清单!C31:J31"
+    },
+    {
+      "id": "sub_e_2",
+      "number": "E-2",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "Change from biological indicator to parametric release;\n从生物指示剂变更为参数放行；",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "N Turn to E-3\n转向E-3",
+      "source": "实质性变更主清单!C32:J32"
+    },
+    {
+      "id": "sub_e_3",
+      "number": "E-3",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "Changing a device from labelled “non-sterile” to labelled “sterile”;\n将器械标签由“非无菌”更改为“无菌”；",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "N Turn to E-4\n转向E-4",
+      "source": "实质性变更主清单!C33:J33"
+    },
+    {
+      "id": "sub_e_4",
+      "number": "E-4",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "Change (e.g. of the device) which adversely affects the sterility assurance leve\n改变（例如设备的改变），会对无菌保障水平产生不利影响",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "N Turn to E-5\n转向E-5",
+      "source": "实质性变更主清单!C34:J34"
+    },
+    {
+      "id": "sub_e_5",
+      "number": "E-5",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "Change in packaging design which affects sterility, stability or microbiological state of the device, including seal integrity;\n包装设计的更改会影响器械的无菌性、稳定性或微生物状态，包括密封完整性；",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "N Turn to E-6\n转向E-6",
+      "source": "实质性变更主清单!C35:J35"
+    },
+    {
+      "id": "sub_e_6",
+      "number": "E-6",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "Changes to storage or transportation conditions which could adversely affect the sterility or stability.\n储存或运输条件的变更可能会对物品的无菌性或稳定性产生不利影响。",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "N Turn to E-7\n转向E-7",
+      "source": "实质性变更主清单!C36:J36"
+    },
+    {
+      "id": "sub_e_7",
+      "number": "E-7",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "The sterilization supplier has changed.\n灭菌供应商发生变更",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "N Turn to E-8\n转向E-8",
+      "source": "实质性变更主清单!C37:J37"
+    },
+    {
+      "id": "sub_e_8",
+      "number": "E-8",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "Shelf-life extension?\n有效期延长？",
+      "yes_result": "Turn to E-8.1\n转向E-8.1",
+      "no_result": "Return to Main Chart for final determination\n返回主表做最终确认",
+      "source": "实质性变更主清单!C38:J38"
+    },
+    {
+      "id": "sub_e_8_1",
+      "number": "E-8.1",
+      "chart": "E",
+      "source_title": "Chart E Change of terminal sterilisation",
+      "text": "Extension of the (labelled) shelf life which is not validated against protocols approved by the notified body.\n未依据公告机构批准的方案进行验证的有效期（标签上的）延长情况。（或有效期延长方案未经过公告机构的批准）",
+      "yes_result": "Significant change, end of evaluation\n重大变更，结束评估。",
+      "no_result": "Return to Main Chart for final determination\n返回主表做最终确认",
+      "source": "实质性变更主清单!C39:J39"
+    }
+  ],
+  "f_text": "None of the above applies\n以上均不适用",
+  "f_options": [
+    {
+      "value": "not_applicable",
+      "label": "N/A"
+    },
+    {
+      "value": "ra_non_significant",
+      "label": "和RA初步评估，该变更不属于Significant Change"
+    },
+    {
+      "value": "ra_significant",
+      "label": "经过RA确认，该变更属于Significant Change"
+    }
+  ],
+  "final_options": [
+    {
+      "value": "non_significant",
+      "label": "'The change is considered non-significant per  Art. 120(3c) point (b) MDR’"
+    },
+    {
+      "value": "significant",
+      "label": " The change is considered significant per  Art. 120(3c) point (b) MDR'"
+    }
+  ]
+}

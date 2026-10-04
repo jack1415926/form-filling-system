@@ -1,3 +1,4 @@
+from .review_access import readable_change
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -52,6 +53,7 @@ class PlanPatchSerializer(serializers.Serializer):
 
 
 class ExecutionPlanDetail(APIView):
+    allow_review_read = True
     http_method_names = ["get", "patch", "head", "options"]
 
     @staticmethod
@@ -65,13 +67,13 @@ class ExecutionPlanDetail(APIView):
 
     def get(self, request, pk):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = readable_change(request, pk)
             return Response(self.data(record))
 
     def patch(self, request, pk):
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
-            if record.status != ChangeRequest.Status.DRAFT:
+            if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改执行计划。"}, status=409)
             payload = PlanPatchSerializer(data=request.data)
             payload.is_valid(raise_exception=True)

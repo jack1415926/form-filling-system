@@ -1,3 +1,4 @@
+import { actorUser, canEdit, backLabel } from './workflow'
 import { newestResponse } from './latestResponse'
 import DateInput from './DateInput'
 import { useEffect, useState } from 'react'
@@ -15,11 +16,13 @@ function ActionForm({ action, record, leaving, paused, onDirty, onBusy, onSaved,
   action: EcrAction; record: ChangeRequest; leaving: boolean; paused: boolean
   onDirty: (value: boolean) => void; onBusy: (value: boolean) => void; onSaved: (data: EcrData) => EcrData; onComplete: () => void
 }) {
+  const queryClient = useQueryClient()
+  const actorId = actorUser(queryClient).id
   const [dateInvalid, setDateInvalid] = useState(false)
   const save = useAutosave({
-    fields: actionFields(action), enabled: record.status === 'draft' && !leaving, valid: !dateInvalid, paused, onDirty, onBusy,
+    fields: actionFields(action), enabled: canEdit(record, actorUser(queryClient).role) && !leaving, valid: !dateInvalid, paused, onDirty, onBusy,
     send: async (patch) => {
-      const data = await api<EcrData>(`/api/changes/${record.id}/ecr-actions/${action.id}/`, 'PATCH', patch, record.applicant)
+      const data = await api<EcrData>(`/api/changes/${record.id}/ecr-actions/${action.id}/`, 'PATCH', patch, actorId)
       const latest = save.queue.active ? onSaved(data) : data
       return actionFields(latest.actions.find((row) => row.id === action.id)!)
     },
@@ -27,11 +30,11 @@ function ActionForm({ action, record, leaving, paused, onDirty, onBusy, onSaved,
   const values = save.values as EcrValues
   const dirty = save.dirty
   const update = (next: Partial<EcrValues>) => save.update(next)
-  const disabled = record.status !== 'draft' || leaving || save.manual
+  const disabled = !canEdit(record, actorUser(queryClient).role) || leaving || save.manual
   const manualSave = () => { void save.manualSave().then(onComplete).catch(() => {}) }
   return <div className="preview-drawer" {...save.composition}>
     <Tag>{action.function}</Tag><p className="question-text">{action.text}</p>
-    {record.status !== 'draft' && <Alert type="info" title="申请已锁定，仅供查看。" />}
+    {!canEdit(record, actorUser(queryClient).role) && <Alert type="info" title="申请已锁定，仅供查看。" />}
     <label htmlFor="ecr-owner">负责人</label><Input id="ecr-owner" maxLength={255} disabled={disabled} value={values.owner} onChange={(event) => update({ owner: event.target.value })} />
     <label htmlFor="ecr-result">评估结果</label><Input.TextArea id="ecr-result" disabled={disabled} value={values.result} autoSize={{ minRows: 5, maxRows: 12 }} onChange={(event) => update({ result: event.target.value })} />
     <div className="form-grid"><div><label htmlFor="ecr-status">评估状态</label><Select id="ecr-status" style={{ width: '100%' }} disabled={disabled} options={statusOptions} value={values.status} onChange={(status: EcrValues['status']) => update({ status })} /></div><div><label htmlFor="ecr-date">日期</label><DateInput id="ecr-date" disabled={disabled} value={values.date ?? ''} onChange={(event) => { const invalid = event.target.validity.badInput; setDateInvalid(invalid); if (!invalid) update({ date: event.target.value || null }) }} /></div></div>
@@ -46,14 +49,15 @@ export default function EcrEditor({ record, onDirty, onBusy, onBack, onPrevious,
 }) {
   const { modal, message } = App.useApp()
   const queryClient = useQueryClient()
+  const actorId = actorUser(queryClient).id
   const [editor, setEditor] = useState<EcrAction | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [all, setAll] = useState(false)
-  const queryKey = ['ecr-actions', record.applicant, record.id]
+  const queryKey = ['ecr-actions', actorId, record.id]
   const actions = useQuery({ queryKey, refetchOnWindowFocus: false, queryFn: async () => {
-    const result = await api<EcrData>(`/api/changes/${record.id}/ecr-actions/`, 'GET', undefined, record.applicant)
+    const result = await api<EcrData>(`/api/changes/${record.id}/ecr-actions/`, 'GET', undefined, actorId)
     const current = queryClient.getQueryData<EcrData>(queryKey)
     return newestResponse(current, result)
   } })
@@ -68,7 +72,7 @@ export default function EcrEditor({ record, onDirty, onBusy, onBack, onPrevious,
   }
   const rows = (actions.data?.actions ?? []).filter((row) => all || row.question_answer === 'Y')
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>ECR 评估行动</h1><p className="muted">默认只显示已保存问题回答为“是”的行动；未触发内容可在全部行动中查看。</p></div><Button disabled={busy} onClick={onBack}>返回我的申请</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>ECR 评估行动</h1><p className="muted">默认只显示已保存问题回答为“是”的行动；未触发内容可在全部行动中查看。</p></div><Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div>
     {actions.error && <Alert type="error" showIcon title={actions.data ? '评估刷新失败，当前内容仍保留' : '无法读取 ECR 评估'} description={actions.error.message} className="form-alert" action={<Button disabled={busy} loading={actions.isFetching} onClick={() => void actions.refetch()}>重试</Button>} />}
     <section className="panel list-panel"><div className="section-heading"><h2>ECR 评估行动</h2><Select aria-label="行动筛选" disabled={busy || !!editor} style={{ width: 190 }} value={all ? 'all' : 'relevant'} options={[{ value: 'relevant', label: '当前触发' }, { value: 'all', label: '全部行动' }]} onChange={(value) => setAll(value === 'all')} /></div>
       <Table<EcrAction> rowKey="id" pagination={false} loading={actions.isPending} dataSource={rows} scroll={{ x: 1035 }} locale={{ emptyText: <Empty description={actions.error ? '读取失败，请重试' : '暂无当前触发的行动，可先保存问题答案或查看全部行动。'} /> }} columns={[
@@ -76,15 +80,15 @@ export default function EcrEditor({ record, onDirty, onBusy, onBack, onPrevious,
         { title: '职能', dataIndex: 'function', width: 125 },
         { title: 'ECR 评估行动', dataIndex: 'text', width: 380, render: (text: string) => <div className="question-text">{text}</div> },
         { title: '填写摘要', width: 280, render: (_, row) => <div className="preview-summary"><div>{row.owner || '未填负责人'} · {statusLabels[row.status]} · {row.date || '未填日期'}</div><p title={row.result}>{row.result ? row.result.slice(0, 100) : '未填写评估结果'}</p></div> },
-        { title: '操作', width: 90, render: (_, row) => <Button type="link" disabled={busy || !!editor} onClick={() => setEditor(row)}>{record.status === 'draft' ? '编辑' : '查看'}</Button> },
+        { title: '操作', width: 90, render: (_, row) => <Button type="link" disabled={busy || !!editor} onClick={() => setEditor(row)}>{canEdit(record, actorUser(queryClient).role) ? '编辑' : '查看'}</Button> },
       ]} />
     </section><div className="form-footer"><span className="muted">未触发时隐藏，不删除已有填写；触发后重新出现。</span><div className="form-actions"><Button disabled={busy || !!editor} onClick={onPrevious}>上一页</Button><Button disabled={busy || !!editor} onClick={onNext}>下一页</Button></div></div>
     <Drawer open={!!editor} size={720} title={editor && `问题 ${editor.number} · ECR 评估`} onClose={close} maskClosable={!busy} keyboard={!busy} closable={!busy} extra={<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button>}>
       {editor && <ActionForm key={editor.id} action={actions.data?.actions.find((row) => row.id === editor.id) ?? editor} record={record} leaving={leaving} paused={confirming} onDirty={(value) => { setDirty(value); onDirty(value) }} onBusy={(value) => { setSaving(value); onBusy(value) }} onComplete={() => { setEditor(null); setDirty(false); message.success('已保存') }} onSaved={(data) => {
         const latest = newestResponse(queryClient.getQueryData<EcrData>(queryKey), data)
         queryClient.setQueryData(queryKey, latest)
-        void queryClient.invalidateQueries({ queryKey: ['change', record.applicant, record.id] })
-        void queryClient.invalidateQueries({ queryKey: ['changes', record.applicant] })
+        void queryClient.invalidateQueries({ queryKey: ['change', actorId, record.id] })
+        void queryClient.invalidateQueries({ queryKey: ['changes', actorId] })
         return latest
       }} />}
     </Drawer>

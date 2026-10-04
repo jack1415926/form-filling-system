@@ -60,3 +60,7 @@ GET／PATCH `/api/changes/{id}/execution-plan/` 使用认证、CSRF、预期账�
 执行计划技术交付与列出的真实页面复验完成。原件、旧业务数据及申请 #8 未修改，临时数据结束后清理；没有 Git 提交／推送或正式部署。实际业务验收及其余工作表单独保留。
 
 结束时已删除本轮两个临时账号、申请 #46／#47、关联填写与会话和凭据文件。清理后旧十张业务表逐字段完全一致，执行计划表为 0，独立测试库不存在。关闭专属浏览器及本轮启动的 Django／Vite 预览，MySQL 保持原 Running／Manual 状态。
+
+## 后续 GitHub 交付同步（2026-10-04）
+
+上述验证记录保留当时状态。功能代码已随 [69ad8e7](https://github.com/jack1415926/form-filling-system/commit/69ad8e72389d55577a36d88bde276c611da4fafe) 推送到 `codex/enforce-unique-change-numbers`，尚未合并 main；PR #2 已合并的基线为 `dd74f27`。当前功能、验证数量、服务快照和剩余事项统一见 [README](../../README.md)。代码推送不代表数据库同步、正式部署或完整业务验收通过。

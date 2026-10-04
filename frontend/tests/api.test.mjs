@@ -11,6 +11,14 @@ test('nested validation errors retain field paths and messages', () => {
 })
 
 const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve() }
+test('role rejection refreshes identity and retains the permission message instead of a login error', async (t) => {
+  mockEnvironment(t, async () => new Response(JSON.stringify({ detail: '当前账号为审核员，不能访问填写员功能。', code: 'role_forbidden' }), { status: 403 }))
+  let changed = 0
+  window.addEventListener('role-changed', () => changed++)
+  await assert.rejects(api('/api/changes/'), (error) => error.status === 403 && error.message === '当前账号为审核员，不能访问填写员功能。')
+  assert.equal(changed, 1)
+})
+
 function mockEnvironment(t, fetcher, cookie = 'csrftoken=test-csrf') {
   const previous = { fetch: globalThis.fetch, document: globalThis.document, window: globalThis.window }
   globalThis.fetch = fetcher; globalThis.document = { cookie }; globalThis.window = new EventTarget()

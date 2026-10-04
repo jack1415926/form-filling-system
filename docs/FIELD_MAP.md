@@ -20,7 +20,7 @@
 | ECO 计划完成时间 | D11 | planned_eco_date |
 | 变更原因 | K3 | change_reason |
 
-`applicant` 关联登录用户，与 D10 的业务负责人文字分开保存。`status`、`created_at`、`updated_at` 为系统字段。所有概述业务字段可暂不填写；短文本的长度和日期格式由后端检查。本批不新增自动编号或提交必填业务规则。
+`applicant` 关联登录用户，与 D10 的业务负责人文字分开保存。`status`、`created_at`、`updated_at` 为系统字段。所有概述业务字段可暂不填写；短文本的长度和日期格式由后端检查。不新增自动编号；提交批次另确认标题与ECR编号非空，草稿保存仍允许留空。
 
 编号规则见 [MVP](MVP.md#数据存储与-er-补充)；本文件维护映射，不另记录实现状态。当前状态见 [README](../README.md#当前进度)。
 
@@ -61,7 +61,7 @@
 
 正式页面的数据请求及退出请求携带 `X-Expected-User`（页面预期账号 ID）。后端仍以当前认证账号决定权限；该头仅作上下文前提校验，不授予任何权限。与当前账号不符时返回 409、`code=account_changed`，操作不执行，页面刷新身份并切换工作台。旧 API 客户端未携带此头时保持既有认证行为；登录、身份读取及 CSRF 获取不绑定旧账号。物料列表 GET 在同一事务内锁定申请并完成基础字段及处置读取，避免混合不同版本。
 
-## 八表总览与待开发映射
+## 八表总览与开发映射
 
 | 工作表 | 填报或展示内容 |
 | --- | --- |
@@ -71,8 +71,8 @@
 | ECO | 固定行动、负责人、完成情况、完成／不适用／在实施阶段完成状态及日期 |
 | EMC reference | 参考定义只读；本人申请填写测试标记与说明，已正式接入B版；审查归入后续 MVP 的全站审核员功能，管理员定义维护暂不纳入 MVP |
 | 设计变更执行计划 | 已接入；11 条固定活动、责任人、开始与结束日期及备注 |
-| 实质性变更评估表 | 主表适用性回答、原因、下一步及评估结论 |
-| 实质性变更评估子表 | 子问题回答、原因和规则引导 |
+| 实质性变更评估表 | 已接入；七项主表适用性、原因、原规则下一步提示、人工组结论与最终结论 |
+| 实质性变更评估子表 | 已接入A～E抽屉；37题回答、原因及原规则提示 |
 
 总体实施安排见 [MVP](MVP.md#两周实施安排)，当前下一小批入口见 README；本文件只维护字段与规则映射。
 
@@ -120,7 +120,7 @@ GET／PATCH `/api/changes/{id}/execution-plan/` 返回 `{updated_at, rows}`，PA
 - “Decision Tree Refer ”：保留原有指导内容，不将其自动转为本次新增的审批、拒绝或退回流程。
 - “实质性变更主清单”：子问题的 Y/N 分支、下一题和结束结论，作为固定规则来源。
 
-后续实现前需逐项登记完整字段、固定项标识和规则分支，尤其核对条件性备注、主子表跳转及结束条件。原实例中的回答与行动填写内容分别保留，不因问题回答“否”而自动删除已填行动。旧表中的宏、隐藏区域和公式用于技术核对，不构成 MVP 的 Excel 导入／导出功能。
+新增或调整规则前需逐项登记完整字段、固定项标识和规则分支，尤其核对条件性备注、主子表跳转及结束条件。原实例中的回答与行动填写内容分别保留，不因问题回答“否”而自动删除已填行动。旧表中的宏、隐藏区域和公式用于技术核对，不构成 MVP 的 Excel 导入／导出功能。
 
 ## EMC reference：B版仅填写者（已接入）
 
@@ -129,3 +129,25 @@ GET／PATCH `/api/changes/{id}/execution-plan/` 返回 `{updated_at, rows}`，PA
 GET/PATCH `/api/changes/{id}/emc/` 返回矩阵、updated_at、initialized和can_fill。PATCH结构为 `{"cells":{"emc_change_001/emc_test_001":{"mark":"X","remark":"说明"}}}`；省略保持、空字符串清空。只允许本人申请，metadata、行列、角色等字段拒绝；超级用户也不开放跨申请维护。
 
 四张表为emc_reference、emc_reference_row、emc_reference_test、emc_reference_cell。稳定行／列键与物理主键分开，交叉格通过行和测试外键关联，同格唯一及复合归属约束。GET返回默认配置但不写库，首次实际填写保存本单副本；空格不创建记录，清空两格删除记录但保留参考。旧申请未补录EMC结果，问题7改变不删除填写。来源与限制见[接入记录](testing/EMC-INTEGRATION-2026-10-03.md)。
+
+## 实质性变更评估主表／子表（已实现）
+
+主表C2／C3／C4引用概述D8／D7／K3，网页直接显示已保存ECR编号／标题／变更原因。B6:F11为第0项及A～E，C列映射applicability（空／Y适用／N不适用），D列reason，E列原公式next_steps只读提示；A～E的F列为人工result，第0项无子表结论。A～Dresult为空／not_applicable／significant／continue，E最后一项为non_significant。F项C12映射f_assessment（空／not_applicable／ra_non_significant／ra_significant），C14最终结论为空／non_significant／significant，标签保留原数据验证文本，不预填实例。
+
+子表B3:F39与隐藏主清单C3:J39逐题对应：题号、完整题干、Y/N回答、只读分支结果、原因。A4题、B10题、C8题、D6题、E9题，共37题。内部question_key如sub_b_1_1，页面显示B-1.1；answer为空／Y／N，reason为原F列。原子表E40汇总结论在网页改为各组抽屉底部人工选择，直接编辑主表该组result，没有第二份结论记录。
+
+固定定义在backend/changes/significant_change.json，来源地址、原主表公式、验证说明及原分组标题随定义保留；GET/PATCH `/api/changes/{id}/significant-change/` 返回完整定义和updated_at。PATCH格式为 `{"assessment":{"final_conclusion":"significant"},"charts":{"A":{"applicability":"Y","result":"continue"}},"questions":{"sub_b_1_1":{"answer":"N","reason":"原因"}}}`；省略保持、空字符串清空，未知字段、非法标识或选项整批拒绝，全部字段空白删除对应填写记录。GET不创建数据，固定文字不随申请复制。
+
+主表B不适用提前结束提示、多行说明重复引用Chart B、C-2原分组标题及第0项参考清单缺失均标注疑点，不自动改分支或结论；未回答不等于N，不适用不删除回答，改答不清除人工结论。源文件哈希、74个分支及验证定义比对见 [交付记录](testing/SIGNIFICANT-CHANGE-2026-10-04.md)。
+
+## 提交信息（系统新增，已实现）
+
+review_mode为空／designated／public，submitted_at为提交时间，不对应源表单元格，也不允许普通概述PATCH修改。提交批次review_record保存本单指定审核员账号与空批准时间；当前按审核轮次关联并记录个人批准（见下节），与ECR／ECO的负责人文字分开；不能从源表姓名自动指定系统审核员。审核员名单以有效账号及Django“审核员”组为准。
+
+标题title与ECR编号ecr_no仅提交时要求非空（含纯空白拒绝）。其他工作表不新增整表必填；提交读取已经保存的内容，成功后pending／approved状态下全部填写接口拒绝修改；退回后允许本人修订，见下节审核轮次规则。指定至少选一名、公开不选人且至少存在两名有效审核员；正式确认前的选择仅保留在页面，不写草稿。接口及边界见 [提交记录](testing/SUBMISSION-2026-10-04.md)。
+
+## 审核轮次与反馈（已实现）
+
+current_review_round为当前审核轮次号，只读系统字段。review_round冻结提交时标题／ECR／ECO、方式、时间、结束状态及退回人／原因；不保存八表完整快照。review_record关联轮次及真实审核员账号，assigned表示指定人员，approved_at记录个人通过。review_feedback关联轮次、作者、文字、创建时间及重试UUID，不对应Excel业务字段，也不自动产生通过或退回。
+
+returned新增为可填写状态，draft／returned仅本人可写；pending／approved只读。退回不能永久删除申请。新轮批准从零计数，个人负责人文字不映射为系统审核人员。退回沟通列表只返回当前returned轮次，并按指定／公开审核权限筛选；不改变字段来源或开放修订中的完整表单。接口和权限边界见 [审核闭环](testing/REVIEW-WORKFLOW-2026-10-05.md)。

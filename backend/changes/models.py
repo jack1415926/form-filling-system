@@ -5,6 +5,7 @@ from django.db.models.functions import NullIf
 from .dispositions import LOCATIONS, DISPOSITIONS
 from .ecr import ECR_ACTION_IDS
 from .eco import ECO_ACTION_IDS
+from .significant_change import CHART_IDS, QUESTION_IDS, F_VALUES, FINAL_VALUES, RESULT_VALUES
 
 
 class ChangeRequest(models.Model):
@@ -12,9 +13,13 @@ class ChangeRequest(models.Model):
         DRAFT = "draft", "草稿"
         PENDING = "pending", "待审批"
         APPROVED = "approved", "已批准"
+        RETURNED = "returned", "待修订"
 
     applicant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    review_mode = models.CharField(max_length=16, blank=True, db_collation="utf8mb4_bin", choices=[("designated", "指定审核"), ("public", "公开审核")])
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    current_review_round = models.PositiveIntegerField(default=0)
     title = models.CharField(max_length=255, blank=True)
     ecr_no = models.CharField(max_length=64, blank=True)
     eco_no = models.CharField(max_length=64, blank=True)
@@ -43,13 +48,64 @@ class ChangeRequest(models.Model):
         db_table = "change_request"
         ordering = ["-updated_at", "-id"]
         constraints = [
+            models.CheckConstraint(condition=models.Q(review_mode__in=["", "designated", "public"]), name="change_valid_review_mode"),
             models.UniqueConstraint(fields=["ecr_no_unique"], name="change_request_ecr_no_unique"),
             models.UniqueConstraint(fields=["eco_no_unique"], name="change_request_eco_no_unique"),
             models.CheckConstraint(
-                condition=models.Q(status__in=["draft", "pending", "approved"]),
+                condition=models.Q(status__in=["draft", "pending", "approved", "returned"]),
                 name="change_request_valid_status",
             )
         ]
+
+
+class ReviewRound(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="review_rounds")
+    number = models.PositiveIntegerField()
+    review_mode = models.CharField(max_length=16, db_collation="utf8mb4_bin")
+    request_id = models.UUIDField(null=True, blank=True)
+    title = models.CharField(max_length=255)
+    ecr_no = models.CharField(max_length=64)
+    eco_no = models.CharField(max_length=64, blank=True)
+    submitted_at = models.DateTimeField()
+    state = models.CharField(max_length=16, default="pending", db_collation="utf8mb4_bin")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    returned_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT)
+    return_reason = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "review_round"
+        constraints = [
+            models.UniqueConstraint(fields=["change", "number"], name="review_unique_round"),
+            models.UniqueConstraint(fields=["change", "request_id"], name="review_unique_submission"),
+            models.CheckConstraint(condition=models.Q(number__gt=0), name="review_round_positive"),
+            models.CheckConstraint(condition=models.Q(review_mode__in=["designated", "public"]), name="review_round_mode"),
+            models.CheckConstraint(condition=models.Q(state__in=["pending", "approved", "returned"]), name="review_round_state"),
+        ]
+
+
+class ReviewRecord(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="review_records")
+    round = models.ForeignKey(ReviewRound, null=True, blank=True, on_delete=models.CASCADE, related_name="records")
+    reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    assigned = models.BooleanField(default=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "review_record"
+        constraints = [models.UniqueConstraint(fields=["round", "reviewer"], name="review_unique_person")]
+
+
+class ReviewFeedback(models.Model):
+    round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE, related_name="feedback")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    request_id = models.UUIDField()
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "review_feedback"
+        constraints = [models.UniqueConstraint(fields=["round", "author", "request_id"], name="review_unique_feedback")]
 
 
 class MaterialChange(models.Model):
@@ -169,6 +225,56 @@ class ExecutionPlanResponse(models.Model):
             models.UniqueConstraint(fields=["change", "activity_key"], name="plan_unique_activity"),
             models.CheckConstraint(condition=models.Q(activity_key__in=PLAN_ACTIVITY_IDS), name="plan_valid_activity"),
             models.CheckConstraint(condition=models.Q(start_date__isnull=True) | models.Q(end_date__isnull=True) | models.Q(end_date__gte=models.F("start_date")), name="plan_date_order"),
+        ]
+
+
+class SignificantAssessment(models.Model):
+    change = models.OneToOneField(ChangeRequest, on_delete=models.CASCADE, related_name="significant_assessment")
+    f_assessment = models.CharField(max_length=24, blank=True, db_collation="utf8mb4_bin")
+    final_conclusion = models.CharField(max_length=16, blank=True, db_collation="utf8mb4_bin")
+
+    class Meta:
+        db_table = "significant_assessment"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(f_assessment__in=F_VALUES), name="sig_valid_f"),
+            models.CheckConstraint(condition=models.Q(final_conclusion__in=FINAL_VALUES), name="sig_valid_final"),
+        ]
+
+
+class SignificantChartResponse(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="significant_charts")
+    chart_key = models.CharField(max_length=1, db_collation="utf8mb4_bin")
+    applicability = models.CharField(max_length=1, blank=True, db_collation="utf8mb4_bin")
+    reason = models.TextField(blank=True)
+    result = models.CharField(max_length=16, blank=True, db_collation="utf8mb4_bin")
+
+    class Meta:
+        db_table = "significant_chart_response"
+        constraints = [
+            models.UniqueConstraint(fields=["change", "chart_key"], name="sig_unique_chart"),
+            models.CheckConstraint(condition=models.Q(chart_key__in=CHART_IDS), name="sig_valid_chart"),
+            models.CheckConstraint(condition=models.Q(applicability__in=["", "Y", "N"]), name="sig_valid_applicability"),
+            models.CheckConstraint(condition=models.Q(result__in=RESULT_VALUES), name="sig_valid_result"),
+            models.CheckConstraint(condition=(
+                models.Q(chart_key="0", result="")
+                | models.Q(chart_key__in=["A", "B", "C", "D"], result__in=["", "not_applicable", "significant", "continue"])
+                | models.Q(chart_key="E", result__in=["", "not_applicable", "significant", "non_significant"])
+            ), name="sig_result_for_chart"),
+        ]
+
+
+class SignificantQuestionResponse(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="significant_questions")
+    question_key = models.CharField(max_length=16, db_collation="utf8mb4_bin")
+    answer = models.CharField(max_length=1, blank=True, db_collation="utf8mb4_bin")
+    reason = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "significant_question_response"
+        constraints = [
+            models.UniqueConstraint(fields=["change", "question_key"], name="sig_unique_question"),
+            models.CheckConstraint(condition=models.Q(question_key__in=QUESTION_IDS), name="sig_valid_question"),
+            models.CheckConstraint(condition=models.Q(answer__in=["", "Y", "N"]), name="sig_valid_answer"),
         ]
 
 

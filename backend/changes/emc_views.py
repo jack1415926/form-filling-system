@@ -1,3 +1,4 @@
+from .review_access import readable_change
 import json
 import re
 from copy import deepcopy
@@ -64,7 +65,7 @@ def matrix_data(record):
 
 
 def response_data(record):
-    return {**matrix_data(record), "updated_at": record.updated_at.isoformat(), "can_fill": record.status == "draft"}
+    return {**matrix_data(record), "updated_at": record.updated_at.isoformat(), "can_fill": record.status in ["draft", "returned"]}
 
 
 def apply_patch(matrix, patch):
@@ -113,6 +114,7 @@ def persist(record, matrix):
 
 
 class EmcDetail(APIView):
+    allow_review_read = True
     http_method_names = ["get", "patch", "head", "options"]
 
     def record(self, request, pk):
@@ -121,12 +123,12 @@ class EmcDetail(APIView):
 
     def get(self, request, pk):
         with transaction.atomic():
-            return Response(response_data(self.record(request, pk)))
+            return Response(response_data(readable_change(request, pk)))
 
     def patch(self, request, pk):
         with transaction.atomic():
             record = self.record(request, pk)
-            if record.status != "draft":
+            if record.status not in ["draft", "returned"]:
                 return Response({"detail": "申请已锁定，不能修改EMC。"}, status=409)
             serializer = EmcPatch(data=request.data)
             serializer.is_valid(raise_exception=True)

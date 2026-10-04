@@ -1,3 +1,4 @@
+import { actorUser, canEdit, backLabel } from './workflow'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Drawer, Dropdown, Empty, Form, Input, Select, Table, Tabs, Tag } from 'antd'
@@ -75,6 +76,7 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
 }) {
   const { modal, message } = App.useApp()
   const queryClient = useQueryClient()
+  const actorId = actorUser(queryClient).id
   const path = `/api/changes/${record.id}/materials/`
   const [editor, setEditor] = useState<{ category: MaterialCategory; material?: Material } | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -82,15 +84,15 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
   const [confirming, setConfirming] = useState(false)
   const [filter, setFilter] = useState<MaterialCategory | ''>('')
   useEffect(() => { onEditorOpen(!!editor); return () => onEditorOpen(false) }, [editor, onEditorOpen])
-  const locked = record.status !== 'draft'
-  const materials = useQuery({ queryKey: ['materials', record.applicant, record.id], queryFn: () => api<Material[]>(path, 'GET', undefined, record.applicant), refetchOnWindowFocus: false })
+  const locked = !canEdit(record, actorUser(queryClient).role)
+  const materials = useQuery({ queryKey: ['materials', actorId, record.id], queryFn: () => api<Material[]>(path, 'GET', undefined, actorId), refetchOnWindowFocus: false })
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['materials', record.applicant, record.id] })
-    void queryClient.invalidateQueries({ queryKey: ['change', record.applicant, record.id] })
-    void queryClient.invalidateQueries({ queryKey: ['changes', record.applicant] })
+    void queryClient.invalidateQueries({ queryKey: ['materials', actorId, record.id] })
+    void queryClient.invalidateQueries({ queryKey: ['change', actorId, record.id] })
+    void queryClient.invalidateQueries({ queryKey: ['changes', actorId] })
   }
   const deletion = useMutation({
-    mutationFn: (id: number) => api<void>(path + id + '/', 'DELETE', undefined, record.applicant),
+    mutationFn: (id: number) => api<void>(path + id + '/', 'DELETE', undefined, actorId),
     onMutate: () => onBusy(true), onSettled: () => onBusy(false),
     onSuccess: () => { refresh(); message.success('物料已删除') },
   })
@@ -103,7 +105,7 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
     modal.confirm({ content: discardSavedWarning, onCancel: () => setConfirming(false), title: '放弃未保存的物料修改？', okText: '放弃修改', cancelText: '继续填写', onOk: () => { setConfirming(false); discard() } })
   }
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>物料明细</h1><p className="muted">分别记录升版、新增和停用的物料，物料信息和处置建议一起保存。</p></div><Button disabled={busy} onClick={onBack}>返回我的申请</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>物料明细</h1><p className="muted">分别记录升版、新增和停用的物料，物料信息和处置建议一起保存。</p></div><Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div>
     {locked && <Alert type="info" title="申请已锁定，物料仅供查看。" className="form-alert" />}
     {materials.error ? <Alert type="error" title={materials.error.message} action={<Button onClick={() => void materials.refetch()}>重试</Button>} /> : <section className="panel list-panel material-section">
       <div className="section-heading"><h2>物料明细</h2><div className="form-actions"><span className="muted">类别筛选</span><Select aria-label="类别筛选" value={filter} onChange={setFilter} disabled={busy || !!editor} options={[{ value: '', label: '不限' }, { value: 'revision', label: '升版' }, { value: 'addition', label: '新增' }, { value: 'discontinuation', label: '停用' }]} style={{ width: 110 }} />{!locked && <Dropdown trigger={['click']} disabled={busy || !!editor || materials.isPending} menu={{ items: categories.map((category) => ({ key: category.key, label: category.label })), onClick: ({ key }) => { deletion.reset(); if (filter) setFilter(key as MaterialCategory); setEditor({ category: key as MaterialCategory }) } }}><Button type="primary" disabled={busy || !!editor || materials.isPending}>新增物料</Button></Dropdown>}</div></div>
@@ -119,9 +121,9 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
     {deletion.error && <Alert type="error" showIcon title="删除失败" description={deletion.error.message} className="form-alert" />}
     <div className="form-footer"><span className="muted">继续填写变更问题评估。</span><Button disabled={busy || !!editor} onClick={onNext}>下一页</Button></div>
     <Drawer open={!!editor} title={editor && `${editor.material ? locked ? '查看' : '编辑' : '新增'}：${categories.find((item) => item.key === editor.category)?.label}`} onClose={close} closable={!busy} maskClosable={!busy} keyboard={!busy} size={720} extra={<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button>}>
-      {editor && <MaterialForm key={editor.material?.id ?? editor.category} {...editor} material={materials.data?.find((item) => item.id === editor.material?.id) ?? editor.material} path={path} ownerId={record.applicant} locked={locked} leaving={leaving} paused={confirming}
+      {editor && <MaterialForm key={editor.material?.id ?? editor.category} {...editor} material={materials.data?.find((item) => item.id === editor.material?.id) ?? editor.material} path={path} ownerId={actorId} locked={locked} leaving={leaving} paused={confirming}
         onDirty={(value) => { setDirty(value); onDirty(value) }} onBusy={(value) => { setSaving(value); onBusy(value) }}
-        onSaved={(result) => { queryClient.setQueryData<Material[]>(['materials', record.applicant, record.id], (rows) => rows?.map((row) => row.id === result.id ? result : row)); refresh() }}
+        onSaved={(result) => { queryClient.setQueryData<Material[]>(['materials', actorId, record.id], (rows) => rows?.map((row) => row.id === result.id ? result : row)); refresh() }}
         onComplete={() => { setEditor(null); setDirty(false); onDirty(false); message.success('物料已保存') }} />}
     </Drawer>
   </>

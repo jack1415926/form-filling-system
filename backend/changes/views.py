@@ -1,3 +1,4 @@
+from .review_access import readable_change
 import json
 
 from django.contrib.auth import authenticate, login, logout
@@ -19,10 +20,11 @@ from .eco import ECO_ACTIONS, ECO_ACTION_IDS
 from .questions import QUESTIONS
 from .dispositions import LOCATIONS
 from .permissions import account_changed
+from .roles import business_role
 
 
 def user_data(user):
-    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username}
+    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "role": business_role(user)}
 
 
 @require_GET
@@ -75,16 +77,21 @@ class ChangeList(generics.ListCreateAPIView):
 
 
 class ChangeDetail(generics.RetrieveUpdateAPIView):
+    allow_review_read = True
     serializer_class = ChangeRequestSerializer
     http_method_names = ["get", "patch", "delete", "head", "options"]
 
     def get_queryset(self):
         return ChangeRequest.objects.filter(applicant=self.request.user)
 
+    def get(self, request, *args, **kwargs):
+        with transaction.atomic():
+            return Response(self.get_serializer(readable_change(request, kwargs['pk'])).data)
+
     def patch(self, request, *args, **kwargs):
         with transaction.atomic():
             record = get_object_or_404(self.get_queryset().select_for_update(), pk=kwargs["pk"])
-            if record.status != ChangeRequest.Status.DRAFT:
+            if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改表单。"}, status=status.HTTP_409_CONFLICT)
             serializer = self.get_serializer(record, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
@@ -101,10 +108,11 @@ class ChangeDetail(generics.RetrieveUpdateAPIView):
 
 
 class MaterialList(APIView):
+    allow_review_read = True
     def get(self, request, pk):
         # ponytail: serialize this application's reads/writes; use a snapshot if contention becomes measurable.
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = readable_change(request, pk)
             return Response(MaterialChangeSerializer(record.materials.prefetch_related("dispositions"), many=True).data)
 
     def post(self, request, pk):
@@ -113,7 +121,7 @@ class MaterialList(APIView):
     def write(self, request, pk, material_pk=None):
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
-            if record.status != ChangeRequest.Status.DRAFT:
+            if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改物料。"}, status=status.HTTP_409_CONFLICT)
             material = get_object_or_404(MaterialChange, pk=material_pk, change=record) if material_pk is not None else None
             if request.method == "DELETE":
@@ -152,6 +160,7 @@ class MaterialDetail(MaterialList):
 
 
 class QuestionList(APIView):
+    allow_review_read = True
     http_method_names = ["get", "patch", "head", "options"]
 
     @staticmethod
@@ -169,13 +178,13 @@ class QuestionList(APIView):
 
     def get(self, request, pk):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = readable_change(request, pk)
             return Response(self.data(record))
 
     def patch(self, request, pk):
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
-            if record.status != ChangeRequest.Status.DRAFT:
+            if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改问题回答。"}, status=status.HTTP_409_CONFLICT)
             serializer = QuestionPatchSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -201,6 +210,7 @@ class QuestionList(APIView):
 
 
 class EcrActionList(APIView):
+    allow_review_read = True
     http_method_names = ["get", "head", "options"]
 
     @staticmethod
@@ -215,7 +225,7 @@ class EcrActionList(APIView):
 
     def get(self, request, pk):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = readable_change(request, pk)
             return Response(self.data(record))
 
 
@@ -227,7 +237,7 @@ class EcrActionDetail(APIView):
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
             if action_key not in ECR_ACTION_IDS:
                 return Response({"detail": "行动不存在。"}, status=404)
-            if record.status != ChangeRequest.Status.DRAFT:
+            if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改 ECR 评估。"}, status=409)
             existing = record.ecr_responses.filter(action_key=action_key).first()
             instance = existing or EcrActionResponse(change=record, action_key=action_key)
@@ -247,6 +257,7 @@ class EcrActionDetail(APIView):
 
 
 class EcoActionList(APIView):
+    allow_review_read = True
     http_method_names = ["get", "head", "options"]
 
     @staticmethod
@@ -261,7 +272,7 @@ class EcoActionList(APIView):
 
     def get(self, request, pk):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = readable_change(request, pk)
             return Response(self.data(record))
 
 
@@ -273,7 +284,7 @@ class EcoActionDetail(APIView):
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
             if action_key not in ECO_ACTION_IDS:
                 return Response({"detail": "行动不存在。"}, status=404)
-            if record.status != ChangeRequest.Status.DRAFT:
+            if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改 ECO 执行。"}, status=409)
             existing = record.eco_responses.filter(action_key=action_key).first()
             instance = existing or EcoActionResponse(change=record, action_key=action_key)

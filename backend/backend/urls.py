@@ -19,6 +19,9 @@ from django.urls import path
 from changes import views
 from changes.emc_views import EmcDetail
 from changes.execution_plan_views import ExecutionPlanDetail
+from changes.significant_change_views import SignificantChangeDetail
+from changes.submission_views import ReviewerList, SubmissionDetail
+from changes.review_views import ReviewList, ReviewDetail
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,8 +29,14 @@ urlpatterns = [
     path('api/auth/login/', views.login_view),
     path('api/auth/logout/', views.logout_view),
     path('api/auth/me/', views.me_view),
+    path('api/reviewers/', ReviewerList.as_view()),
+    path('api/review/', ReviewList.as_view()),
+    path('api/changes/<int:pk>/review-rounds/<int:number>/', ReviewDetail.as_view()),
+    path('api/changes/<int:pk>/review-rounds/<int:number>/<str:action>/', ReviewDetail.as_view()),
+    path('api/changes/<int:pk>/submission/', SubmissionDetail.as_view()),
     path('api/changes/<int:pk>/emc/', EmcDetail.as_view()),
     path('api/changes/<int:pk>/execution-plan/', ExecutionPlanDetail.as_view()),
+    path('api/changes/<int:pk>/significant-change/', SignificantChangeDetail.as_view()),
     path('api/changes/', views.ChangeList.as_view()),
     path('api/changes/<int:pk>/', views.ChangeDetail.as_view()),
     path('api/changes/<int:pk>/materials/', views.MaterialList.as_view()),

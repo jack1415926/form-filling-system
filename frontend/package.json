@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:review": "node --test tests/review.test.mjs",
+    "test:submission": "node --test tests/submission.test.mjs",
+    "test:significant-change": "node --test tests/significant-change.test.mjs",
     "test:execution-plan": "node --test tests/execution-plan.test.mjs",
     "test:autosave": "node --test tests/autosave.test.mjs",
     "test:form-draft": "node --test tests/form-draft.test.mjs",

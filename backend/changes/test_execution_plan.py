@@ -149,15 +149,17 @@ class ExecutionPlanTransactionTests(TransactionTestCase):
         self.assertEqual(ExecutionPlanResponse.objects.count(), 0)
 
     def test_migration_roundtrip_preserves_existing_request_without_prefill(self):
-        before = list(ChangeRequest.objects.values())
+        fields = [field.attname for field in ChangeRequest._meta.concrete_fields if field.name not in ['review_mode', 'submitted_at', 'current_review_round']]
+        before = list(ChangeRequest.objects.values(*fields))
         try:
             executor = MigrationExecutor(connection); executor.migrate([('changes', '0009_emc_reference')])
             executor = MigrationExecutor(connection); executor.migrate([('changes', '0010_executionplanresponse')])
-            self.assertEqual(list(ChangeRequest.objects.values()), before)
+            self.assertEqual(list(ChangeRequest.objects.values(*fields)), before)
             self.assertEqual(ExecutionPlanResponse.objects.count(), 0)
             ExecutionPlanResponse.objects.create(change=self.change, activity_key='plan_001', owner='temporary')
             executor = MigrationExecutor(connection); executor.migrate([('changes', '0009_emc_reference')])
-            self.assertEqual(list(ChangeRequest.objects.values()), before)
+            self.assertEqual(list(ChangeRequest.objects.values(*fields)), before)
             self.assertNotIn('execution_plan_response', connection.introspection.table_names())
         finally:
-            MigrationExecutor(connection).migrate([('changes', '0010_executionplanresponse')])
+            executor = MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())
