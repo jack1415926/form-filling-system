@@ -1,15 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { actorUser, canEdit, backLabel } from './workflow'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Drawer, Dropdown, Empty, Form, Input, Select, Table, Tabs, Tag } from 'antd'
 import DispositionFields from './DispositionFields'
-import { api, type ChangeRequest, type Material, type MaterialCategory, type MaterialValues } from './api'
+import { api, ApiError, type ChangeRequest, type Material, type MaterialCategory, type MaterialValues } from './api'
+import type { MaterialField } from './formDraft'
+import useAutosave, { discardSavedWarning } from './useAutosave'
+import { materialFields, materialPayload } from './autosaveFields'
+import { checkedMaterial, materialFormValues } from './materialSave'
 
 const categories: { key: MaterialCategory; label: string }[] = [
   { key: 'revision', label: '升版的物料或文件' },
   { key: 'addition', label: '新增的物料' },
   { key: 'discontinuation', label: '由于此变更而停用的物料' },
 ]
-const commonFields: { key: keyof MaterialValues; label: string; long?: boolean }[] = [
+const commonFields: { key: MaterialField; label: string; long?: boolean }[] = [
   { key: 'material_no', label: '物料号或文件号' },
   { key: 'description', label: '物料描述／文件标题', long: true },
   { key: 'material_class', label: '物料分类' },
@@ -20,30 +25,30 @@ const categoryFields: Record<MaterialCategory, typeof commonFields> = {
   discontinuation: [{ key: 'revision', label: '版本' }, { key: 'discontinued_project', label: '在哪个项目停用？' }, { key: 'change_description', label: '变更描述', long: true }],
 }
 
-function MaterialForm({ material, category, path, ownerId, locked, leaving, onDirty, onBusy, onSaved }: {
+function MaterialForm({ material, category, path, ownerId, locked, leaving, onDirty, onBusy, onSaved, onComplete, paused }: {
   material?: Material; category: MaterialCategory; path: string; ownerId: number; locked: boolean; leaving: boolean
-  onDirty: (value: boolean) => void; onBusy: (value: boolean) => void; onSaved: () => void
+  onDirty: (value: boolean) => void; onBusy: (value: boolean) => void; onSaved: (material: Material) => void; onComplete: () => void; paused: boolean
 }) {
   const [form] = Form.useForm<MaterialValues>()
   const [requestId] = useState(() => crypto.randomUUID())
-  const changedFields = useRef(new Set<keyof MaterialValues>())
-  const changedDispositions = useRef<Record<string, Set<'disposition' | 'remark'>>>({})
   const fields = [...commonFields, ...categoryFields[category]]
-  const save = useMutation({
-    mutationFn: (values: MaterialValues) => {
-      const keys = material ? [...changedFields.current] : [...fields.map((field) => field.key), 'spare_part', 'optional_part'] as (keyof MaterialValues)[]
-      const payload = Object.fromEntries(keys.map((key) => [key, values[key] ?? '']))
-      if (category !== 'addition') {
-        if (!material) payload.dispositions = Object.fromEntries(Object.entries(values.dispositions ?? {}).map(([key, value]) => [key, { disposition: value.disposition ?? '', remark: value.remark ?? '' }]))
-        else if (Object.keys(changedDispositions.current).length) payload.dispositions = Object.fromEntries(Object.entries(changedDispositions.current).map(([key, fields]) => [key, Object.fromEntries([...fields].map((field) => [field, values.dispositions?.[key]?.[field] ?? '']))]))
-      }
-      return api<Material>(material ? path + material.id + '/' : path, material ? 'PATCH' : 'POST', material ? payload : { ...payload, category, request_id: requestId }, ownerId)
+  const keys: MaterialField[] = [...fields.map((field) => field.key), 'spare_part', 'optional_part']
+  const defaults = { spare_part: '', optional_part: '', dispositions: {} } as Partial<MaterialValues>
+  const save = useAutosave({
+    fields: materialFields(material ?? defaults, keys), enabled: !locked && !leaving, auto: !!material, force: !material, paused, onDirty, onBusy,
+    send: async (patch) => {
+      try { await form.validateFields() } catch { throw new ApiError(400, '请修正表单校验提示后保存') }
+      const payload = materialPayload(patch)
+      const response = await api<unknown>(material ? path + material.id + '/' : path, material ? 'PATCH' : 'POST', material ? payload : { ...payload, category, request_id: requestId }, ownerId)
+      const result = checkedMaterial(response, category, keys, material?.id)
+      if (save.queue.active) onSaved(result)
+      return materialFields(result, keys)
     },
-    onMutate: () => onBusy(true),
-    onSettled: () => onBusy(false),
-    onSuccess: () => { onDirty(false); onSaved() },
   })
-  const materialFields = <>
+  const valuesKey = JSON.stringify(save.values)
+  useEffect(() => { form.setFieldsValue(materialFormValues(save.values, form.getFieldValue('dispositions'))) }, [form, valuesKey, save.values])
+  const manualSave = () => { void save.manualSave().then(onComplete).catch(() => {}) }
+  const fieldInputs = <>
     {fields.map((field) => <Form.Item key={field.key} name={field.key} label={field.label} rules={field.long ? [] : [{ max: 255, message: '最多 255 个字符' }]}>
       {field.long ? <Input.TextArea autoSize={{ minRows: 3, maxRows: 10 }} /> : <Input maxLength={255} />}
     </Form.Item>)}
@@ -51,21 +56,17 @@ function MaterialForm({ material, category, path, ownerId, locked, leaving, onDi
       <Select options={[{ value: '', label: '未填写' }, { value: 'Y', label: 'Y' }, { value: 'N', label: 'N' }]} />
     </Form.Item>)}</div>
   </>
-  return <Form id="material-form" form={form} layout="vertical" requiredMark={false} initialValues={material ?? { spare_part: '', optional_part: '', dispositions: {} }}
-    disabled={locked || leaving || save.isPending} onFinish={(values) => save.mutate(values)}
-    onValuesChange={(values: Partial<MaterialValues>) => {
-      Object.keys(values).filter((key) => key !== 'dispositions').forEach((key) => changedFields.current.add(key as keyof MaterialValues))
-      for (const [key, fields] of Object.entries(values.dispositions ?? {})) {
-        const changed = changedDispositions.current[key] ??= new Set()
-        Object.keys(fields).forEach((field) => changed.add(field as 'disposition' | 'remark'))
-      }
-      onDirty(true)
-    }}>
-    {category === 'addition' ? materialFields : <Tabs items={[
-      { key: 'material', label: '物料信息', forceRender: true, children: materialFields },
+  return <Form id="material-form" form={form} layout="vertical" requiredMark={false} initialValues={material ?? defaults}
+    disabled={locked || leaving || save.manual} onFinish={manualSave} {...save.composition}
+    onValuesChange={(_changed, values: MaterialValues) => save.update(materialFields(values, keys))}>
+    {category === 'addition' ? fieldInputs : <Tabs items={[
+      { key: 'material', label: '物料信息', forceRender: true, children: fieldInputs },
       { key: 'disposition', label: '处置建议', forceRender: true, children: <DispositionFields /> },
     ]} />}
     {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
+    <div className="form-footer"><span className={save.dirty ? 'save-status unsaved' : 'save-status'}>{!material && !save.error && !save.manual ? '首次创建请手动保存' : save.status}</span>
+      {!locked && <Button type="primary" htmlType="submit" loading={save.manual} disabled={leaving || save.manual}>{category === 'addition' ? '保存物料' : '保存物料及处置'}</Button>}
+    </div>
   </Form>
 }
 
@@ -75,21 +76,23 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
 }) {
   const { modal, message } = App.useApp()
   const queryClient = useQueryClient()
+  const actorId = actorUser(queryClient).id
   const path = `/api/changes/${record.id}/materials/`
   const [editor, setEditor] = useState<{ category: MaterialCategory; material?: Material } | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [filter, setFilter] = useState<MaterialCategory | ''>('')
   useEffect(() => { onEditorOpen(!!editor); return () => onEditorOpen(false) }, [editor, onEditorOpen])
-  const locked = record.status !== 'draft'
-  const materials = useQuery({ queryKey: ['materials', record.applicant, record.id], queryFn: () => api<Material[]>(path, 'GET', undefined, record.applicant), refetchOnWindowFocus: false })
+  const locked = !canEdit(record, actorUser(queryClient).role)
+  const materials = useQuery({ queryKey: ['materials', actorId, record.id], queryFn: () => api<Material[]>(path, 'GET', undefined, actorId), refetchOnWindowFocus: false })
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ['materials', record.applicant, record.id] })
-    void queryClient.invalidateQueries({ queryKey: ['change', record.applicant, record.id] })
-    void queryClient.invalidateQueries({ queryKey: ['changes', record.applicant] })
+    void queryClient.invalidateQueries({ queryKey: ['materials', actorId, record.id] })
+    void queryClient.invalidateQueries({ queryKey: ['change', actorId, record.id] })
+    void queryClient.invalidateQueries({ queryKey: ['changes', actorId] })
   }
   const deletion = useMutation({
-    mutationFn: (id: number) => api<void>(path + id + '/', 'DELETE', undefined, record.applicant),
+    mutationFn: (id: number) => api<void>(path + id + '/', 'DELETE', undefined, actorId),
     onMutate: () => onBusy(true), onSettled: () => onBusy(false),
     onSuccess: () => { refresh(); message.success('物料已删除') },
   })
@@ -98,10 +101,11 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
     if (busy) return
     const discard = () => { setEditor(null); setDirty(false); onDirty(false) }
     if (!dirty) { discard(); return }
-    modal.confirm({ title: '放弃未保存的物料修改？', okText: '放弃修改', cancelText: '继续填写', onOk: discard })
+    setConfirming(true)
+    modal.confirm({ content: discardSavedWarning, onCancel: () => setConfirming(false), title: '放弃未保存的物料修改？', okText: '放弃修改', cancelText: '继续填写', onOk: () => { setConfirming(false); discard() } })
   }
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>物料明细</h1><p className="muted">分别记录升版、新增和停用的物料，物料信息和处置建议一起保存。</p></div><Button disabled={busy} onClick={onBack}>返回我的申请</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>物料明细</h1><p className="muted">分别记录升版、新增和停用的物料，物料信息和处置建议一起保存。</p></div><Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div>
     {locked && <Alert type="info" title="申请已锁定，物料仅供查看。" className="form-alert" />}
     {materials.error ? <Alert type="error" title={materials.error.message} action={<Button onClick={() => void materials.refetch()}>重试</Button>} /> : <section className="panel list-panel material-section">
       <div className="section-heading"><h2>物料明细</h2><div className="form-actions"><span className="muted">类别筛选</span><Select aria-label="类别筛选" value={filter} onChange={setFilter} disabled={busy || !!editor} options={[{ value: '', label: '不限' }, { value: 'revision', label: '升版' }, { value: 'addition', label: '新增' }, { value: 'discontinuation', label: '停用' }]} style={{ width: 110 }} />{!locked && <Dropdown trigger={['click']} disabled={busy || !!editor || materials.isPending} menu={{ items: categories.map((category) => ({ key: category.key, label: category.label })), onClick: ({ key }) => { deletion.reset(); if (filter) setFilter(key as MaterialCategory); setEditor({ category: key as MaterialCategory }) } }}><Button type="primary" disabled={busy || !!editor || materials.isPending}>新增物料</Button></Dropdown>}</div></div>
@@ -116,10 +120,11 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
     </section>}
     {deletion.error && <Alert type="error" showIcon title="删除失败" description={deletion.error.message} className="form-alert" />}
     <div className="form-footer"><span className="muted">继续填写变更问题评估。</span><Button disabled={busy || !!editor} onClick={onNext}>下一页</Button></div>
-    <Drawer open={!!editor} title={editor && `${editor.material ? locked ? '查看' : '编辑' : '新增'}：${categories.find((item) => item.key === editor.category)?.label}`} onClose={close} closable={!busy} maskClosable={!busy} keyboard={!busy} size={720} footer={editor && <div className="form-footer"><span className={dirty ? 'save-status unsaved' : 'save-status'}>{dirty ? '有未保存的修改' : editor.material ? '已保存' : '尚未保存'}</span>{!locked && <Button type="primary" htmlType="submit" form="material-form" loading={saving} disabled={busy}>{editor.category === 'addition' ? '保存物料' : '保存物料及处置'}</Button>}</div>} extra={<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button>}>
-      {editor && <MaterialForm key={editor.material?.id ?? editor.category} {...editor} path={path} ownerId={record.applicant} locked={locked} leaving={leaving}
+    <Drawer open={!!editor} title={editor && `${editor.material ? locked ? '查看' : '编辑' : '新增'}：${categories.find((item) => item.key === editor.category)?.label}`} onClose={close} closable={!busy} maskClosable={!busy} keyboard={!busy} size={720} extra={<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button>}>
+      {editor && <MaterialForm key={editor.material?.id ?? editor.category} {...editor} material={materials.data?.find((item) => item.id === editor.material?.id) ?? editor.material} path={path} ownerId={actorId} locked={locked} leaving={leaving} paused={confirming}
         onDirty={(value) => { setDirty(value); onDirty(value) }} onBusy={(value) => { setSaving(value); onBusy(value) }}
-        onSaved={() => { setEditor(null); setDirty(false); refresh(); message.success('物料已保存') }} />}
+        onSaved={(result) => { queryClient.setQueryData<Material[]>(['materials', actorId, record.id], (rows) => rows?.map((row) => row.id === result.id ? result : row)); refresh() }}
+        onComplete={() => { setEditor(null); setDirty(false); onDirty(false); message.success('物料已保存') }} />}
     </Drawer>
   </>
 }
