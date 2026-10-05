@@ -2,6 +2,8 @@
 
 更新日期：2026-10-05。面向需要逐步接手项目的人。本文解释“系统如何工作、为什么这样设计、以后怎么改”，当前状态以 [README](../README.md) 为汇总入口，具体字段以 [字段说明](FIELD_MAP.md) 为准。
 
+最新交付：审核修改意见闭环和申请内跨八表悬浮入口已实现；原提出者复核、未解决项禁批准、逐条回应及审核安排限制均由后端校验。旧普通留言只读保留。0014新增两张意见表，137项真实MySQL、78项前端及13组真实页面检查通过，人工业务验收待完成。下一批为独立系统反馈及管理员处理；[本批记录](testing/REVIEW-ISSUES-2026-10-05.md)和[MVP当前范围](MVP.md#2026-10-05-审核意见与系统反馈)为当前依据，下文原审核批次描述保留历史。
+
 ## 建议的阅读顺序
 
 1. 先看 README，分清已经实现、尚未实现和待复核的内容。
@@ -28,9 +30,9 @@ Model采用draft／pending／returned／approved四个状态，提交、批准�
 
 当前本机样例：申请 #8，ECR-26010601，包含源表概述、33 条停用物料、330 个处置值，以及一次性补录的27题和31条ECR填写。用户后续可以继续修改，原Excel不是实时同步源。新草稿仍为空；没有通用导入功能，样例不会随 Git 克隆到别的设备。
 
-此前自动保存、执行计划和修复已通过 [69ad8e7](https://github.com/jack1415926/form-filling-system/commit/69ad8e72389d55577a36d88bde276c611da4fafe) 推送到 `codex/enforce-unique-change-numbers`，尚未进入 main；PR #2 已合并的是此前 `dd74f27`，两批交付不要混淆。审核闭环交付时全量后端125项／前端76项通过；最新修复专项25项MySQL／16项前端及4项隔离浏览器模拟场景通过，推送前重跑全量127项真实MySQL和76项前端检查通过；验证范围统一以 README 为入口。本机数据库已迁移至0013；实质性评估、提交与审核闭环及审查修复纳入本次Git提交，目标分支为codex/enforce-unique-change-numbers；69ad8e7不包含它们，业务验收及正式部署仍待完成。
+2026-10-05只读核验远端：功能分支 `codex/enforce-unique-change-numbers` 与本地HEAD均为 `1ea9ff2`，main为 `58224d5`，最新功能尚未合并。`1ea9ff2` 包含实质性评估、提交与审核闭环及审查修复；此前 `69ad8e7` 包含自动保存、执行计划等较早交付，不能只同步它获得最新功能。本机数据库迁移至0013，其他设备代码同步后仍须自行执行未应用迁移。审核闭环交付时125项MySQL／76项前端、修复专项25项MySQL／16项前端与4项隔离模拟场景保留为历史证据；本轮重跑127项真实MySQL、76项前端、lint/build及迁移一致性通过，八表填写恢复、审核／退回重提与反馈技术复验完成，见 [本轮记录](testing/REVERIFICATION-2026-10-05.md)。本轮只修改文档，没有产品代码修复、提交、推送或合并；人工业务验收及正式部署仍待完成。
 
-## 先理解十七个业务表
+## 先理解十九个业务表
 
 ```mermaid
 erDiagram
@@ -45,7 +47,9 @@ erDiagram
     CHANGE_REQUEST ||--o{ SIGNIFICANT_QUESTION_RESPONSE : has
     CHANGE_REQUEST ||--o{ REVIEW_ROUND : submits
     REVIEW_ROUND ||--o{ REVIEW_RECORD : assigns
-    REVIEW_ROUND ||--o{ REVIEW_FEEDBACK : discusses
+    REVIEW_ROUND ||--o{ REVIEW_FEEDBACK : legacy_notes
+    CHANGE_REQUEST ||--o{ REVIEW_ISSUE : has
+    REVIEW_ISSUE ||--o{ REVIEW_ISSUE_EVENT : tracks
     CHANGE_REQUEST ||--o| EMC_REFERENCE : has
     EMC_REFERENCE ||--o{ EMC_REFERENCE_ROW : defines
     EMC_REFERENCE ||--o{ EMC_REFERENCE_TEST : defines
@@ -65,7 +69,9 @@ erDiagram
 | execution_plan_response | 固定活动对应的责任人、开始／结束日期及备注 | 每单只保存填写，不重复活动文字 |
 | review_round | 每轮方式、提交时基本信息、状态及退回原因 | 不复制完整表单，隔离新旧轮 |
 | review_record | 本轮指定人员及实际个人批准时间 | 按轮唯一，旧批准不计入新轮 |
-| review_feedback | 本轮作者、时间及文字意见 | 追加和UUID去重，旧轮及批准后只读 |
+| review_feedback | 旧普通留言作者、时间及文字 | 历史只读保留，不再新增 |
+| review_issue | 申请、来源轮次、原提出者、页签、定位、问题、状态和版本 | 未解决项跨轮保留，独立于批准票数 |
+| review_issue_event | 意见处理及请求确认记录 | 追加历史，UUID及版本保护重试和迟到动作 |
 | significant_assessment | 本单F项与人工最终结论 | 与组结论和逐题提示分开保存 |
 | significant_chart_response | 第0项及A～E适用性、原因、人工组结论 | 主表与抽屉编辑同一字段 |
 | significant_question_response | 37题回答及原因 | 稳定题号对应固定定义和分支 |
@@ -78,7 +84,7 @@ erDiagram
 
 编号和版本用文本保存，避免 `000003151` 变成数字后丢失前导零。ECR 与 ECO 分别全局唯一，空编号允许多个；物料号没有全局唯一规则，不能用它判断一次新增是否重复。
 
-申请删除会通过外键级联删除物料、处置、问题回答、ECR／ECO 填写、EMC 参考、执行计划及实质性评估填写；只允许本人草稿，操作不可恢复。Django 的用户和会话表属于系统表，和这十七个业务表职责不同。
+申请删除会通过外键级联删除物料、处置、问题回答、ECR／ECO 填写、EMC 参考、执行计划及实质性评估填写；只允许本人草稿，操作不可恢复。Django 的用户和会话表属于系统表，和这十九个业务表职责不同。
 
 ### Model、migration、serializer 各负责什么
 
@@ -191,7 +197,7 @@ sequenceDiagram
 | 执行计划 | EMC后第七页、11条活动、五列表格、日期顺序硬校验及真实恢复 | 用户选择的日期规则；[交付记录](testing/EXECUTION-PLAN-2026-10-03.md) |
 | 最新保存恢复修复 | 删除格不重写、物料异常响应保留输入、30秒期限与迟到保护 | 九组模拟、四组真实回归；[记录](testing/SAVE-RECOVERY-FIXES.md) |
 | 实质性变更评估 | 第八页签、主表＋五组37题、人工结论、真实恢复 | 原模板疑点保留并标注；[交付记录](testing/SIGNIFICANT-CHANGE-2026-10-04.md)；随本次审核闭环一并纳入Git提交 |
-| 当前GitHub推送 | 自动保存、执行计划和修复提交69ad8e7已推送功能分支 | main仍58224d5，业务验收与正式部署未关闭 |
+| 当前GitHub状态 | 最新功能及审核修复提交1ea9ff2已推送功能分支 | 2026-10-05只读核验main仍58224d5；本轮复验文档未提交／推送，业务验收与正式部署未关闭 |
 
 历史日志中各批测试数量都是当时结果，不是互相矛盾。当前计数以 README 为准；问题页新增10项后端测试，ECR新增7项，EMC接入时后端86项、前端22项；EMC新增9项后端，旧演示6项前端替换为正式草稿4项，其他断言保留；历史计数保留。
 
@@ -286,4 +292,12 @@ roles使用原生审核员组，FillerPermission统一限制本批DRF业务接�
 
 ReviewWorkbench提供指定任务、公开任务、退回沟通和本人已处理记录，ReviewPanel按URL轮次读取进度、可见过程历史和反馈，必要时复用八张表组件只读。readable_change负责表单GET的当前轮权限；全局FillerPermission仅向明确标记的GET放行审核读取，写入仍仅填写员本人。前端workflow统一草稿／退回编辑规则和真实查看者ID，缓存与X-Expected-User不伪装为申请者。
 
-当前review_round冻结方式／基本信息，review_record按轮存指定人员与批准，review_feedback按轮追加文字并UUID去重。approve／return／feedback以及提交均使用申请锁重检当前轮次；returned允许修改，重提expected_round＋新UUID开始下一轮。旧轮只读、不复制完整表单版本。0013迁移及逆迁移守卫、125项MySQL／76项前端及13组真实页面证据见 [本批记录](testing/REVIEW-WORKFLOW-2026-10-05.md)。两项审查修复已落地：退回沟通列表为仍有权限但未个人批准的审核员提供意见入口；共享back函数及八表按钮统一拦截审核请求在途／当前待审核轮次结果未确认时的返回。最新专项及推送前全量127项MySQL／76项前端验证见同一交付记录，保留此前125项的历史结果。下一步是人工业务复验和收集实际体验；管理员规则维护及导出仍不属于MVP。
+当前review_round冻结方式／基本信息，review_record按轮存指定人员与批准，review_feedback按轮追加文字并UUID去重。approve／return／feedback以及提交均使用申请锁重检当前轮次；returned允许修改，重提expected_round＋新UUID开始下一轮。旧轮只读、不复制完整表单版本。0013迁移及逆迁移守卫、125项MySQL／76项前端及13组真实页面证据见 [交付记录](testing/REVIEW-WORKFLOW-2026-10-05.md)。两项审查修复已落地：退回沟通列表为仍有权限但未个人批准的审核员提供意见入口；共享back函数及八表按钮统一拦截审核请求在途／当前待审核轮次结果未确认时的返回。
+
+本轮已使用实际临时账号／申请复验两项修复、八表保存恢复、指定／公开批准、退回八表修订、名单变更与旧轮隔离、反馈作者时间及终态只读。延迟／丢响应为浏览器注入，数据库写入真实完成；并发／事务／迁移守卫由现有真实MySQL测试覆盖。127项后端和76项前端检查通过；临时数据清理后原17张业务表、已有账号和组关系逐字段保持。本轮没有确认产品代码缺陷，详细矩阵及工具边界见 [复验记录](testing/REVERIFICATION-2026-10-05.md)。下一步仅保留用户人工业务验收、模板疑点确认、合并与部署；管理员规则维护、导入／导出仍不属于MVP。
+
+## 正式审核意见闭环（0014）
+
+三项前端审查问题已修复：SubmissionEditor接收未发送意见状态并阻止重提；ReviewPanel的回应草稿包含原版本，刷新不提升；查询结果按轮次、状态、权限和版本释放不可执行动作的unknown保护，原UUID确认优先。最新84项前端、lint/build与6组隔离模拟页面通过，后端未改；[修复记录](testing/REVIEW-ISSUES-2026-10-05.md#code-review-三项p2修复)，业务复验待完成。
+
+review_issues.py集中校验意见载荷、版本、原提出者及重提阻止原因；review_views.py沿用申请行锁整批退回、逐条回应／解决并检查批准条件；submission_views.py拒绝未回应项或改变锁定安排的重提。ReviewPanel由申请外层持续挂载，审核员与填写员共用抽屉，页签切换不丢草稿；SubmissionEditor按接口返回锁定选择并显示阻止原因。前端不自动保存正式意见动作，未知结果保留原UUID并打开恢复入口。详细数据、接口和验证见[本批记录](testing/REVIEW-ISSUES-2026-10-05.md)。

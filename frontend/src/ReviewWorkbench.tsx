@@ -10,7 +10,7 @@ export default function ReviewWorkbench({ user, leaving, onReauthenticate, rende
   const [kind, setKind] = useState('designated'), [selected, setSelected] = useState<{ id: number; number: number } | null>(null)
   const [busy, setBusy] = useState(false), [dirty, setDirty] = useState(false)
   const list = useQuery({ queryKey: ['review-list', user.id, kind], enabled: !selected, refetchOnWindowFocus: false, queryFn: () => api<(RoundInfo & { change_id: number })[]>(`/api/review/?kind=${kind}`, 'GET', undefined, user.id) })
-  const back = () => { if (busy || leaving) return; if (dirty && !window.confirm('尚未发送的反馈或退回原因会丢失，确定返回列表？')) return; setSelected(null); setDirty(false) }
+  const back = () => { if (busy || leaving) return; if (dirty && !window.confirm('尚未发送的审核意见或处理说明会丢失，确定返回列表？')) return; setSelected(null); setDirty(false) }
   return <>
     {selected ? <ReviewPanel key={`${selected.id}:${selected.number}`} changeId={selected.id} number={selected.number} leaving={leaving} onReauthenticate={onReauthenticate} onBack={back} onBusy={(value) => { setBusy(value); onBusy(value) }} onDirty={(value) => { setDirty(value); onDirty(value) }} renderForm={(record) => renderForm(record, back)} /> : <>
       <div className="page-heading"><h1>审核工作台</h1><Button loading={list.isFetching} onClick={() => void list.refetch()}>刷新列表</Button></div>

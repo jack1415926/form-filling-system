@@ -5,8 +5,8 @@ import { canEdit } from './workflow.ts'
 
 export type Reviewer = { id: number; username: string; display_name: string }
 export type SubmissionPayload = { review_mode: 'designated' | 'public'; reviewer_ids: number[]; expected_round?: number; request_id?: string }
-export type SubmissionData = { change: ChangeRequest; reviewers: Reviewer[]; request_id?: string | null }
-export const submissionChoiceWarning = '审核方式和人员尚未提交，只保留在当前页面；离开后需要重新选择。尚未发送的反馈或修改说明也会丢失。'
+export type SubmissionData = { change: ChangeRequest; reviewers: Reviewer[]; request_id?: string | null; review_arrangement_locked: boolean; issue_blockers: string[] }
+export const submissionChoiceWarning = '审核方式和人员尚未提交，只保留在当前页面；离开后需要重新选择。尚未发送的审核意见或回应也会丢失。'
 export const modeLabel = (mode: ChangeRequest['review_mode']) => mode === 'designated' ? '指定审核' : mode === 'public' ? '公开审核' : '未记录'
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
 const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value))
@@ -41,6 +41,7 @@ export function checkedSubmission(value: unknown, owner: Pick<ChangeRequest, 'id
   if (payload && (row.status === 'draft' || row.status === 'returned' && !returnedConfirmation || !date(row.submitted_at) || row.review_mode !== payload.review_mode
       || payload.request_id && value.request_id !== payload.request_id
       || reviewers.map((person) => person.id).sort((a, b) => a - b).join(',') !== [...payload.reviewer_ids].sort((a, b) => a - b).join(','))) return invalid()
+  if (typeof value.review_arrangement_locked !== 'boolean' || !Array.isArray(value.issue_blockers) || !value.issue_blockers.every((row) => typeof row === 'string')) return invalid()
   return value as SubmissionData
 }
 
@@ -80,7 +81,8 @@ export function submissionConfirmed(data: SubmissionData, owner: Pick<ChangeRequ
   try { checkedSubmission(data, owner, payload); return true } catch { return false }
 }
 
-export function submissionError(record: ChangeRequest, mode: '' | SubmissionPayload['review_mode'], ids: number[], reviewers: Reviewer[]): string | null {
+export function submissionError(record: ChangeRequest, mode: '' | SubmissionPayload['review_mode'], ids: number[], reviewers: Reviewer[], reviewDraftDirty = false): string | null {
+  if (reviewDraftDirty) return '仍有未发送的审核回应，请从悬浮审核意见入口提交或清除后再重提。'
   if (!record.title.trim() || !record.ecr_no.trim()) return '提交前必须填写标题和 ECR 编号，请返回概述补齐。'
   if (!mode) return '请选择审核方式。'
   if (mode === 'public') return reviewers.length < 2 ? '系统中的有效审核员不足两人，请联系账号维护人员设置审核员身份。' : null

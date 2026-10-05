@@ -108,6 +108,44 @@ class ReviewFeedback(models.Model):
         constraints = [models.UniqueConstraint(fields=["round", "author", "request_id"], name="review_unique_feedback")]
 
 
+class ReviewIssue(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="review_issues")
+    source_round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    tab = models.CharField(max_length=32)
+    location = models.CharField(max_length=255, blank=True)
+    text = models.TextField()
+    state = models.CharField(max_length=16, default="awaiting_reply", db_collation="utf8mb4_bin")
+    version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "review_issue"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(state__in=["awaiting_reply", "awaiting_review", "resolved"]), name="review_issue_state"),
+            models.CheckConstraint(condition=models.Q(version__gt=0), name="review_issue_version"),
+        ]
+
+
+class ReviewIssueEvent(models.Model):
+    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="issue_events")
+    round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE)
+    issue = models.ForeignKey(ReviewIssue, null=True, on_delete=models.CASCADE, related_name="events")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    kind = models.CharField(max_length=16)
+    text = models.TextField(blank=True)
+    state = models.CharField(max_length=16, blank=True)
+    version = models.PositiveIntegerField(default=0)
+    request_id = models.UUIDField()
+    position = models.PositiveIntegerField(default=0)
+    payload = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "review_issue_event"
+        constraints = [models.UniqueConstraint(fields=["change", "author", "request_id", "position"], name="review_issue_request")]
+
+
 class MaterialChange(models.Model):
     class Category(models.TextChoices):
         REVISION = "revision", "升版"

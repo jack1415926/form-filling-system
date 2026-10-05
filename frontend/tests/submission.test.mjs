@@ -7,8 +7,14 @@ import { ApiError } from '../src/api.ts'
 
 const reviewers=[{id:2,username:'reviewer1',display_name:'One'},{id:3,username:'reviewer2',display_name:'Two'}]
 const change={id:1,applicant:4,current_review_round:0,title:'Submit',ecr_no:'SUB-001',eco_no:'',affected_products:'',affected_region:'',initiating_factory:'',affected_factories:'',ccb_owner:'',change_owner:'',planned_eco_date:null,change_reason:'',status:'draft',review_mode:'',submitted_at:null,created_at:'2026-10-04T01:00:00Z',updated_at:'2026-10-04T01:00:00.123456Z'}
-const draft={change,reviewers:[]}
-const submitted=(mode='designated')=>({change:{...change,status:'pending',review_mode:mode,submitted_at:'2026-10-04T01:01:00Z',updated_at:'2026-10-04T01:01:00.123456Z'},reviewers:mode==='designated'?reviewers:[]})
+const draft={change,reviewers:[],review_arrangement_locked:false,issue_blockers:[]}
+const submitted=(mode='designated')=>({change:{...change,status:'pending',review_mode:mode,submitted_at:'2026-10-04T01:01:00Z',updated_at:'2026-10-04T01:01:00.123456Z'},reviewers:mode==='designated'?reviewers:[],review_arrangement_locked:false,issue_blockers:[]})
+
+test('unsent opinion responses block submission even after all persisted opinions have been answered',()=>{
+ const returned={...change,status:'returned',review_mode:'designated',current_review_round:1}
+ assert.match(submissionError(returned,'designated',[2],reviewers,true),/未发送.*审核回应/)
+ assert.equal(submissionError(returned,'designated',[2],reviewers,false),null)
+})
 
 test('reviewer lists validate identity, types and uniqueness without exposing extra account requirements',()=>{
  assert.deepEqual(checkedReviewers(reviewers),reviewers)
@@ -96,4 +102,10 @@ test('a different confirmed submission releases navigation and reports the actua
  let cache=submitted();const payload={review_mode:'public',reviewer_ids:[]}
  const result=await recoverSubmissionFailure({failure:new ApiError(0,'late failure'),payload,previousUnknown:true,owner:change,cached:()=>cache,accept:data=>(cache=data),read:async()=>draft})
  assert.equal(result.unknown,null);assert.match(result.error,/原请求不同/);assert.equal(result.refreshReviewers,false);assert.equal(cache.change.review_mode,'designated')
+})
+
+test('missing or malformed opinion submission restrictions reject the entire response',()=>{
+ for(const invalid of [{...draft,review_arrangement_locked:undefined},{...draft,issue_blockers:undefined},{...draft,issue_blockers:[1]}])assert.throws(()=>checkedSubmission(invalid,change))
+ const returned={...submitted(),change:{...submitted().change,status:'returned'},review_arrangement_locked:true,issue_blockers:['Respond to all issues']}
+ assert.equal(checkedSubmission(returned,change).review_arrangement_locked,true)
 })

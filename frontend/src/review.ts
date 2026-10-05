@@ -7,8 +7,16 @@ export type RoundInfo = {
   reviewers: Reviewer[]; approvals: (Reviewer & { approved_at: string })[]
 }
 export type Feedback = { id: number; round_number: number; author: Reviewer; request_id: string; text: string; created_at: string }
-export type ReviewData = { change_id: number; updated_at: string; current_round: number; round: RoundInfo; is_current: boolean; can_view_form: boolean; can_approve: boolean; can_return: boolean; can_feedback: boolean; form: ChangeRequest | null; history: RoundInfo[]; feedback: Feedback[] }
-export type ReviewAction = { kind: 'approve' | 'return' | 'feedback'; text?: string; request_id?: string }
+export type ReviewIssue = { id: number; tab: string; location: string; text: string; source_round: number; author: Reviewer; state: 'awaiting_reply' | 'awaiting_review' | 'resolved'; version: number; can_respond: boolean; can_resolve: boolean; can_reject: boolean; events: { kind: string; text: string; state: string; version: number; round_number: number; author_id: number; request_id: string; created_at: string }[] }
+export type IssueInput = { tab?: string; location?: string; text: string; issue_id?: number; version?: number }
+export type ReplyDraft = { text: string; version: number }
+export function editReply(current: ReplyDraft | undefined, text: string, version: number): ReplyDraft {
+  return { text, version: current?.text ? current.version : version }
+}
+export type ReviewData = { change_id: number; updated_at: string; current_round: number; round: RoundInfo; is_current: boolean; can_view_form: boolean; can_approve: boolean; can_return: boolean; can_feedback: boolean; form: ChangeRequest | null; history: RoundInfo[]; feedback: Feedback[]; issues: ReviewIssue[]; unresolved_count: number; issue_blockers: string[]; confirmed_requests: string[] }
+export type ReviewAction = { kind: 'approve' | 'return' | 'respond' | 'resolve'; request_id: string; issues?: IssueInput[]; issue_id?: number; version?: number; text?: string }
+export const issueTabs = { overview: '概述', materials: '物料明细', questions: '问题评估', ecr: 'ECR 评估', eco: 'ECO 执行', emc: 'EMC 参考', 'execution-plan': '执行计划', 'significant-change': '实质性变更评估' }
+export const issueStateLabels = { awaiting_reply: '待回应', awaiting_review: '待复核', resolved: '已解决' }
 export const reviewStateLabels = { pending: '待审核', returned: '已退回', approved: '已批准' }
 export const reviewPath = (id: number, number: number) => `/api/changes/${id}/review-rounds/${number}/`
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
@@ -32,13 +40,30 @@ export function checkedReview(value: unknown, id: number, number: number): Revie
     && ['is_current', 'can_view_form', 'can_approve', 'can_return', 'can_feedback'].every((key) => typeof value[key] === 'boolean')
     && Array.isArray(value.history) && value.history.every(validRound)
     && Array.isArray(value.feedback) && value.feedback.every((row) => object(row) && Number.isSafeInteger(row.id) && person(row.author) && typeof row.request_id === 'string' && typeof row.text === 'string' && date(row.created_at))
+    && Array.isArray(value.issues) && value.issues.every((row) => object(row) && Number.isSafeInteger(row.id) && Number(row.id) > 0 && person(row.author)
+      && typeof row.tab === 'string' && row.tab in issueTabs && typeof row.location === 'string' && typeof row.text === 'string'
+      && Number.isSafeInteger(row.source_round) && Number(row.source_round) > 0 && Number.isSafeInteger(row.version) && Number(row.version) > 0
+      && typeof row.state === 'string' && row.state in issueStateLabels && ['can_respond', 'can_resolve', 'can_reject'].every((key) => typeof row[key] === 'boolean')
+      && Array.isArray(row.events) && row.events.length > 0 && row.events.every((item) => object(item) && ['return', 'respond', 'resolve'].includes(String(item.kind)) && typeof item.text === 'string' && typeof item.state === 'string' && item.state in issueStateLabels && Number.isSafeInteger(item.version) && Number(item.version) > 0 && Number.isSafeInteger(item.round_number) && Number(item.round_number) > 0 && Number.isSafeInteger(item.author_id) && typeof item.request_id === 'string' && date(item.created_at)))
+    && Number.isSafeInteger(value.unresolved_count) && Number(value.unresolved_count) >= 0
+    && Array.isArray(value.issue_blockers) && value.issue_blockers.every((row) => typeof row === 'string')
+    && Array.isArray(value.confirmed_requests) && value.confirmed_requests.every((row) => typeof row === 'string')
     && formValid
     && (!value.can_view_form || object(value.form))
   if (!valid) throw new ApiError(200, '审核响应不完整，操作结果未确认。请刷新当前轮次核对。')
   return value as ReviewData
 }
 export function actionConfirmed(action: ReviewAction, data: ReviewData, actorId: number): boolean {
-  if (action.kind === 'approve') return data.round.approvals.some((row) => row.id === actorId)
-  if (action.kind === 'return') return data.round.returned_by?.id === actorId && data.round.return_reason === action.text
-  return data.feedback.some((row) => row.author.id === actorId && row.request_id === action.request_id)
+  return data.confirmed_requests.includes(action.request_id) && (action.kind !== 'approve' || data.round.approvals.some((row) => row.id === actorId))
+}
+
+export function actionCanRetry(action: ReviewAction, data: ReviewData): boolean {
+  if (!data.is_current) return false
+  if (action.kind === 'approve') return data.round.state === 'pending' && data.can_approve
+  if (action.kind === 'return') return data.round.state === 'pending' && data.can_return && (action.issues ?? []).every((item) =>
+    !item.issue_id || data.issues.some((issue) => issue.id === item.issue_id && issue.can_reject && issue.version === item.version))
+  const issue = data.issues.find((row) => row.id === action.issue_id)
+  return !!issue && issue.version === action.version && (action.kind === 'respond'
+    ? data.round.state === 'returned' && issue.can_respond
+    : data.round.state === 'pending' && issue.can_resolve)
 }

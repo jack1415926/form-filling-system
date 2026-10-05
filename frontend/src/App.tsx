@@ -16,6 +16,7 @@ import ExecutionPlanEditor from './ExecutionPlanEditor'
 import SignificantChangeEditor from './SignificantChangeEditor'
 import SubmissionEditor from './SubmissionEditor'
 import ReviewWorkbench from './ReviewWorkbench'
+import ReviewPanel from './ReviewPanel'
 import { submissionChoiceWarning } from './submission'
 import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
@@ -24,6 +25,10 @@ import { overviewFields } from './autosaveFields'
 
 const stateLabels = { draft: '草稿', pending: '待审核', approved: '已批准', returned: '待修订' }
 const stateColors = { draft: 'default', pending: 'gold', approved: 'green', returned: 'orange' }
+const reviewReadOnlyTheme = { components: {
+  Input: { colorTextDisabled: '#243731', colorBgContainerDisabled: '#f8faf9' },
+  Select: { colorTextDisabled: '#243731', colorBgContainerDisabled: '#f8faf9' },
+} }
 const dateTime = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12: false })
 
 function Login({ onLogin, compact = false, onBusy }: { onLogin: (user: User) => void; compact?: boolean; onBusy?: (busy: boolean) => void }) {
@@ -112,6 +117,7 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [issueBusy, setIssueBusy] = useState(false), [issueDirty, setIssueDirty] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const saveRef = useRef<SaveHandle>(null)
   const { modal } = AntApp.useApp()
@@ -119,20 +125,21 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
   useEffect(() => { onLeaveMessage(tab === 'submission' ? submissionChoiceWarning : discardSavedWarning); return () => onLeaveMessage(discardSavedWarning) }, [tab, onLeaveMessage])
   useEffect(() => {
     const handleUnload = (event: BeforeUnloadEvent) => {
-      if (dirty || busy) { event.preventDefault(); event.returnValue = '' }
+      if (dirty || busy || issueDirty || issueBusy) { event.preventDefault(); event.returnValue = '' }
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [dirty, busy])
+  }, [dirty, busy, issueDirty, issueBusy])
   const editorProps = { ...props,
+    leaving: props.leaving || issueBusy,
     saveRef,
     paused: confirming,
-    onDirty: (value: boolean) => { setDirty(value); props.onDirty(value) },
-    onBusy: (value: boolean) => { setBusy(value); props.onBusy(value) },
+    onDirty: (value: boolean) => { setDirty(value); props.onDirty(value || issueDirty) },
+    onBusy: (value: boolean) => { setBusy(value); props.onBusy(value || issueBusy) },
   }
   const switchTab = (key: string) => {
-    if (busy || editorOpen || props.leaving || key === tab) return
-    const change = () => { setDirty(false); props.onDirty(false); setTab(key); window.scrollTo({ top: 0 }) }
+    if (busy || issueBusy || editorOpen || props.leaving || key === tab) return
+    const change = () => { setDirty(false); props.onDirty(issueDirty); setTab(key); window.scrollTo({ top: 0 }) }
     if (!dirty) { change(); return }
     setConfirming(true)
     if (!saveRef.current) {
@@ -144,8 +151,9 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
       switchPage={change} discard={() => { setConfirming(false); change(); dialog.destroy() }} close={() => { setConfirming(false); dialog.destroy() }}
     /> })
   }
-  return <><Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }, { key: 'execution-plan', label: '执行计划' }, { key: 'significant-change', label: '实质性变更评估' }, { key: 'submission', label: '提交审核' }].filter((item) => !props.reviewOnly || item.key !== 'submission').map((item) => ({ ...item, disabled: busy || editorOpen || props.leaving }))} />
-    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setEditorOpen} onNext={() => switchTab('questions')} /> : tab === 'questions' ? <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} onNext={() => switchTab('ecr')} /> : tab === 'ecr' ? <EcrEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('questions')} onNext={() => switchTab('eco')} /> : tab === 'eco' ? <EcoEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('ecr')} onNext={() => switchTab('emc')} /> : tab === 'emc' ? <EmcEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('eco')} onNext={() => switchTab('execution-plan')} /> : tab === 'execution-plan' ? <ExecutionPlanEditor {...editorProps} onPrevious={() => switchTab('emc')} onNext={() => switchTab('significant-change')} /> : tab === 'significant-change' ? <SignificantChangeEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('execution-plan')} onNext={props.reviewOnly ? undefined : () => switchTab('submission')} /> : <SubmissionEditor {...editorProps} onPrevious={() => switchTab('significant-change')} />}
+  return <>{!props.reviewOnly && !!props.record.current_review_round && <ReviewPanel compact key={`${props.record.id}:${props.record.current_review_round}`} changeId={props.record.id} number={props.record.current_review_round} leaving={props.leaving || busy || confirming} onReauthenticate={props.onReauthenticate} onBusy={(value) => { setIssueBusy(value); props.onBusy(value || busy) }} onDirty={(value) => { setIssueDirty(value); props.onDirty(value || dirty) }} />}
+    <Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }, { key: 'execution-plan', label: '执行计划' }, { key: 'significant-change', label: '实质性变更评估' }, { key: 'submission', label: '提交审核' }].filter((item) => !props.reviewOnly || item.key !== 'submission').map((item) => ({ ...item, disabled: busy || issueBusy || editorOpen || props.leaving }))} />
+    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setEditorOpen} onNext={() => switchTab('questions')} /> : tab === 'questions' ? <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} onNext={() => switchTab('ecr')} /> : tab === 'ecr' ? <EcrEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('questions')} onNext={() => switchTab('eco')} /> : tab === 'eco' ? <EcoEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('ecr')} onNext={() => switchTab('emc')} /> : tab === 'emc' ? <EmcEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('eco')} onNext={() => switchTab('execution-plan')} /> : tab === 'execution-plan' ? <ExecutionPlanEditor {...editorProps} onPrevious={() => switchTab('emc')} onNext={() => switchTab('significant-change')} /> : tab === 'significant-change' ? <SignificantChangeEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('execution-plan')} onNext={props.reviewOnly ? undefined : () => switchTab('submission')} /> : <SubmissionEditor {...editorProps} reviewDraftDirty={issueDirty} onPrevious={() => switchTab('significant-change')} />}
   </>
 }
 
@@ -182,7 +190,7 @@ function ReviewerWorkspace({ user, error, retry }: { user: User; error: Error | 
   const exit = useMutation({ mutationFn: () => api('/api/auth/logout/', 'POST', undefined, user.id), onSuccess: () => { queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' }); queryClient.setQueryData(['me'], null) } })
   return <div className="app-shell"><header className="topbar"><div className="brand"><strong>表单填报系统 · 审核员</strong></div><div className="user-menu"><span>{user.display_name}</span><Button disabled={exit.isPending} onClick={retry}>刷新身份</Button><Button disabled={reviewBusy} onClick={() => setReauthenticate(true)}>重新登录</Button><Button disabled={reviewBusy} loading={exit.isPending} onClick={() => { if (reviewDirty) modal.confirm({ title: "离开未发送的反馈？", content: "未发送的反馈或退回原因会丢失。", onOk: () => exit.mutate() }); else exit.mutate() }}>退出登录</Button></div></header>
     <main className="workspace">{(error || exit.error) && <Alert type="error" title={(error || exit.error)?.message} className="form-alert" />}
-      <ReviewWorkbench onBusy={setReviewBusy} onDirty={setReviewDirty} user={user} leaving={exit.isPending || reauthenticate} onReauthenticate={() => setReauthenticate(true)} renderForm={(record, onBack) => <ChangeEditor key={record.id} reviewOnly record={record} onDirty={() => {}} onBusy={() => {}} onLeaveMessage={() => {}} leaving={exit.isPending || reauthenticate || reviewBusy} onReauthenticate={() => setReauthenticate(true)} onBack={onBack} onSaved={() => {}} />} />
+      <ReviewWorkbench onBusy={setReviewBusy} onDirty={setReviewDirty} user={user} leaving={exit.isPending || reauthenticate} onReauthenticate={() => setReauthenticate(true)} renderForm={(record, onBack) => <ConfigProvider theme={reviewReadOnlyTheme}><ChangeEditor key={record.id} reviewOnly record={record} onDirty={() => {}} onBusy={() => {}} onLeaveMessage={() => {}} leaving={exit.isPending || reauthenticate || reviewBusy} onReauthenticate={() => setReauthenticate(true)} onBack={onBack} onSaved={() => {}} /></ConfigProvider>} />
     </main>
     <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} onCancel={() => setReauthenticate(false)}><Login compact onBusy={setReauthBusy} onLogin={(current) => { if (current.id !== user.id || current.role !== user.role) queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' }); queryClient.setQueryData(['me'], current); setReauthenticate(false); void queryClient.invalidateQueries({ queryKey: ['review-list', current.id] }); void queryClient.invalidateQueries({ queryKey: ['review-round', current.id] }) }} /></Modal>
   </div>
@@ -255,7 +263,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
         {detail.error && <Alert type="error" showIcon title="申请信息刷新失败，当前填写内容仍保留" description={detail.error.message} className="form-alert" action={<Button loading={detail.isFetching} disabled={saving || exit.isPending} onClick={() => void detail.refetch()}>重试</Button>} />}
         <ChangeEditor onLeaveMessage={setLeaveMessage} key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={() => setReauthenticate(true)} onBack={() => navigate(() => { setDirty(false); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
       </> : detail.isPending ? <Spin tip="正在读取草稿…"><div className="loading-space" /></Spin> : <Alert type="error" title={detail.error?.message ?? '无法读取申请。'} action={<><Button loading={detail.isFetching} disabled={exit.isPending} onClick={() => void detail.refetch()}>重试</Button><Button disabled={exit.isPending} onClick={() => { setSelectedId(null); setDirty(false) }}>返回列表</Button></>} />}
-      <footer className="workspace-footer"><span className="muted">当前提供八张工作表填写、指定／公开提交及提交后锁定；支持按轮审核、退回修订及自由文字反馈。</span></footer>
+      <footer className="workspace-footer"><span className="muted">当前提供八张工作表填写、指定／公开提交及提交后锁定；支持按轮审核、退回修订和逐条审核意见复核。</span></footer>
     </main>
     <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} maskClosable={false} keyboard={!reauthBusy} onCancel={() => setReauthenticate(false)}>
       <p className="muted">使用原账号可继续当前填写；切换账号会关闭原申请。</p>

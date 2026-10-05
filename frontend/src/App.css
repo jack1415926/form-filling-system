@@ -23,6 +23,10 @@
 .assessment-conclusion h3 { margin: 20px 0 12px; }
 .assessment-source-note { margin-bottom: 20px; }
 .review-note { border-top: 1px solid #edf1ee; padding: 14px 0; }
+.review-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; border-top: 1px solid #edf1ee; margin-top: 20px; padding-top: 20px; }
+.review-actions .form-actions { flex-wrap: wrap; }
+.review-feedback-entry { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 16px; }
+.review-feedback-entry textarea { width: 100%; }
 .question-hint { color: #945d0b; font-size: 13px; line-height: 1.6; margin: 8px 0 0; }
 .ecr-preview { max-width: 1360px; }
 .preview-questions { margin: 24px 0; }

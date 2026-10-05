@@ -40,9 +40,16 @@ class ReviewFlowTests(TestCase):
         return self.owner_client.post(self.base+'submission/',payload,format='json'),payload
 
     def action(self,index,kind,number=1,text='Reason',request_id=None):
-        data={} if kind=='approve' else {'text':text}
+        data={'request_id':str(request_id or uuid.uuid4())} if kind=='approve' else {'request_id':str(request_id or uuid.uuid4()),'issues':[{'tab':'overview','text':text}]} if kind=='return' else {'text':text}
         if kind=='feedback':data['request_id']=str(request_id or uuid.uuid4())
         return self.clients[index].post(self.base+f'review-rounds/{number}/{kind}/',data,format='json')
+
+    def legacy_return(self,index=0,number=1,text='Legacy reason'):
+        # Fixture for an application returned before formal opinions existed.
+        self.change.refresh_from_db()
+        round=self.change.review_rounds.get(number=number)
+        round.state='returned';round.returned_by=self.reviewers[index];round.return_reason=text;round.save()
+        self.change.status='returned';self.change.save()
 
     def metadata(self,client=None,number=1):
         return (client or self.clients[0]).get(self.base+f'review-rounds/{number}/')
@@ -86,7 +93,7 @@ class ReviewFlowTests(TestCase):
         self.submit();self.action(0,'approve')
         self.assertEqual(self.action(0,'return',text='Need clarification').status_code,200)
         self.change.refresh_from_db();self.assertEqual(self.change.status,'returned')
-        data=self.metadata().json();self.assertFalse(data['can_view_form']);self.assertIsNone(data['form']);self.assertTrue(data['can_feedback'])
+        data=self.metadata().json();self.assertFalse(data['can_view_form']);self.assertIsNone(data['form']);self.assertFalse(data['can_feedback'])
         for suffix in ['', 'materials/', 'questions/', 'ecr-actions/', 'eco-actions/', 'emc/', 'execution-plan/', 'significant-change/']:
             self.assertEqual(self.clients[0].get(self.base+suffix).status_code,404)
         writes=[(self.base,{'title':'Revised private title'}),(self.base+f'materials/{material.pk}/',{'description':'updated'}),
@@ -101,8 +108,8 @@ class ReviewFlowTests(TestCase):
         self.assertEqual(self.metadata().json()['round']['title'],'Original title')
         self.assertEqual(self.action(1,'approve').status_code,409)
 
-    def test_resubmission_starts_fresh_round_revokes_old_reviewer_and_retains_opinions(self):
-        self.submit();self.action(0,'feedback',text='Original opinion');self.action(0,'approve');self.action(1,'return')
+    def test_legacy_resubmission_starts_fresh_round_revokes_old_reviewer_and_retains_opinions(self):
+        self.submit();ReviewFeedback.objects.create(round=self.change.review_rounds.get(number=1),author=self.reviewers[0],text='Original opinion',request_id=uuid.uuid4());self.action(0,'approve');self.legacy_return(1)
         note=ReviewFeedback.objects.first();self.assertIsNotNone(note)
         self.owner_client.patch(self.base,{'title':'New title'},format='json')
         response,payload=self.submit(people=[self.reviewers[2].pk]);self.assertEqual(response.status_code,200)
@@ -118,8 +125,8 @@ class ReviewFlowTests(TestCase):
         self.assertEqual(self.action(2,'approve',number=2).status_code,200)
         self.change.refresh_from_db();self.assertEqual(self.change.status,'approved')
 
-    def test_retired_submission_request_cannot_create_or_confirm_a_new_round(self):
-        _,original=self.submit();self.action(0,'return')
+    def test_legacy_retired_submission_request_cannot_create_or_confirm_a_new_round(self):
+        _,original=self.submit();self.legacy_return()
         self.assertEqual(self.owner_client.post(self.base+'submission/',original,format='json').status_code,200)
         self.assertEqual(ReviewRound.objects.count(),1)
         response,new=self.submit('public',[]);self.assertEqual(response.status_code,200)
@@ -128,45 +135,43 @@ class ReviewFlowTests(TestCase):
         self.assertEqual(ReviewRound.objects.count(),2)
 
     def test_returned_discussion_list_includes_unapproved_assignees_and_excludes_outsiders(self):
-        self.submit();self.action(0,'return')
+        self.submit();self.legacy_return()
         rows=self.clients[1].get('/api/review/?kind=returned').json()
         self.assertEqual([(row['change_id'],row['number']) for row in rows],[(self.change.pk,1)])
         self.assertEqual(self.clients[1].get('/api/review/?kind=handled').json(),[])
         self.assertEqual(self.clients[2].get('/api/review/?kind=returned').json(),[])
         data=self.metadata(self.clients[1]).json()
-        self.assertTrue(data['can_feedback']);self.assertFalse(data['can_view_form']);self.assertIsNone(data['form'])
-        self.assertEqual(self.action(1,'feedback').status_code,200)
+        self.assertFalse(data['can_feedback']);self.assertFalse(data['can_view_form']);self.assertIsNone(data['form'])
+        self.assertEqual(self.action(1,'feedback').status_code,409)
         self.submit(people=[self.reviewers[2].pk])
         self.assertEqual(self.clients[1].get('/api/review/?kind=returned').json(),[])
         self.assertEqual(self.metadata(self.clients[1],2).status_code,404)
 
     def test_returned_public_discussion_is_discoverable_without_a_personal_vote(self):
-        self.submit('public',[]);self.action(0,'return')
+        self.submit('public',[]);self.legacy_return()
         rows=self.clients[2].get('/api/review/?kind=returned').json()
         self.assertEqual(len(rows),1);self.assertEqual(rows[0]['state'],'returned')
-        self.assertTrue(self.metadata(self.clients[2]).json()['can_feedback'])
+        self.assertFalse(self.metadata(self.clients[2]).json()['can_feedback'])
         self.assertEqual(self.clients[2].get(self.base).status_code,404)
         self.submit('public',[])
         self.assertEqual(self.clients[2].get('/api/review/?kind=returned').json(),[])
 
-    def test_feedback_between_return_and_resubmit_and_retry_deduplication(self):
-        self.submit();self.action(0,'return')
-        request_id=uuid.uuid4();self.assertEqual(self.action(0,'feedback',text='Please explain',request_id=request_id).status_code,200)
-        self.assertEqual(self.action(0,'feedback',text='Please explain',request_id=request_id).status_code,200)
-        self.assertEqual(self.action(0,'feedback',text='Different',request_id=request_id).status_code,409)
+    def test_legacy_feedback_is_readonly_and_survives_resubmission(self):
+        self.submit();self.legacy_return()
+        note=ReviewFeedback.objects.create(round=self.change.review_rounds.get(number=1),author=self.reviewers[0],text='Old feedback',request_id=uuid.uuid4())
+        self.assertEqual(self.action(0,'feedback').status_code,409)
+        self.assertEqual(self.metadata().json()['feedback'][0]['text'],note.text)
+        self.assertEqual(self.submit()[0].status_code,200)
+        self.assertEqual(self.metadata(number=2).json()['feedback'][0]['text'],note.text)
         self.assertEqual(ReviewFeedback.objects.count(),1)
-        response=self.owner_client.post(self.base+'review-rounds/1/feedback/',{'text':'Explanation','request_id':str(uuid.uuid4())},format='json')
-        self.assertEqual(response.status_code,200)
-        self.assertEqual(self.metadata().json()['feedback'][1]['author']['id'],self.owner.pk)
-        self.submit();self.assertEqual(self.action(0,'feedback').status_code,409)
 
     def test_strict_actions_permissions_csrf_and_atomic_rollback(self):
         self.submit()
         self.assertEqual(self.action(0,'return',text=' ').status_code,400)
         self.assertEqual(self.action(0,'return',text='x'*10001).status_code,400)
-        self.assertEqual(self.owner_client.post(self.base+'review-rounds/1/approve/',{},format='json').status_code,403)
+        self.assertEqual(self.owner_client.post(self.base+'review-rounds/1/approve/',{'request_id':str(uuid.uuid4())},format='json').status_code,403)
         csrf_client=APIClient(enforce_csrf_checks=True);csrf_client.force_login(self.reviewers[0])
-        self.assertEqual(csrf_client.post(self.base+'review-rounds/1/approve/',{},format='json').status_code,403)
+        self.assertEqual(csrf_client.post(self.base+'review-rounds/1/approve/',{'request_id':str(uuid.uuid4())},format='json').status_code,403)
         with patch('changes.review_views.ChangeRequest.save',side_effect=RuntimeError('rollback')):
             with self.assertRaises(RuntimeError):self.action(0,'approve')
         self.assertFalse(ReviewRecord.objects.filter(approved_at__isnull=False).exists())
@@ -189,7 +194,8 @@ class ReviewTransactionTests(TransactionTestCase):
     def request(self,user,action,barrier):
         try:
             client=APIClient();client.force_authenticate(user);barrier.wait(timeout=5)
-            payload={} if action=='approve' else {'text':'Return'}
+            payload={'request_id':str(uuid.uuid4())}
+            if action=='return':payload['issues']=[{'tab':'overview','text':'Return'}]
             return client.post(f'/api/changes/{self.change.pk}/review-rounds/1/{action}/',payload,format='json').status_code
         finally:connections['default'].close()
 
@@ -201,7 +207,7 @@ class ReviewTransactionTests(TransactionTestCase):
         self.change.refresh_from_db();self.assertEqual(self.change.status,'approved');self.assertEqual(ReviewRecord.objects.filter(approved_at__isnull=False).count(),2)
 
     def test_final_approval_and_return_first_committed_transition_wins(self):
-        client=APIClient();client.force_authenticate(self.people[0]);client.post(f'/api/changes/{self.change.pk}/review-rounds/1/approve/',{},format='json')
+        client=APIClient();client.force_authenticate(self.people[0]);client.post(f'/api/changes/{self.change.pk}/review-rounds/1/approve/',{'request_id':str(uuid.uuid4())},format='json')
         barrier=Barrier(2)
         with ThreadPoolExecutor(max_workers=2) as pool:
             tasks=[pool.submit(self.request,self.people[1],'approve',barrier),pool.submit(self.request,self.people[0],'return',barrier)]

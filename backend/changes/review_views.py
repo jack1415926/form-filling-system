@@ -13,6 +13,8 @@ from .permissions import ExpectedAccountPermission
 from .review_access import is_owner, eligible, can_read_round, reviewer_rounds
 from .roles import business_role
 from .serializers import ChangeRequestSerializer
+from .review_issues import (ReturnValues, IssueActionValues, ApproveValues, blockers, issue_data,
+                            replay, event, checked_issue, return_issues)
 
 
 def person(user):
@@ -40,8 +42,12 @@ def review_data(record, round, user):
     notes = ReviewFeedback.objects.filter(round__in=rounds).select_related('author', 'round').order_by('created_at', 'id')
     return {'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'current_round': record.current_review_round,
             'round': round_data(round), 'is_current': current, 'can_view_form': may_view,
-            'can_approve': may_review and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
-            'can_return': may_review, 'can_feedback': current and record.status in ['pending', 'returned'] and (owner or allowed),
+            'can_approve': may_review and not record.review_issues.exclude(state='resolved').exists() and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
+            'can_return': may_review, 'can_feedback': False,
+            'issues': issue_data(record, round, user, owner, allowed, current),
+            'unresolved_count': record.review_issues.exclude(state='resolved').count() if current else 0,
+            'issue_blockers': blockers(record) if current else [],
+            'confirmed_requests': [str(value) for value in record.issue_events.filter(author=user, round=round).values_list('request_id', flat=True).distinct()],
             'form': ChangeRequestSerializer(record).data if may_view else None,
             'history': [round_data(row) for row in rounds],
             'feedback': [{'id': note.pk, 'round_number': note.round.number, 'author': person(note.author),
@@ -107,28 +113,34 @@ class ReviewDetail(APIView):
             return Response(review_data(record, round, request.user))
 
     def post(self, request, pk, number, action=None):
-        if action not in ['approve', 'return', 'feedback']:
+        if action not in ['approve', 'return', 'feedback', 'respond', 'resolve']:
             raise NotFound()
-        values = {}
-        if action == 'approve':
-            if not isinstance(request.data, dict) or request.data:
-                raise serializers.ValidationError({'detail': '通过操作不接受额外字段。'})
-        else:
-            serializer = TextValues(data=request.data, context={'feedback': action == 'feedback'})
-            serializer.is_valid(raise_exception=True); values = serializer.validated_data
+        if action == 'feedback':
+            return Response({'detail': '普通留言已停止新增，历史留言只读保留。'}, status=409)
+        serializer = (ApproveValues if action == 'approve' else ReturnValues if action == 'return' else IssueActionValues)(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
         with transaction.atomic():
             record, round = self.locked(request, pk, number)
             if record.current_review_round != number:
                 return Response({'detail': '该页面属于旧审核轮次，请刷新当前状态。'}, status=409)
             owner, reviewer = is_owner(request.user, record), eligible(request.user, round)
-            if action != 'feedback' and not reviewer:
+            if action == 'respond' and not owner:
+                return Response({'detail': '只有申请本人可以回应意见。'}, status=403)
+            if action != 'respond' and not reviewer:
                 return Response({'detail': '没有本轮审核权限。'}, status=403)
+            if replay(record, request.user, action, values):
+                return Response(review_data(record, round, request.user))
             if action == 'approve':
                 existing = round.records.filter(reviewer=request.user).first()
                 if existing and existing.approved_at and record.status in ['pending', 'approved']:
+                    event(record, round, request.user, action, values)
+                    record.updated_at = timezone.now(); record.save(update_fields=['updated_at'])
                     return Response(review_data(record, round, request.user))
                 if record.status != 'pending' or round.state != 'pending':
                     return Response({'detail': '本轮已结束，不能再通过。'}, status=409)
+                if record.review_issues.exclude(state='resolved').exists():
+                    return Response({'detail': '存在未解决正式意见，不能批准。'}, status=409)
                 row = existing or ReviewRecord(change=record, round=round, reviewer=request.user, assigned=False)
                 row.approved_at = timezone.now(); row.save()
                 approvals = round.records.filter(approved_at__isnull=False).count()
@@ -136,23 +148,21 @@ class ReviewDetail(APIView):
                 if done:
                     round.state = 'approved'; round.approved_at = row.approved_at; round.save(update_fields=['state', 'approved_at'])
                     record.status = 'approved'
+                event(record, round, request.user, action, values)
             elif action == 'return':
-                if record.status == 'returned' and round.returned_by_id == request.user.pk and round.return_reason == values['text']:
-                    return Response(review_data(record, round, request.user))
                 if record.status != 'pending' or round.state != 'pending':
                     return Response({'detail': '本轮已结束，不能再退回。'}, status=409)
-                round.state = 'returned'; round.returned_by = request.user; round.return_reason = values['text']; round.returned_at = timezone.now()
+                reason = return_issues(record, round, request.user, values)
+                round.state = 'returned'; round.returned_by = request.user; round.return_reason = reason; round.returned_at = timezone.now()
                 round.save(update_fields=['state', 'returned_by', 'return_reason', 'returned_at']); record.status = 'returned'
             else:
-                if not (owner or reviewer):
-                    return Response({'detail': '没有本轮反馈权限。'}, status=403)
-                existing = round.feedback.filter(author=request.user, request_id=values['request_id']).first()
-                if existing:
-                    if existing.text != values['text']:
-                        return Response({'detail': '同一反馈请求携带了不同内容，请核对原记录。'}, status=409)
-                    return Response(review_data(record, round, request.user))
-                if record.status not in ['pending', 'returned']:
-                    return Response({'detail': '申请已批准，反馈只读。'}, status=409)
-                ReviewFeedback.objects.create(round=round, author=request.user, **values)
+                if action == 'respond' and record.status != 'returned' or action == 'resolve' and record.status != 'pending':
+                    return Response({'detail': '当前状态不允许此意见操作。'}, status=409)
+                issue = checked_issue(record, request.user, values, owner=action == 'respond')
+                if action == 'resolve' and issue.state != 'awaiting_review':
+                    return Response({'detail': '填写员尚未回应，不能确认解决。'}, status=409)
+                issue.state = 'awaiting_review' if action == 'respond' else 'resolved'; issue.version += 1
+                issue.save(update_fields=['state', 'version'])
+                event(record, round, request.user, action, values, issue, values['text'])
             record.updated_at = timezone.now(); record.save(update_fields=['status', 'updated_at'])
             return Response(review_data(record, round, request.user))

@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from .models import ChangeRequest, ReviewRecord, ReviewRound
 from .roles import REVIEWER_GROUP, business_role
 from .serializers import ChangeRequestSerializer
+from .review_issues import blockers
 
 
 def reviewer_data(user):
@@ -63,7 +64,8 @@ class SubmissionDetail(APIView):
     def data(record):
         round = record.review_rounds.filter(number=record.current_review_round).first()
         reviewers = round.records.filter(assigned=True).select_related('reviewer').order_by('reviewer_id') if round and round.review_mode == 'designated' else []
-        return {'change': ChangeRequestSerializer(record).data, 'reviewers': [reviewer_data(row.reviewer) for row in reviewers], 'request_id': str(round.request_id) if round and round.request_id else None}
+        return {'change': ChangeRequestSerializer(record).data, 'reviewers': [reviewer_data(row.reviewer) for row in reviewers], 'request_id': str(round.request_id) if round and round.request_id else None,
+                'review_arrangement_locked': record.review_issues.exclude(state='resolved').exists(), 'issue_blockers': blockers(record)}
 
     def get(self, request, pk):
         with transaction.atomic():
@@ -97,6 +99,13 @@ class SubmissionDetail(APIView):
                 return Response({'detail': '申请轮次已变化，请刷新后再次提交。'}, status=409)
             if record.status == 'returned' and not request_id:
                 raise serializers.ValidationError({'request_id': '再次提交必须携带新的请求标识。'})
+            if record.review_issues.exclude(state='resolved').exists():
+                reasons = blockers(record)
+                if reasons:
+                    return Response({'detail': ' '.join(reasons)}, status=409)
+                saved_ids = list(current.records.filter(assigned=True).order_by('reviewer_id').values_list('reviewer_id', flat=True))
+                if current.review_mode != values['review_mode'] or saved_ids != sorted(values['reviewer_ids']):
+                    return Response({'detail': '存在未解决意见，重提必须沿用原审核方式及指定名单。'}, status=409)
             errors = {field: '提交前必须填写。' for field in ['title', 'ecr_no'] if not getattr(record, field).strip()}
             if errors:
                 raise serializers.ValidationError(errors)

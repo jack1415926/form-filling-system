@@ -151,3 +151,7 @@ review_mode为空／designated／public，submitted_at为提交时间，不对�
 current_review_round为当前审核轮次号，只读系统字段。review_round冻结提交时标题／ECR／ECO、方式、时间、结束状态及退回人／原因；不保存八表完整快照。review_record关联轮次及真实审核员账号，assigned表示指定人员，approved_at记录个人通过。review_feedback关联轮次、作者、文字、创建时间及重试UUID，不对应Excel业务字段，也不自动产生通过或退回。
 
 returned新增为可填写状态，draft／returned仅本人可写；pending／approved只读。退回不能永久删除申请。新轮批准从零计数，个人负责人文字不映射为系统审核人员。退回沟通列表只返回当前returned轮次，并按指定／公开审核权限筛选；不改变字段来源或开放修订中的完整表单。接口和权限边界见 [审核闭环](testing/REVIEW-WORKFLOW-2026-10-05.md)。
+
+## 正式审核修改意见（0014，已实现）
+
+系统新增内容，不属于Excel原字段。每条意见保存所属网页页签、可选题号／行动号／物料文字定位、具体问题、原提出者和来源轮次；定位不绑定可被删除的物料记录。review_issue保存状态和版本，review_issue_event追加回应、确认解决及继续修改过程。未解决项跨轮保留，重提保持原审核安排，原提出者确认解决后才允许正常批准。旧review_feedback只读保留，独立系统反馈仍待实现。[交付与验证](testing/REVIEW-ISSUES-2026-10-05.md)。

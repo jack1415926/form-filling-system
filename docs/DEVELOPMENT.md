@@ -70,11 +70,11 @@ uv pip install --offline --reinstall --python .venv\Scripts\python.exe -r backen
 
 ## 本机运行快照
 
-2026-10-04 实质性评估交付结束检查：MySQL Running／Manual，前端 `http://localhost:5173/` 与后端 `http://127.0.0.1:8001/api/auth/csrf/` 均返回200。本轮按需要启动了本项目两个隐藏开发进程，结束保持运行，没有设置系统自启动；以后仍按上文分别启动。
+2026-10-05技术复验结束检查：MySQL Running／Manual，前端 `http://localhost:5173/` 与后端 `http://127.0.0.1:8001/api/auth/csrf/` 均返回200，迁移至0013；没有修改系统自启动。本轮核对并重启了旧 `--noreload` 项目后端；暂停后MySQL与开发服务关闭，再仅恢复本项目所需服务。普通进程无服务控制权限时，通过Windows管理员UAC只执行 `Start-Service MySQL`，不更改启动类型。运行快照不保证服务以后持续运行；以后仍按上文启动，服务已运行时先检查再操作。
 
 ## 同步与迁移
 
-2026-10-04 此前核对：PR #2 已合并，远端 `main` 为 `58224d5`；此前功能提交 [69ad8e7](https://github.com/jack1415926/form-filling-system/commit/69ad8e72389d55577a36d88bde276c611da4fafe) 已推送到 `codex/enforce-unique-change-numbers`，尚未合并到 main。获取自动保存、执行计划和最新保存恢复修复须同步该功能分支，不能只从 main 更新。保留各自 `.local`、前端本机配置和数据库，不复制密码；checkout 有未提交修改时先保留，不强行覆盖。代码同步后应用全部尚未执行迁移至 `0010_executionplanresponse`，不要手工执行历史 A/B SQL。
+2026-10-05通过 `git ls-remote` 只读核验：远端 `main` 为 `58224d5`，功能分支 `codex/enforce-unique-change-numbers` 与本地HEAD均为 `1ea9ff2`，最新功能尚未合并。该提交包含实质性评估、提交锁定、审核闭环及审查修复；此前 `69ad8e7` 只含较早的自动保存、执行计划及保存恢复修复。其他设备应同步功能分支，不能只从main更新。保留各自 `.local`、前端本机配置和数据库，不复制密码；checkout有未提交修改时先保留，不强行覆盖。代码同步后应用全部尚未执行迁移至 `0013_review_rounds`，重启后端后再使用新版前端，不要手工执行历史A/B SQL。以下各迁移段落保留其交付时的数据保护证据，不表示当前升级只需执行到0010或0011。
 
 先备份开发数据库并停止 Django 写入服务，再在根目录执行：
 
@@ -168,3 +168,11 @@ npm.cmd run test:review`；交付时全量后端102项／前端57项及17组真�
 审核员登录 → 指定任务／公开审核／退回沟通／我的已处理记录 → 查看申请。“退回沟通”显示仍有权限的当前退回轮次，包括尚未个人批准的审核员；重新提交后旧轮移出该列表。审核员八张表只读，退回期间只看基本信息及意见；填写员本人在returned可修订并第九页再次提交，默认沿用但可更改名单。新轮重新审核，旧轮请求不可写入。自由文字反馈在本轮pending／returned可追加，旧轮和approved只读。
 
 审核专项为 `test changes.test_review --noinput`，前端 `npm.cmd run test:review`。审核闭环交付时全量125项真实MySQL、76项前端、lint/build及13组真实页面通过。最新两项审查修复专项25项MySQL、16项前端、4项隔离浏览器模拟场景及lint/build通过，推送前全量127项真实MySQL及76项前端检查已重跑通过；业务复验另行记录。退回／第二轮／反馈已存在时，逆迁移在DDL前停止，不能用回退迁移撤销审核；需制定数据恢复方案。详情见 [交付记录](testing/REVIEW-WORKFLOW-2026-10-05.md)。
+
+## 正式审核意见升级（0014）
+
+同步当前功能源码后先备份开发库、停写，执行全部未应用迁移至0014_review_issues，再重启后端与前端。本机已完成，原17张业务表及原账号／组关系保持；本批结果见[审核意见交付](testing/REVIEW-ISSUES-2026-10-05.md)。本地源码尚未提交／推送，不能只同步远端1ea9ff2取得本功能。不要删除历史留言，0014只新增意见及事件表；有任何意见／请求确认事件时逆迁移明确拒绝，需要另定历史保留方案。
+
+前后端须同步升级：批准POST新增必填request_id；退回改为request_id＋多条issues，新增respond／resolve。旧空批准载荷、仅文字退回和普通feedback写入不再支持，关闭旧页面并重新加载新版。既有无正式意见的退回申请继续可重提。独立系统反馈尚未接入。
+
+专项为`backend.ps1 test changes.test_review changes.test_review_issues changes.test_submission --noinput`；前端使用现有test:review／test:submission。完整前端检查用`node --test tests/*.test.mjs`，包括当前npm脚本未注册的material-save四项；当前全部文件78项、现有npm脚本74项，勿混淆。最终全量后端137项、lint/build及迁移一致性通过，业务验收单独记录。
