@@ -146,9 +146,9 @@ review_mode为空／designated／public，submitted_at为提交时间，不对�
 
 标题title与ECR编号ecr_no仅提交时要求非空（含纯空白拒绝）。其他工作表不新增整表必填；提交读取已经保存的内容，成功后pending／approved状态下全部填写接口拒绝修改；退回后允许本人修订，见下节审核轮次规则。指定至少选一名、公开不选人且至少存在两名有效审核员；正式确认前的选择仅保留在页面，不写草稿。接口及边界见 [提交记录](testing/SUBMISSION-2026-10-04.md)。
 
-## 审核轮次与反馈（已实现）
+## 审核轮次与历史留言（已实现）
 
-current_review_round为当前审核轮次号，只读系统字段。review_round冻结提交时标题／ECR／ECO、方式、时间、结束状态及退回人／原因；不保存八表完整快照。review_record关联轮次及真实审核员账号，assigned表示指定人员，approved_at记录个人通过。review_feedback关联轮次、作者、文字、创建时间及重试UUID，不对应Excel业务字段，也不自动产生通过或退回。
+current_review_round为当前审核轮次号，只读系统字段。review_round冻结提交时标题／ECR／ECO、方式、时间、结束状态及退回人／原因；不保存八表完整快照。review_record关联轮次及真实审核员账号，assigned表示指定人员，approved_at记录个人通过。review_feedback关联轮次、作者、文字、创建时间及重试UUID；0014起只读保留历史，不再新增，也不转换为正式意见。当前意见及处理事件见下节，不对应Excel业务字段。
 
 returned新增为可填写状态，draft／returned仅本人可写；pending／approved只读。退回不能永久删除申请。新轮批准从零计数，个人负责人文字不映射为系统审核人员。退回沟通列表只返回当前returned轮次，并按指定／公开审核权限筛选；不改变字段来源或开放修订中的完整表单。接口和权限边界见 [审核闭环](testing/REVIEW-WORKFLOW-2026-10-05.md)。
 

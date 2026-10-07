@@ -1,49 +1,26 @@
 # 开发与演示
 
-本文件只维护操作方法。进度见 [README](../README.md)，规则见 [MVP](MVP.md)，理解代码与下一批范围见 [项目开发梳理](PROJECT_GUIDE.md)；历史人工复验见 [复查记录](testing/REVIEW-2026-09-30.md#人工复验流程)。
+更新日期：2026-10-07。本文维护已有项目的日常操作、代码更新、检查和历史迁移参考。首次在Windows新设备安装、建库、配置账号并走完整业务流程，按[新设备上手指南](GETTING_STARTED.md)顺序执行。
+
+| 要做什么 | 入口 |
+| --- | --- |
+| 首次在另一台设备运行 | [新设备上手](GETTING_STARTED.md)第1～8步 |
+| 日常启动／停止 | [上手指南第9步](GETTING_STARTED.md#9-以后如何启动和停止)或下文启动章节 |
+| 更新已有代码与数据库 | 下文“同步与迁移” |
+| 修改代码后检查 | 下文“开发检查” |
+| 查询某次交付或迁移证据 | 下文历史参考及[testing目录](testing/) |
+
+进度和Git状态以[README](../README.md)为汇总入口；需求以[MVP](MVP.md)为准；代码地图见[开发梳理](PROJECT_GUIDE.md)；字段来源见[字段映射](FIELD_MAP.md)。
 
 ## 环境与配置
 
-技术基线：Node.js 24、Python 3.14、MySQL 8.4；依赖固定在 `backend/requirements.txt` 和 `frontend/package-lock.json`。当前机器已安装，无需重建环境。MySQL 服务为手动启动，重启电脑后如未运行，用服务管理器启动 `MySQL`。
+项目基线为Node.js 24、Python 3.14、MySQL 8.4及PowerShell 7。配置结构、空数据库创建及依赖安装统一见[上手指南](GETTING_STARTED.md#1-准备软件与项目目录)。本机曾使用F:\codex_project\form_file_system，新设备自行选择路径并重建虚拟环境，不复制旧设备的绝对路径。
 
-当前项目目录为 `F:\codex_project\form_file_system`。虚拟环境含解释器的绝对路径，项目改名或移动后如 Python 启动失败，需重新定位环境，不能只移动目录。
-
-后端从 `.local/development.json` 加载进程配置，已有同名环境变量优先。其他设备自行配置，不复制本机密码：
-
-```json
-{
-  "DJANGO_SECRET_KEY": "本机随机密钥",
-  "DJANGO_DEBUG": "1",
-  "DB_NAME": "form_system",
-  "DB_USER": "本机数据库用户",
-  "DB_PASSWORD": "本机数据库密码",
-  "DB_HOST": "127.0.0.1",
-  "DB_PORT": "3306"
-}
-```
-
-数据库须采用 `utf8mb4`、InnoDB。应用账号需要开发库建表及读写权限；运行测试还需要独立测试库 `test_form_system` 的创建/删除权限，不应使用其他业务库或管理员账号。
-
-后端及前端代理默认使用 8000。本机该端口被占用，因此 `.local/development.json` 增加 `"BACKEND_PORT": "8001"`，`frontend/.env.local` 写入 `BACKEND_PORT=8001`；两份配置不提交，其他设备没有覆盖配置时仍使用 8000。
-
-仅在缺少依赖时执行下列安装步骤；uv/Python/npm 缓存放在 F 盘项目 `.local`，代理设置仅对当前进程生效：
-
-```powershell
-$env:UV_CACHE_DIR = Join-Path $PWD '.local\uv-cache'
-$env:UV_PYTHON_INSTALL_DIR = Join-Path $PWD '.local\python'
-$env:HTTPS_PROXY = 'http://127.0.0.1:7890'
-$env:HTTP_PROXY = 'http://127.0.0.1:7890'
-uv python install 3.14 --no-bin --no-registry
-uv venv --python 3.14 .venv
-uv pip install --python .venv\Scripts\python.exe -r backend\requirements.txt
-cd frontend
-npm.cmd ci --cache ..\.local\npm-cache --proxy http://127.0.0.1:7890 --https-proxy http://127.0.0.1:7890
-cd ..
-```
+后端脚本读取`.local/development.json`，已有同名进程环境变量优先。默认后端8000；旧设备因占用使用8001，同时配置`frontend/.env.local`的BACKEND_PORT。两边须一致，修改后重启；前端固定localhost:5173。凭据、数据库、原Excel和本机配置不随Git同步。
 
 ### 改名后修复虚拟环境
 
-本机已用下列命令完成修复。在新项目根目录执行，沿用上方 uv 缓存目录设置；解释器路径以实际安装为准。若沙箱拒绝访问现有缓存，在普通用户 PowerShell 中执行，不修改缓存 ACL。
+这是旧设备移动项目后的历史修复方法，新设备优先按上手指南重新建立环境。在新项目根目录执行，沿用[上手指南](GETTING_STARTED.md#3-安装项目依赖)的uv缓存设置；解释器路径以实际安装为准。若沙箱拒绝访问现有缓存，在普通用户 PowerShell 中执行，不修改缓存 ACL。
 
 ```powershell
 uv venv --allow-existing --python .local\python\cpython-3.14.6-windows-x86_64-none\python.exe .venv
@@ -54,53 +31,45 @@ uv pip install --offline --reinstall --python .venv\Scripts\python.exe -r backen
 
 ## 启动与账号
 
-在项目根目录用 MSI 安装的 PowerShell 7 启动后端：
+确认MySQL运行，项目根目录启动后端：
 
 ```powershell
 & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1
 ```
 
-另开窗口，在 `frontend/` 执行 `npm.cmd run dev`，打开 **http://localhost:5173**。前端通过 `/api` 代理访问后端，写入保留 CSRF 校验；不要混用 localhost 与 127.0.0.1。端口占用时先核对已有服务。`-ExecutionPolicy Bypass` 仅用于这一进程。
+另开PowerShell，进入同一项目的`frontend`目录执行`npm.cmd run dev`，访问[正式网页](http://localhost:5173)。两窗口保持打开，停止前确认保存成功且无未知操作，再分别Ctrl+C；不会自动停止MySQL。`-ExecutionPolicy Bypass`仅用于该进程。新设备无旧演示账号，须自行创建。
 
-物料处置从正式申请详情的“物料明细”进入；升版／停用编辑抽屉内切换“物料信息／处置建议”，统一保存到数据库。原型已移除，`?preview=disposition` 不再提供内存样例。
+### 提交批次升级与审核账号配置
 
-演示账号保存在 `.local/demo-accounts.json`：`applicant` 用于填报，`other` 用于用户隔离检查，`admin` 用于 Django 管理后台。本机 `demo_applicant` 的申请 #8 已按要求补录源表概述、33 条物料、330 个处置值、27题及31条ECR填写；之后用户可继续修改，不与源Excel实时同步。样例及配置不随Git复制，新申请仍为空草稿。
+技术管理员通过后端脚本的`createsuperuser`建立，再在后端`/admin/`创建启用的普通填写员及至少两名审核员。审核员加入原生“审核员”组，不需staff／superuser；技术超级用户不会自动成为审核员。具体步骤及账号示例见[上手指南第7步](GETTING_STARTED.md#7-配置业务账号)。
 
-需要其他账号时，用同一后端脚本执行 `createsuperuser`，再访问后端 `/admin/` 创建普通用户（默认 `http://127.0.0.1:8000/admin/`，本机为 8001）。单账号新登录会使其他独立会话失效；旧端未保存输入仍保留，可在页头或物料抽屉点击重新登录；使用原账号继续填写，切换账号会关闭原申请。人工测试使用演示账号，技术回归应使用独立测试账号。
-
-## 本机运行快照
-
-2026-10-05技术复验结束检查：MySQL Running／Manual，前端 `http://localhost:5173/` 与后端 `http://127.0.0.1:8001/api/auth/csrf/` 均返回200，迁移至0013；没有修改系统自启动。本轮核对并重启了旧 `--noreload` 项目后端；暂停后MySQL与开发服务关闭，再仅恢复本项目所需服务。普通进程无服务控制权限时，通过Windows管理员UAC只执行 `Start-Service MySQL`，不更改启动类型。运行快照不保证服务以后持续运行；以后仍按上文启动，服务已运行时先检查再操作。
+旧设备的填报／管理员凭据曾保存在`.local/demo-accounts.json`，保留审核员凭据在`.local/reviewer-accounts.json`；仅供该设备，不复制到新设备或Git。旧样例#8不随代码同步。单账号新登录会使旧会话失效；完整多身份操作按[第8步](GETTING_STARTED.md#8-走完整业务流程)使用独立浏览器或配置文件。
 
 ## 同步与迁移
 
-2026-10-05通过 `git ls-remote` 只读核验：远端 `main` 为 `58224d5`，功能分支 `codex/enforce-unique-change-numbers` 与本地HEAD均为 `1ea9ff2`，最新功能尚未合并。该提交包含实质性评估、提交锁定、审核闭环及审查修复；此前 `69ad8e7` 只含较早的自动保存、执行计划及保存恢复修复。其他设备应同步功能分支，不能只从main更新。保留各自 `.local`、前端本机配置和数据库，不复制密码；checkout有未提交修改时先保留，不强行覆盖。代码同步后应用全部尚未执行迁移至 `0013_review_rounds`，重启后端后再使用新版前端，不要手工执行历史A/B SQL。以下各迁移段落保留其交付时的数据保护证据，不表示当前升级只需执行到0010或0011。
+当前完整升级目标为`0014_review_issues`；Git记录见[README当前进度](../README.md#当前进度)，不要以旧本地main或旧提交代替最新代码。
 
-先备份开发数据库并停止 Django 写入服务，再在根目录执行：
+1. 保留本机配置和未提交修改；确认项目数据库范围，备份已有开发库，停止本项目后端写入。
+2. 获取所需源码版本。Git拉取不复制数据库、账号或申请，也不执行迁移。
+3. 若依赖锁定文件变化，按上手指南重新安装对应依赖；保留自己的`.local`和前端本机配置。
+4. 根目录执行下列迁移和检查，确认0014及此前全部标为[X]。不能只迁移到某模块最初交付的0011／0012／0013。
+5. 重启当前源码的前后端，关闭旧页面并重新加载，核对登录、已有申请读取及基本操作。使用`--noreload`的旧后端不会自动加载新代码，必须重启。
 
 ```powershell
 & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 migrate --noinput
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 showmigrations changes
+& 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 check
 ```
 
-`0002_unique_numbers` 先按数据库排序规则检查重复非空编号，冲突时在 DDL 前停止并列出编号和申请 ID。由业务确认修正后重试，不自动删数据或改号。迁移回退只移除生成列和约束，申请数据保留，但唯一性保护也会失效。迁移完成后运行下列检查，再启动服务。
+### 正式审核意见升级（0014）
 
-`0003_materialchange` 只新增三类物料表、申请外键及类别／Y/N 检查约束，不修改或预填已有申请。本机已应用；其他设备仍须执行迁移。后端若以 `--noreload` 运行，代码更新后必须重启，否则旧进程不会加载新增路由。
+前后端须同步升级：批准POST必填request_id；退回改为request_id加非空issues清单，新增respond／resolve；旧空批准、仅文字退回及普通feedback写入不再支持。旧留言与退回原因只读保留，不删除或追认为已解决意见；升级前无正式意见的退回申请仍可重提。
 
-`0004_materialchange_request_id_and_more` 新增可空 UUID `request_id` 及申请／UUID 组合唯一约束，旧物料的 UUID 为 NULL，业务字段保留。本机已应用；更新前端去重逻辑前须先部署迁移及后端，再更新前端。
+存在未解决项时须全部回应并沿用原审核安排；全部意见由原提出者确认解决后，才能正常批准。0014若已有意见或请求确认事件，逆迁移明确拒绝，须另定历史保留方案。0013也有审核历史保护，不能将回退迁移当作撤销审核。详见[正式意见交付](testing/REVIEW-ISSUES-2026-10-05.md)与[历史审核交付](testing/REVIEW-WORKFLOW-2026-10-05.md)。
 
-`0005_materialdisposition` 新增处置表、物料外键、位置唯一约束及位置／处置值 CHECK；原申请和物料字段不改，不预填 NA。先执行迁移并重启后端，再使用更新后的正式页面。本机已应用。
+## 开发检查
 
-`0006_questionresponse` 新增问题回答表、申请外键、申请／题号唯一约束及题号／回答 CHECK，不给旧申请或新草稿预填答案。本机已备份并应用；其他设备仍须先备份、停写、迁移并重启后端，再使用问题页。问题评估从物料页“下一页”或第三个页签进入，第 5／13／14 题缺少条件性理由只提示，允许保存草稿。
-
-`0008_ecoactionresponse` 新增独立 ECO 填写表及申请／行动唯一、合法行动与状态约束；不修改既有业务数据、不复制源实例。本机已备份、停写并应用，旧业务表逐字段保持。其他设备仍须先备份、停写、迁移、重启后端再更新页面。第五个页签为 ECO 执行，ECR 下一页进入；新状态为“在实施阶段完成”，局部测试 `test changes.test_eco`。
-
-`0009_emc_reference` 新增EMC参考、行、测试列、交叉格四表及归属约束；没有数据预填。本机已备份、停写并应用，六张旧业务表逐字段保持。其他设备先备份、停写、迁移、重启后端再使用第六页签。EMC接入批次只开放本人填写；当前0013已接入按审核轮次授权的全站只读审核，管理员定义与规则维护暂不纳入 MVP；局部测试 `test changes.test_emc`。不执行早期A/B SQL草案来重复建表，实际SQL导出见 `docs/design/sql/emc-current.sql`。
-
-`0010_executionplanresponse` 新增执行计划填写表、申请／活动唯一、二进制活动标识及日期顺序约束，没有预填或修改旧业务数据。本机已备份、停写并应用，旧十张表逐字段一致；其他设备仍须备份、停写、迁移并重启后端。第七页签在 EMC 后，通过 EMC 下一页进入；专项 `test changes.test_execution_plan`，记录见 [执行计划](testing/EXECUTION-PLAN-2026-10-03.md)。
-
-## 检查
-
-`0007_ecractionresponse` 新增 ECR 行动填写表，申请／行动标识唯一及行动／状态 CHECK；不修改旧业务字段，不预填样例。本机已备份并应用，其他设备仍须备份、停写、迁移并重启后端。正式 ECR 在登录后的第四个页签，通过真实接口保存，不使用演示数据；局部测试为 `test changes.test_ecr`。MySQL 手动启动方式保留。
+普通启动只需上手指南中的Django check和迁移检查；以下是修改代码或交付时的检查命令，不要求每天演示前全部执行。
 
 ```powershell
 & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 check
@@ -121,10 +90,13 @@ npm.cmd run test:ecr-draft
 npm.cmd run test:eco-draft
 npm.cmd run test:latest-response
 npm.cmd run test:emc-draft
+node --test tests/*.test.mjs
 npm.cmd run build
 ```
 
-后端测试使用真实 MySQL 独立库 `test_form_system`，结束后销毁。`DB_TEST_NAME` 可覆盖测试库名，但不得与开发库同名（忽略大小写）；不使用 SQLite 替代。测试结果不能代替原设备验证或用户业务验收。
+完整前端检查使用`node --test tests/*.test.mjs`，覆盖未注册到npm脚本的material-save检查。
+
+后端测试使用真实 MySQL 独立库 `test_form_system`，结束后销毁。`DB_TEST_NAME` 可覆盖测试库名，但不得与开发库同名（忽略大小写）；不使用 SQLite 替代。测试账号还须具备该独立测试库的创建／删除及读写权限，第2步上手配置只授予开发库权限；不要为运行测试将开发库用作测试库。测试结果不能代替新设备验证或用户业务验收。
 
 ### 按修改范围运行测试
 
@@ -138,17 +110,39 @@ npm.cmd run build
 
 ECR 内存演示仍可访问 `http://localhost:5173/?preview=ecr`，不需要登录、MySQL 或后端，刷新恢复初始场景。正式填写请使用无查询参数的网站入口并登录，进入申请的 ECR 评估或 ECO 执行页签。`test:ecr-preview` 检查共用固定行动、演示联动及单条保存逻辑；正式接口验证见 [接入记录](testing/ECR-INTEGRATION-2026-10-02.md)。
 
-## 实质性变更评估本批升级
+## 历史迁移与模块参考
 
-实质性评估纳入本次Git提交；此前69ad8e7不包含该模块，其他设备应同步功能分支最新提交。取得本批源码后先保留本机配置、备份开发库并停写，再执行上面的migrate命令应用到 `0011_significant_change`，重启后端后使用新版前端。本机0011已应用；不手工复制数据库或样例。本批仅新增三张表与约束，旧十一张业务表及#8保持，新申请与旧申请均不预填。
+以下保留各批独有的迁移、数据保护、样例和验证信息；“本机已应用”、运行状态及测试数量均为当时记录，不代表另一台设备已具备环境或数据。当前升级统一按上文执行至0014，当前行为以README和MVP为准。其他逐批证据见[testing目录](testing/)。
 
-入口：本人申请 → 实质性变更评估，或执行计划下一页。主表和A～E抽屉共用保存队列与人工组结论；关闭抽屉保留输入，自动保存不关闭抽屉。专项后端命令为 `test changes.test_significant_change --noinput`，前端为 `npm.cmd run test:significant-change
-npm.cmd run test:submission
-npm.cmd run test:review`；交付时全量后端102项／前端57项及17组真实页面场景通过；首次读取校验修复后前端全量59项通过，后端及页面验证沿用交付记录。原表疑点、验证边界和备份证据见 [交付记录](testing/SIGNIFICANT-CHANGE-2026-10-04.md)。
+### 基础表及八表迁移（0002～0010）
 
-## 提交批次升级与审核账号配置
+`0002_unique_numbers` 先按数据库排序规则检查重复非空编号，冲突时在 DDL 前停止并列出编号和申请 ID。由业务确认修正后重试，不自动删数据或改号。迁移回退只移除生成列和约束，申请数据保留，但唯一性保护也会失效。迁移完成后运行下列检查，再启动服务。
 
-提交与锁定纳入本次Git提交，69ad8e7不包含它；其他设备应同步功能分支最新提交。其他设备取得本批源码后先保留配置并备份开发库、停止本项目Django写入，执行上文migrate应用至 `0012_submission`，重启后端再使用新版前端。角色及提交功能与迁移配套，不单独使用旧后端；不手工修改申请status来替代提交。
+`0003_materialchange` 只新增三类物料表、申请外键及类别／Y/N 检查约束，不修改或预填已有申请。本机已应用；其他设备仍须执行迁移。后端若以 `--noreload` 运行，代码更新后必须重启，否则旧进程不会加载新增路由。
+
+`0004_materialchange_request_id_and_more` 新增可空 UUID `request_id` 及申请／UUID 组合唯一约束，旧物料的 UUID 为 NULL，业务字段保留。本机已应用；更新前端去重逻辑前须先部署迁移及后端，再更新前端。
+
+`0005_materialdisposition` 新增处置表、物料外键、位置唯一约束及位置／处置值 CHECK；原申请和物料字段不改，不预填 NA。先执行迁移并重启后端，再使用更新后的正式页面。本机已应用。
+
+`0006_questionresponse` 新增问题回答表、申请外键、申请／题号唯一约束及题号／回答 CHECK，不给旧申请或新草稿预填答案。本机已备份并应用；其他设备仍须先备份、停写、迁移并重启后端，再使用问题页。问题评估从物料页“下一页”或第三个页签进入，第 5／13／14 题缺少条件性理由只提示，允许保存草稿。
+
+`0007_ecractionresponse` 新增 ECR 行动填写表，申请／行动标识唯一及行动／状态 CHECK；不修改旧业务字段，不预填样例。本机已备份并应用，其他设备仍须备份、停写、迁移并重启后端。正式 ECR 在登录后的第四个页签，通过真实接口保存，不使用演示数据；局部测试为 `test changes.test_ecr`。MySQL 手动启动方式保留。
+
+`0008_ecoactionresponse` 新增独立 ECO 填写表及申请／行动唯一、合法行动与状态约束；不修改既有业务数据、不复制源实例。本机已备份、停写并应用，旧业务表逐字段保持。其他设备仍须先备份、停写、迁移、重启后端再更新页面。第五个页签为 ECO 执行，ECR 下一页进入；新状态为“在实施阶段完成”，局部测试 `test changes.test_eco`。
+
+`0009_emc_reference` 新增EMC参考、行、测试列、交叉格四表及归属约束；没有数据预填。本机已备份、停写并应用，六张旧业务表逐字段保持。其他设备先备份、停写、迁移、重启后端再使用第六页签。EMC接入批次只开放本人填写；0013起已接入按审核轮次授权的全站只读审核，管理员定义与规则维护暂不纳入 MVP；局部测试 `test changes.test_emc`。不执行早期A/B SQL草案来重复建表，实际SQL导出见 `docs/design/sql/emc-current.sql`。
+
+`0010_executionplanresponse` 新增执行计划填写表、申请／活动唯一、二进制活动标识及日期顺序约束，没有预填或修改旧业务数据。本机已备份、停写并应用，旧十张表逐字段一致；其他设备仍须备份、停写、迁移并重启后端。第七页签在 EMC 后，通过 EMC 下一页进入；专项 `test changes.test_execution_plan`，记录见 [执行计划](testing/EXECUTION-PLAN-2026-10-03.md)。
+
+### 实质性变更评估历史升级（0011）
+
+实质性评估已包含在PR #3合并记录中。0011为该模块历史迁移，完整升级执行全部未应用迁移至0014，再同步重启前后端。本机0011交付时旧十一张业务表及#8保持，新旧申请均未预填；不手工复制数据库或样例。
+
+入口：本人申请 → 实质性变更评估，或执行计划下一页。主表和A～E抽屉共用保存队列与人工组结论；关闭抽屉保留输入，自动保存不关闭抽屉。专项后端命令为 `test changes.test_significant_change --noinput`，前端为 `npm.cmd run test:significant-change`；交付时全量后端102项／前端57项及17组真实页面场景通过；首次读取校验修复后前端全量59项通过，后端及页面验证沿用交付记录。原表疑点、验证边界和备份证据见 [交付记录](testing/SIGNIFICANT-CHANGE-2026-10-04.md)。
+
+### 提交批次历史升级（0012）
+
+提交与锁定已包含在PR #3合并记录中。0012为该模块历史迁移，完整升级仍应用至0014并同步前后端；保留配置、备份开发库、停止本项目Django写入后执行上文migrate。不要手工修改申请status替代提交。
 
 0012增加审核方式／提交时间及review_record，创建原生“审核员”组但不改变现有账号身份。本机已应用，十四张原业务表保持。实际使用前，在现有Django后台（本机8001的 `/admin/`）用技术管理员配置审核账号：创建至少两名有效普通用户，在用户的Groups中加入“审核员”，保存。无需给这些账号staff／superuser或Django模型权限。未加入组的账号为填写员，技术超级用户也不会自动成为业务审核员。组变更后刷新身份或重新登录；审核员现在可进入审核工作台执行本轮通过／退回和反馈。临时复验账号已清理；后续按用户要求创建了两名保留的演示审核员，见下文。
 
@@ -161,18 +155,14 @@ npm.cmd run test:review`；交付时全量后端102项／前端57项及17组真�
 
 2026-10-04按用户要求创建 `demo_reviewer_1`（审核员1）、`demo_reviewer_2`（审核员2）：均已启用，加入“审核员”组，没有staff／superuser权限。随机密码保存在忽略的 `.local/reviewer-accounts.json`，不上传Git、不在日志显示。名单接口已验证两人可选，业务表未改变。刷新页面或重新登录以重新读取人员名单；审核工作台、通过／退回及反馈已接入，账号配置保持。
 
-## 审核闭环升级（0013）
+### 审核闭环历史升级（0013）
 
-当前本机0013已应用。其他设备取得本次提交源码后，先保留配置并备份数据库、停写，再运行migrate并重启后端、更新前端；不要只更新前端。新增returned和轮次字段、review_round／review_feedback及轮次关联，旧实际提交会挂到第1轮，旧无元数据锁定记录不补造。原15张表字段和#8保持，两名保留审核员有效。
+0013在原审核批次已应用，后续0014也已应用（均为2026-10-05交付记录，本次未重查数据库）。其他设备取得当前源码后，先保留配置并备份数据库、停写，再运行migrate并重启后端、更新前端；不要只更新前端。新增returned和轮次字段、review_round／review_feedback及轮次关联，旧实际提交会挂到第1轮，旧无元数据锁定记录不补造。原15张表字段和#8保持，两名保留审核员有效。
 
-审核员登录 → 指定任务／公开审核／退回沟通／我的已处理记录 → 查看申请。“退回沟通”显示仍有权限的当前退回轮次，包括尚未个人批准的审核员；重新提交后旧轮移出该列表。审核员八张表只读，退回期间只看基本信息及意见；填写员本人在returned可修订并第九页再次提交，默认沿用但可更改名单。新轮重新审核，旧轮请求不可写入。自由文字反馈在本轮pending／returned可追加，旧轮和approved只读。
+审核员登录 → 指定任务／公开审核／退回沟通／我的已处理记录 → 查看申请。“退回沟通”显示仍有权限的当前退回轮次，包括尚未个人批准的审核员；重新提交后旧轮移出该列表。审核员八张表只读，退回期间只看基本信息及意见；填写员本人在returned可修订并第九页再次提交，存在未解决正式意见时须全部回应并沿用原方式／名单；无正式未解决项时才允许更改安排。新轮重新审核，旧轮请求不可写入。0014已停止普通留言新增，改为逐条回应及原提出者复核；历史留言只读保留。
 
-审核专项为 `test changes.test_review --noinput`，前端 `npm.cmd run test:review`。审核闭环交付时全量125项真实MySQL、76项前端、lint/build及13组真实页面通过。最新两项审查修复专项25项MySQL、16项前端、4项隔离浏览器模拟场景及lint/build通过，推送前全量127项真实MySQL及76项前端检查已重跑通过；业务复验另行记录。退回／第二轮／反馈已存在时，逆迁移在DDL前停止，不能用回退迁移撤销审核；需制定数据恢复方案。详情见 [交付记录](testing/REVIEW-WORKFLOW-2026-10-05.md)。
+审核专项为 `test changes.test_review --noinput`，前端 `npm.cmd run test:review`。审核闭环交付时全量125项真实MySQL、76项前端、lint/build及13组真实页面通过。该0013批次的两项审查修复专项25项MySQL、16项前端、4项隔离浏览器模拟场景及lint/build通过，推送前全量127项真实MySQL及76项前端检查已重跑通过；业务复验另行记录。退回／第二轮／反馈已存在时，逆迁移在DDL前停止，不能用回退迁移撤销审核；需制定数据恢复方案。详情见 [交付记录](testing/REVIEW-WORKFLOW-2026-10-05.md)。
 
-## 正式审核意见升级（0014）
+## 本机运行快照
 
-同步当前功能源码后先备份开发库、停写，执行全部未应用迁移至0014_review_issues，再重启后端与前端。本机已完成，原17张业务表及原账号／组关系保持；本批结果见[审核意见交付](testing/REVIEW-ISSUES-2026-10-05.md)。本地源码尚未提交／推送，不能只同步远端1ea9ff2取得本功能。不要删除历史留言，0014只新增意见及事件表；有任何意见／请求确认事件时逆迁移明确拒绝，需要另定历史保留方案。
-
-前后端须同步升级：批准POST新增必填request_id；退回改为request_id＋多条issues，新增respond／resolve。旧空批准载荷、仅文字退回和普通feedback写入不再支持，关闭旧页面并重新加载新版。既有无正式意见的退回申请继续可重提。独立系统反馈尚未接入。
-
-专项为`backend.ps1 test changes.test_review changes.test_review_issues changes.test_submission --noinput`；前端使用现有test:review／test:submission。完整前端检查用`node --test tests/*.test.mjs`，包括当前npm脚本未注册的material-save四项；当前全部文件78项、现有npm脚本74项，勿混淆。最终全量后端137项、lint/build及迁移一致性通过，业务验收单独记录。
+2026-10-05正式意见交付记录载明旧设备前端localhost:5173及后端127.0.0.1:8001的CSRF入口均200，迁移至0014，未设置系统自启动；此前MySQL为Running／Manual。2026-10-07文档整理未重查服务或数据库，该快照不代表新设备或当前运行状态。历史备份和数据保持证据见[正式意见记录](testing/REVIEW-ISSUES-2026-10-05.md#备份迁移与原数据)。
