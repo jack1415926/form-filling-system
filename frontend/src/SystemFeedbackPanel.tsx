@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Drawer, FloatButton, Input, Select, Spin, Table, Tabs, Tag } from 'antd'
+import { Alert, App, Button, Drawer, Input, Select, Spin, Table, Tabs, Tag } from 'antd'
+import ReviewInbox from './ReviewInbox'
 import { api, ApiError, type User } from './api'
 import { saveResultUnconfirmed } from './questionDraft'
 import { checkedFeedback, checkedFeedbackPage, feedbackCategories, feedbackStates, feedbackConfirmed, newerFeedback, requestFeedbackDrawer, hasReviewDrawer, openReviewDrawer, subscribeReviewDrawer,
@@ -71,7 +72,7 @@ export default function SystemFeedbackPanel({ user, leaving, onReauthenticate, h
   useEffect(() => {
     const switchDrawer = (event: Event) => {
       const request = event as CustomEvent<{ kind: string; open: () => void }>
-      if (open && request.detail.kind === 'review') {
+      if (open && ['review', 'inbox'].includes(request.detail.kind)) {
         request.preventDefault()
         confirmLeave(() => { setOpen(false); request.detail.open() })
       }
@@ -125,7 +126,7 @@ export default function SystemFeedbackPanel({ user, leaving, onReauthenticate, h
     if (data) setDraft((current) => ({ text: current?.text ?? '', status: current?.status ?? data.status, version: current?.version ?? data.version, ...patch }))
   }
   return <>
-    <FloatButton aria-label="打开系统反馈" tooltip="系统问题或建议，与审核意见分开" description="系统反馈" style={{ right: 104, bottom: 32 }} onClick={openDrawer} />
+    <ReviewInbox user={user} leaving={leaving} onSystem={openDrawer} />
     <Drawer title={managed ? '系统反馈 · 反馈管理' : '系统反馈'} open={open} size={760} onClose={() => { if (!flight.current && (!unknown || revoked)) setOpen(false) }}
       closable={!busy && (!unknown || revoked)} maskClosable={!busy && (!unknown || revoked)} keyboard={!busy && (!unknown || revoked)}
       extra={<div className="form-actions">{reviewAvailable && <Button disabled={pending && !revoked} onClick={openReviewDrawer}>审核修改意见</Button>}<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button></div>}>

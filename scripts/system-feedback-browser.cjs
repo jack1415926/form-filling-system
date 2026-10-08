@@ -1,3 +1,7 @@
+async function openSystemFeedback(page) {
+  if (!await page.getByRole('button', { name: '打开系统反馈', exact: true }).isVisible()) await page.getByRole('button', { name: '打开意见与反馈', exact: true }).click();
+  await page.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+}
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -16,8 +20,10 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
     await page.goto('/');
     await page.getByLabel('用户名', { exact: true }).fill(account.username);
     await page.getByLabel('密码', { exact: true }).fill(account.password);
+    const inbox = page.waitForResponse(response => new URL(response.url()).pathname === '/api/review/inbox/');
     await page.getByRole('button', { name: /登\s*录/ }).click();
     await page.getByRole('heading', { name: account.kind === 'reviewer' ? '审核工作台' : '我的申请', exact: true }).waitFor();
+    if ((await (await inbox).json()).unread_count > 0) await page.getByRole('button', { name: '稍后处理', exact: true }).click();
     return page;
   }
   async function select(page, label, text) {
@@ -29,7 +35,7 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
     const owner = await login(fixture.accounts[0]);
     await owner.getByRole('button', { name: '继续填写', exact: true }).click();
     await owner.locator('#title').fill('反馈期间保留的申请标题');
-    await owner.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(owner);
     await owner.getByLabel('反馈内容', { exact: true }).fill('回归问题：保存后页面体验需要改善');
     let refreshDialogs = 0;
     owner.once('dialog', async dialog => { refreshDialogs++; await dialog.dismiss(); });
@@ -135,7 +141,7 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
     await reviewer.locator('.topbar').getByRole('button', { name: '退出登录', exact: true }).click();
     await reviewer.getByRole('button', { name: '放弃并离开', exact: true }).click();
     await reviewer.getByRole('dialog', { name: '离开未发送的审核意见？', exact: true }).getByRole('button', { name: /取\s*消/ }).click();
-    await reviewer.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(reviewer);
     assert.equal(await reviewer.getByLabel('反馈内容', { exact: true }).inputValue(), '审核员取消退出后保留的系统反馈');
     await reviewer.locator('.ant-drawer-open').getByRole('button', { name: '审核修改意见', exact: true }).click();
     await reviewer.getByRole('button', { name: '保留并切换', exact: true }).click();
@@ -159,7 +165,7 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
     assert.equal(await admin.locator('#title').inputValue(), '撤销反馈管理权限仍须保留的填写草稿');
     results.revocation_releases_unknown_with_explicit_discard = true;
     results.revocation_preserves_unrelated_application_input = true;
-    await owner.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(owner);
     await owner.getByRole('button', { name: '刷新反馈', exact: true }).click();
     await owner.getByText('权限撤销前实际已保存的回应', { exact: true }).waitFor();
     await owner.screenshot({ path: folder + '/owner-history.png', fullPage: true });

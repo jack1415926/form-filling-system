@@ -14,8 +14,10 @@ const folder = '.local/review-recovery-browser';
     await page.goto('/');
     await page.getByLabel('用户名', { exact: true }).fill(account.username);
     await page.getByLabel('密码', { exact: true }).fill(account.password);
+    const inbox = page.waitForResponse(response => new URL(response.url()).pathname === '/api/review/inbox/');
     await page.getByRole('button', { name: /登\s*录/ }).click();
     await page.getByRole('heading', { name: account.role === 'filler' ? '我的申请' : '审核工作台', exact: true }).waitFor();
+    if ((await (await inbox).json()).unread_count > 0) await page.getByRole('button', { name: '稍后处理', exact: true }).click();
     return { context, page };
   }
   try {
@@ -55,8 +57,8 @@ const folder = '.local/review-recovery-browser';
       assert.equal(response.status(), 200);
       await route.abort('failed');
     });
-    await reviewPage.getByRole('button', { name: '通过本轮', exact: true }).click();
-    await reviewPage.getByRole('button', { name: '确认通过', exact: true }).click();
+    await reviewPage.getByRole('button', { name: '本人同意批准', exact: true }).click();
+    await reviewPage.getByRole('button', { name: '确认批准', exact: true }).click();
     await reviewPage.getByText('操作结果未确认，原请求及输入已保留', { exact: true }).waitFor();
     results.unknownReviewProtected = await unloadPrevented();
     assert.equal(results.unknownReviewProtected, true);

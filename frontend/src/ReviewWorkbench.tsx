@@ -1,18 +1,35 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Alert, Button, Empty, Table, Tabs, Tag } from 'antd'
+import { Alert, App, Button, Empty, Table, Tabs, Tag } from 'antd'
 import { api, type ChangeRequest, type User } from './api'
 import { type RoundInfo, reviewStateLabels } from './review'
 import { modeLabel } from './submission'
 import ReviewPanel from './ReviewPanel'
+import { inboxNavigationEvent, type InboxNavigation } from './reviewInboxData'
+import { openReviewDrawer } from './systemFeedback'
 
 export default function ReviewWorkbench({ user, leaving, onReauthenticate, renderForm, onBusy, onDirty }: { user: User; leaving: boolean; onReauthenticate: () => void; renderForm: (record: ChangeRequest, onBack: () => void) => ReactNode; onBusy: (value: boolean) => void; onDirty: (value: boolean) => void }) {
-  const [kind, setKind] = useState('designated'), [selected, setSelected] = useState<{ id: number; number: number } | null>(null)
+  const [kind, setKind] = useState('designated'), [selected, setSelected] = useState<{ id: number; number: number; showIssues?: boolean } | null>(null)
+  const { message } = App.useApp()
   const [busy, setBusy] = useState(false), [dirty, setDirty] = useState(false)
   const list = useQuery({ queryKey: ['review-list', user.id, kind], enabled: !selected, refetchOnWindowFocus: false, queryFn: () => api<(RoundInfo & { change_id: number })[]>(`/api/review/?kind=${kind}`, 'GET', undefined, user.id) })
   const back = () => { if (busy || leaving) return; if (dirty && !window.confirm('尚未发送的审核意见或处理说明会丢失，确定返回列表？')) return; setSelected(null); setDirty(false) }
+  useEffect(() => {
+    const navigate = (event: Event) => {
+      const { actor_id, item, onOpened } = (event as CustomEvent<InboxNavigation>).detail
+      if (actor_id !== user.id) return
+      if (busy || leaving) { message.warning('请先确认当前操作结果再切换申请。'); return }
+      if (selected?.id === item.change_id && selected.number === item.round) { onOpened(); if (item.open_issues) openReviewDrawer(); return }
+      if (dirty && !window.confirm('尚未发送的审核意见或处理说明会丢失，确定切换申请？')) return
+      setDirty(false); onDirty(false)
+      setSelected({ id: item.change_id, number: item.round, showIssues: item.open_issues })
+      onOpened()
+    }
+    window.addEventListener(inboxNavigationEvent, navigate)
+    return () => window.removeEventListener(inboxNavigationEvent, navigate)
+  }, [busy, leaving, dirty, selected, user.id, onDirty, message])
   return <>
-    {selected ? <ReviewPanel key={`${selected.id}:${selected.number}`} changeId={selected.id} number={selected.number} leaving={leaving} onReauthenticate={onReauthenticate} onBack={back} onBusy={(value) => { setBusy(value); onBusy(value) }} onDirty={(value) => { setDirty(value); onDirty(value) }} renderForm={(record) => renderForm(record, back)} /> : <>
+    {selected ? <ReviewPanel key={`${selected.id}:${selected.number}`} initialOpen={selected.showIssues} changeId={selected.id} number={selected.number} leaving={leaving} onReauthenticate={onReauthenticate} onBack={back} onBusy={(value) => { setBusy(value); onBusy(value) }} onDirty={(value) => { setDirty(value); onDirty(value) }} renderForm={(record) => renderForm(record, back)} /> : <>
       <div className="page-heading"><h1>审核工作台</h1><Button loading={list.isFetching} onClick={() => void list.refetch()}>刷新列表</Button></div>
       <Tabs activeKey={kind} onChange={setKind} items={[{ key: 'designated', label: '指定给我的任务' }, { key: 'public', label: '公开审核' }, { key: 'returned', label: '退回沟通' }, { key: 'handled', label: '我的已处理记录' }]} />
       {list.error && <Alert type="error" title={list.error.message} className="form-alert" />}

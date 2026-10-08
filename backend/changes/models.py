@@ -108,6 +108,17 @@ class ReviewFeedback(models.Model):
         constraints = [models.UniqueConstraint(fields=["round", "author", "request_id"], name="review_unique_feedback")]
 
 
+class ReviewInboxRead(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE)
+    signature = models.CharField(max_length=64)
+    read_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'review_inbox_read'
+        constraints = [models.UniqueConstraint(fields=['user', 'round'], name='inbox_read_user_round')]
+
+
 class ReviewIssue(models.Model):
     change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="review_issues")
     source_round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE)

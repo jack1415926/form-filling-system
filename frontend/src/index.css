@@ -5,3 +5,9 @@ button, input, textarea { font: inherit; }
 h1, h2, p { margin-top: 0; }
 h1 { font-size: 30px; line-height: 1.4; margin-bottom: 10px; font-weight: 650; letter-spacing: -.5px; }
 h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.feedback-launcher { position: fixed; z-index: 99; width: 56px; height: 56px; }
+.feedback-launcher-button { width: 56px; height: 56px; padding: 0; border: 1px solid #d8e2dc; border-radius: 50%; background: #fff; color: #243731; box-shadow: 0 3px 12px #24373126; cursor: grab; touch-action: none; user-select: none; font-size: 12px; line-height: 18px; }
+.feedback-launcher-button:active { cursor: grabbing; }
+.feedback-launcher-button:focus-visible { outline: 2px solid #087b67; outline-offset: 3px; }
+.feedback-launcher-menu { position: absolute; right: 0; bottom: 64px; width: 200px; display: grid; gap: 8px; padding: 10px; background: #fff; border: 1px solid #d8e2dc; border-radius: 12px; box-shadow: 0 3px 12px #24373126; }
+.feedback-launcher-hint { margin: 0; color: #52665d; font-size: 12px; line-height: 18px; }

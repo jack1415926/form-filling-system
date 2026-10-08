@@ -2,12 +2,34 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { QueryClient } from '@tanstack/react-query'
 import { canEdit, actorUser } from '../src/workflow.ts'
-import { checkedReview, actionConfirmed, actionCanRetry, editReply, reviewPath } from '../src/review.ts'
+import { checkedReview, actionConfirmed, actionCanRetry, approvalProgress, approvalBlockReason, editReply, reviewPath } from '../src/review.ts'
 
 const actor={id:3,username:'reviewer',display_name:'Reviewer',role:'reviewer'}
 const round={number:1,title:'Submitted title',ecr_no:'ECR-1',eco_no:'ECO-1',review_mode:'public',state:'pending',submitted_at:'2026-10-05T01:00:00Z',approved_at:null,returned_at:null,returned_by:null,return_reason:'',reviewers:[],approvals:[]}
 const data={change_id:1,updated_at:'2026-10-05T01:00:00Z',current_round:1,round,is_current:true,can_view_form:false,can_approve:true,can_return:true,can_feedback:true,form:null,history:[round],feedback:[],issues:[],unresolved_count:0,issue_blockers:[],confirmed_requests:[]}
 const change={id:1,applicant:2,current_review_round:1,title:'Revised',ecr_no:'ECR-1',eco_no:'ECO-1',affected_products:'',affected_region:'',initiating_factory:'',affected_factories:'',ccb_owner:'',change_owner:'',change_reason:'',planned_eco_date:null,status:'returned',review_mode:'public',submitted_at:'2026-10-05T01:00:00Z',created_at:'2026-10-05T00:00:00Z',updated_at:'2026-10-05T01:01:00Z'}
+
+test('first public submission permits approval without return; individual approval and issue resolution do not imply whole approval',()=>{
+ assert.equal(approvalBlockReason(data,actor.id,0),null)
+ assert.match(approvalProgress(round),/0\/2/)
+ const one={...data,round:{...round,approvals:[{...actor,approved_at:round.submitted_at}]}}
+ assert.match(approvalBlockReason(one,actor.id,0),/你已同意批准/)
+ assert.equal(approvalBlockReason(one,4,0),null)
+ assert.match(approvalProgress(one.round),/还需 1 名/)
+ assert.match(approvalProgress({...one.round,state:'approved',approvals:[...one.round.approvals,{...actor,id:4,approved_at:round.submitted_at}]}),/2\/2.*整份申请审核已通过/)
+ assert.match(approvalBlockReason({...data,can_approve:false,unresolved_count:1},actor.id,0),/未解决意见/)
+ assert.equal(approvalBlockReason({...data,issues:[{state:'resolved'}]},actor.id,0),null)
+ assert.match(approvalProgress({...round,state:'returned'}),/重新计算/)
+ assert.match(approvalProgress({...round,review_mode:'designated',reviewers:[actor]}),/0\/1/)
+})
+
+test('disabled approval always explains draft, permission, old round or terminal state',()=>{
+ assert.match(approvalBlockReason(data,actor.id,1),/未提交/)
+ assert.match(approvalBlockReason({...data,can_approve:false},actor.id,0),/权限/)
+ assert.match(approvalBlockReason({...data,is_current:false},actor.id,0),/历史轮次/)
+ assert.match(approvalBlockReason({...data,round:{...round,state:'returned'}},actor.id,0),/重新提交/)
+ assert.match(approvalBlockReason({...data,round:{...round,state:'approved'}},actor.id,0),/已批准/)
+})
 
 test('only the filler can edit draft or returned states; reviewer identity is not replaced with applicant',()=>{
  for(const state of ['draft','returned']){assert.equal(canEdit({status:state}),true);assert.equal(canEdit({status:state},'reviewer'),false)}

@@ -1,32 +1,29 @@
-import { Input, type InputProps } from 'antd'
-import { useState, type SyntheticEvent } from 'react'
+import { Button, Input, type InputProps, type InputRef } from 'antd'
+import { useRef, useState, type ChangeEvent } from 'react'
+import { dateError, minDate, maxDate } from './dateValidation'
 
-// Native date inputs allow five or more year digits even with a max attribute.
 export default function DateInput({ value, onChange, ...props }: InputProps) {
-  const [incomplete, setIncomplete] = useState(false)
-  const change = (event: SyntheticEvent<HTMLInputElement>) => {
-    // Ant Design clones change targets, losing the native date's partial-input validity.
-    const nativeTarget = event.nativeEvent.target
-    const target = nativeTarget instanceof HTMLInputElement ? nativeTarget : event.target as HTMLInputElement
-    const date = target.value
-    if (!target.validity.badInput && date && (date.split('-')[0].length > 4 || Number(date.split('-')[0]) < 1)) {
-      target.value = String(value ?? '')
-    }
-    setIncomplete(target.validity.badInput)
+  const input = useRef<InputRef>(null), picker = useRef<HTMLInputElement>(null)
+  // Keep invalid text locally: editors must retain the last valid saved value.
+  const [draft, setDraft] = useState<string | null>(null)
+  const text = draft ?? String(value ?? '')
+  const error = dateError(text)
+  const change = (event: ChangeEvent<HTMLInputElement>) => {
+    const text = event.target.value, error = dateError(text)
+    const target = input.current!.input!
+    target.value = text
+    target.setCustomValidity(error ?? '')
+    setDraft(error ? text : null)
+    // Forward the real input's validity, including Ant Design's clear-button events.
     onChange?.(Object.create(event, { target: { value: target }, currentTarget: { value: target } }))
   }
-  const checkValidity = (event: SyntheticEvent<HTMLInputElement>) => {
-    if (event.currentTarget.validity.badInput || incomplete) change(event)
-  }
-  return <><Input allowClear {...props} type="date" min="0001-01-01" max="9999-12-31" value={incomplete ? '' : value} onChange={change} onInput={(event) => {
-    checkValidity(event)
-    props.onInput?.(event)
-  }} onKeyUp={(event) => {
-    // Some native date segments emit no input/change event until the ISO value changes.
-    checkValidity(event)
-    props.onKeyUp?.(event)
-  }} onBlur={(event) => {
-    checkValidity(event)
-    props.onBlur?.(event)
-  }} />{incomplete && <p className="question-hint" role="alert">日期尚未填写完整，请补全日期或清空全部日期部分后保存。</p>}</>
+  return <>
+    <Input allowClear {...props} ref={input} type="text" placeholder="YYYY-MM-DD" value={text}
+      aria-invalid={!!error} status={error ? 'error' : props.status} onChange={change}
+      suffix={<Button type="text" size="small" disabled={props.disabled} aria-label="选择日期" onClick={() => picker.current?.showPicker()}>日历</Button>} />
+    <input ref={picker} type="date" aria-hidden="true" tabIndex={-1} disabled={props.disabled}
+      min={minDate} max={maxDate} value={error ? '' : text} onChange={change}
+      style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }} />
+    {error && <p className="question-hint" role="alert">{error}</p>}
+  </>
 }

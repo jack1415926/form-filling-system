@@ -46,7 +46,7 @@ function PlanForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onB
     aria-label={`${row.activity}${field === 'start_date' ? '开始时间' : '结束时间'}`}
     id={`${row.id}-${field}`} disabled={disabled} value={save.values[`${row.id}.${field}`] ?? ''}
     onChange={(event) => {
-      const key = `${row.id}.${field}`, bad = event.target.validity.badInput
+      const key = `${row.id}.${field}`, bad = !event.target.validity.valid
       setIncomplete((current) => { const next = new Set(current); if (bad) next.add(key); else next.delete(key); return next })
       if (!bad) update(row.id, field, event.target.value || null)
     }} />
@@ -60,7 +60,7 @@ function PlanForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onB
         { title: '活动', dataIndex: 'activity', width: 250, render: (text: string) => <div className="question-text">{text}</div> },
         { title: '责任人', width: 155, render: (_, row) => <Input id={`${row.id}-owner`} aria-label={`${row.activity}责任人`} disabled={disabled} maxLength={255} value={save.values[`${row.id}.owner`] ?? ''} onChange={(event) => update(row.id, 'owner', event.target.value)} /> },
         { title: '开始时间', width: 175, render: (_, row) => date(row, 'start_date') },
-        { title: '结束时间', width: 175, render: (_, row) => <>{date(row, 'end_date')}{invalid.includes(row.id) && <p className="question-hint" role="alert">{incomplete.has(`${row.id}.start_date`) || incomplete.has(`${row.id}.end_date`) ? '请补全日期或清空全部日期部分。' : '结束日期不得早于开始日期。'}</p>}</> },
+        { title: '结束时间', width: 175, render: (_, row) => <>{date(row, 'end_date')}{invalid.includes(row.id) && <p className="question-hint" role="alert">{incomplete.has(`${row.id}.start_date`) || incomplete.has(`${row.id}.end_date`) ? '请修正日期或清空日期。' : '结束日期不得早于开始日期。'}</p>}</> },
         { title: '备注', width: 345, render: (_, row) => <Input.TextArea id={`${row.id}-remark`} aria-label={`${row.activity}备注`} disabled={disabled} value={save.values[`${row.id}.remark`] ?? ''} autoSize={{ minRows: 2, maxRows: 6 }} onChange={(event) => update(row.id, 'remark', event.target.value)} /> },
       ]} />
       {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
