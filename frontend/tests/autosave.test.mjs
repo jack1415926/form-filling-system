@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Autosave } from '../src/autosave.ts'
 import { ApiError } from '../src/api.ts'
-import { emcFields, emcPayload, materialFields, materialPayload, questionFields, questionPayload } from '../src/autosaveFields.ts'
+import { emcFields, emcPayload, materialFields, materialPayload, questionFields, questionPayload, overviewFields } from '../src/autosaveFields.ts'
 
 const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve() }
 function setup(send, initial = { title: 'original', region: 'old' }) {
@@ -97,7 +97,7 @@ test('late responses after disposal do not change the draft or schedule another 
   assert.equal(queue.baseline.title, 'original'); assert.equal(timers.size, 0)
 })
 
-test('closing a manually saved drawer releases its parent navigation lock', async () => {
+test('disposing a queue invokes its registered cleanup callback', async () => {
   const { queue } = setup(async (patch) => ({ ...queue.baseline, ...patch }))
   let parentBusy = true
   queue.setOnDispose(() => { parentBusy = false })
@@ -126,4 +126,36 @@ test('successful deletion of optional nested fields does not create an endless b
   const { queue } = setup(async () => ({}), { 'row/test.mark': 'X', 'row/test.remark': 'note' })
   queue.update({ 'row/test.mark': '', 'row/test.remark': '' }); await queue.flush()
   assert.deepEqual(queue.patch, {}); assert.equal(queue.dirty, false)
+})
+
+test('refresh protects local or in-flight values and adopts the snapshot after protection ends', () => {
+  for (const protection of ['dirty', 'pending', 'manual', 'unconfirmed', 'invalid']) {
+    const { queue } = setup(async () => ({}))
+    queue.configure(false, true, false)
+    if (protection === 'dirty') queue.update({ title: 'local' })
+    if (protection === 'pending') queue.pending = true
+    if (protection === 'manual') queue.manual = true
+    if (protection === 'unconfirmed') queue.unconfirmed.add('title')
+    if (protection === 'invalid') queue.valid = false
+    const protectedValues = { ...queue.values }, baseline = { ...queue.baseline }
+    const incoming = { title: 'external', region: 'new' }
+    queue.refresh(incoming)
+    assert.deepEqual(queue.values, protectedValues, protection)
+    assert.deepEqual(queue.baseline, baseline, protection)
+    queue.pending = queue.manual = false; queue.valid = true; queue.unconfirmed.clear()
+    queue.update(baseline); queue.refresh(incoming)
+    assert.deepEqual(queue.values, incoming); assert.deepEqual(queue.baseline, incoming)
+    assert.equal(queue.dirty, false); queue.dispose()
+  }
+})
+
+test('the active overview adapter normalizes a date clear without submitting untouched fields', () => {
+  const { queue } = setup(async () => ({}), overviewFields({ title: 'old', planned_eco_date: '2026-10-03' }))
+  queue.configure(false, true, false)
+  queue.update(overviewFields({ title: 'old', planned_eco_date: '' }))
+  assert.deepEqual(queue.patch, { planned_eco_date: null })
+  queue.update(overviewFields({ title: 'old', planned_eco_date: '2026-10-03' }))
+  assert.deepEqual(queue.patch, {})
+  assert.equal(overviewFields({ planned_eco_date: undefined }).planned_eco_date, null)
+  queue.dispose()
 })

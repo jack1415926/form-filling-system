@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import connection, connections, transaction
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings, tag
 from rest_framework.test import APIClient
 
 from .models import ChangeRequest, ReviewRound, ReviewRecord, ReviewFeedback, MaterialChange
@@ -214,6 +214,7 @@ class ReviewTransactionTests(TransactionTestCase):
             self.assertEqual(sorted(task.result(timeout=10) for task in tasks),[200,409])
         self.change.refresh_from_db();self.assertIn(self.change.status,['approved','returned'])
 
+    @tag('migration')
     def test_migration_seeds_only_actual_submissions_and_reverse_stops_before_ddl_for_history(self):
         latest=MigrationExecutor(connection).loader.graph.leaf_nodes('changes')
         try:

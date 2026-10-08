@@ -1,6 +1,5 @@
-import { ApiError, type Dispositions, type Material, type MaterialCategory, type MaterialValues } from './api.ts'
+import { ApiError, type Dispositions, type Material, type MaterialCategory, type MaterialValues, type MaterialField } from './api.ts'
 import type { Fields } from './autosave.ts'
-import type { MaterialField } from './formDraft.ts'
 import { materialPayload } from './autosaveFields.ts'
 
 const locations = ['company_finished', 'company_wip', 'company_raw', 'supplier_finished', 'supplier_wip', 'supplier_raw', 'supplier_rma', 'customer_return', 'customer_site', 'customer_spares']

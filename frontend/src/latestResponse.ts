@@ -6,8 +6,3 @@ export function newestResponse<T extends { updated_at: string }>(current: T | un
   const order = milliseconds || fraction(current.updated_at).localeCompare(fraction(incoming.updated_at))
   return order > 0 ? current : incoming
 }
-
-// Keep a deferred read available: re-evaluate it when editing/saving protection ends.
-export function refreshBaseline<T extends { updated_at: string }>(baseline: T, incoming: T, protectedDraft: boolean): T {
-  return protectedDraft ? baseline : newestResponse(baseline, incoming)
-}

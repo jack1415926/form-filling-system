@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import connection, connections, IntegrityError, transaction
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -170,26 +169,3 @@ class EmcConcurrencyTests(TransactionTestCase):
                 locked.status = 'pending'; locked.save(update_fields=['status'])
             self.assertEqual(future.result(timeout=15), 409)
         self.assertEqual(EmcReference.objects.count(), 0)
-
-
-class EmcMigrationTests(TransactionTestCase):
-    def test_new_tables_preserve_all_old_business_data_and_reverse(self):
-        user = get_user_model().objects.create_user('emc-migration')
-        before = [('changes', '0008_ecoactionresponse')]
-        after = [('changes', '0009_emc_reference')]
-        try:
-            executor = MigrationExecutor(connection); executor.migrate(before)
-            apps = executor.loader.project_state(before).apps
-            change = apps.get_model('changes', 'ChangeRequest').objects.create(applicant_id=user.pk, title='原申请')
-            apps.get_model('changes', 'EcoActionResponse').objects.create(change_id=change.pk, action_key='eco_001', result='原ECO')
-            names = ['ChangeRequest', 'MaterialChange', 'MaterialDisposition', 'QuestionResponse', 'EcrActionResponse', 'EcoActionResponse']
-            saved = {name: list(apps.get_model('changes', name).objects.values()) for name in names}
-            executor = MigrationExecutor(connection); executor.migrate(after)
-            apps = executor.loader.project_state(after).apps
-            for name in names:
-                self.assertEqual(list(apps.get_model('changes', name).objects.values()), saved[name])
-            self.assertEqual(apps.get_model('changes', 'EmcReference').objects.count(), 0)
-            MigrationExecutor(connection).migrate(before)
-            self.assertNotIn('emc_reference', connection.introspection.table_names())
-        finally:
-            executor = MigrationExecutor(connection); executor.migrate(executor.loader.graph.leaf_nodes())

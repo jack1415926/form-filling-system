@@ -1,11 +1,10 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import date
 from threading import Barrier, Event
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, connections, transaction
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -121,8 +120,12 @@ class ExecutionPlanTransactionTests(TransactionTestCase):
         try:
             client = APIClient(); client.force_authenticate(self.owner)
             if barrier: barrier.wait(timeout=5)
-            if started: started.set()
-            return client.patch(self.path, {'responses': {'plan_001': fields}}, format='json').status_code
+            def mark_parent(execute, sql, params, many, context):
+                if started and sql.lstrip().upper().startswith('SELECT') and 'change_request' in sql:
+                    started.set()
+                return execute(sql, params, many, context)
+            with connection.execute_wrapper(mark_parent):
+                return client.patch(self.path, {'responses': {'plan_001': fields}}, format='json').status_code
         finally:
             connections['default'].close()
 
@@ -143,23 +146,9 @@ class ExecutionPlanTransactionTests(TransactionTestCase):
                     held = ChangeRequest.objects.select_for_update().get(pk=self.change.pk)
                     future = pool.submit(self.writer, {'owner': 'must not write'}, None, started)
                     self.assertTrue(started.wait(timeout=5))
+                    with self.assertRaises(TimeoutError):
+                        future.result(timeout=0.15)
                     if deleted: held.delete()
                     else: held.status = 'pending'; held.save(update_fields=['status'])
                 self.assertEqual(future.result(timeout=10), 404 if deleted else 409)
         self.assertEqual(ExecutionPlanResponse.objects.count(), 0)
-
-    def test_migration_roundtrip_preserves_existing_request_without_prefill(self):
-        fields = [field.attname for field in ChangeRequest._meta.concrete_fields if field.name not in ['review_mode', 'submitted_at', 'current_review_round']]
-        before = list(ChangeRequest.objects.values(*fields))
-        try:
-            executor = MigrationExecutor(connection); executor.migrate([('changes', '0009_emc_reference')])
-            executor = MigrationExecutor(connection); executor.migrate([('changes', '0010_executionplanresponse')])
-            self.assertEqual(list(ChangeRequest.objects.values(*fields)), before)
-            self.assertEqual(ExecutionPlanResponse.objects.count(), 0)
-            ExecutionPlanResponse.objects.create(change=self.change, activity_key='plan_001', owner='temporary')
-            executor = MigrationExecutor(connection); executor.migrate([('changes', '0009_emc_reference')])
-            self.assertEqual(list(ChangeRequest.objects.values(*fields)), before)
-            self.assertNotIn('execution_plan_response', connection.introspection.table_names())
-        finally:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())

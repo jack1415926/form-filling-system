@@ -11,20 +11,6 @@ export type EmcPatch = { cells: Record<string, Partial<Cell>> }
 export const cellKey = (row: string, test: string) => `${row}/${test}`
 export const testName = (label: string) => label.split('\n').find((line) => /[A-Za-z\u4e00-\u9fff]/.test(line)) ?? label
 
-export function emcPatch(baseline: Matrix, values: Matrix, unconfirmed: EmcPatch = { cells: {} }): EmcPatch {
-  const cells: EmcPatch['cells'] = {}
-  const keys = new Set([...Object.keys(baseline.cells), ...Object.keys(values.cells), ...Object.keys(unconfirmed.cells)])
-  for (const key of keys) {
-    const before = baseline.cells[key] ?? { mark: '', remark: '' }
-    const after = values.cells[key] ?? { mark: '', remark: '' }
-    const changed: Partial<Cell> = {}
-    if (after.mark !== before.mark || 'mark' in (unconfirmed.cells[key] ?? {})) changed.mark = after.mark
-    if (after.remark !== before.remark || 'remark' in (unconfirmed.cells[key] ?? {})) changed.remark = after.remark
-    if (Object.keys(changed).length) cells[key] = changed
-  }
-  return { cells }
-}
-
 export function matrixHeaderGroups(tests: Matrix['tests']) {
   const groups: { label: string; bands: { label: string; tests: Matrix['tests'] }[] }[] = []
   for (const test of tests) {

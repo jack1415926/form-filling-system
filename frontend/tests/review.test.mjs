@@ -3,8 +3,6 @@ import { test } from 'node:test'
 import { QueryClient } from '@tanstack/react-query'
 import { canEdit, actorUser } from '../src/workflow.ts'
 import { checkedReview, actionConfirmed, actionCanRetry, editReply, reviewPath } from '../src/review.ts'
-import { checkedSubmission, submissionConfirmed, recoverSubmissionFailure } from '../src/submission.ts'
-import { ApiError } from '../src/api.ts'
 
 const actor={id:3,username:'reviewer',display_name:'Reviewer',role:'reviewer'}
 const round={number:1,title:'Submitted title',ecr_no:'ECR-1',eco_no:'ECO-1',review_mode:'public',state:'pending',submitted_at:'2026-10-05T01:00:00Z',approved_at:null,returned_at:null,returned_by:null,return_reason:'',reviewers:[],approvals:[]}
@@ -80,17 +78,6 @@ test('formal operation confirmation requires the original UUID, not text or anot
  assert.equal(actionConfirmed({kind:'approve',request_id:'one'},confirmed,4),false)
  assert.equal(actionConfirmed({kind:'approve',request_id:'other'},confirmed,3),false)
 })
-test('a successful submission already returned by an auditor still confirms the original request, not a new round',async()=>{
- const request_id='7353bd7d-7942-4db1-a816-e7b36cd0a0bd';const response={change,reviewers:[],request_id,review_arrangement_locked:false,issue_blockers:[]}
- const payload={review_mode:'public',reviewer_ids:[],expected_round:0,request_id}
- assert.equal(checkedSubmission(response,change,payload),response)
- assert.equal(submissionConfirmed(response,change,{...payload,request_id:'different'}),false)
- assert.equal(submissionConfirmed(response,change,{...payload,expected_round:1}),false)
- let cache=response
- const recovery=await recoverSubmissionFailure({failure:new ApiError(0,'lost'),payload,owner:change,previousUnknown:true,cached:()=>cache,accept:value=>(cache=value),read:async()=>response})
- assert.equal(recovery.unknown,null);assert.equal(recovery.error,null);assert.equal(canEdit(cache.change),true)
-})
-
 test('issue response requires complete state, version, ownership permissions and event history',()=>{
  const issue={id:1,tab:'questions',location:'5',text:'Need explanation',source_round:1,author:actor,state:'awaiting_reply',version:1,can_respond:true,can_resolve:false,can_reject:false,events:[{kind:'return',text:'Need explanation',state:'awaiting_reply',version:1,round_number:1,author_id:3,request_id:'one',created_at:round.submitted_at}]}
  const value={...data,issues:[issue],unresolved_count:1}

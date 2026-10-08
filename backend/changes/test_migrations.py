@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, tag
 
 
+@tag('migration')
 class NumberMigrationTests(TransactionTestCase):
     before = [('changes', '0001_initial')]
     after = [('changes', '0002_unique_numbers')]

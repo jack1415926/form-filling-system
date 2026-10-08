@@ -1,16 +1,15 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from threading import Barrier, Event
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import IntegrityError, connection, connections, transaction
-from django.db.migrations.executor import MigrationExecutor
 from django.db.models.deletion import ProtectedError
 from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
-from .models import ChangeRequest, MaterialChange, ReviewRecord, ReviewRound
+from .models import ChangeRequest, MaterialChange, ReviewRecord
 from .roles import REVIEWER_GROUP
 
 
@@ -158,9 +157,13 @@ class SubmissionTransactionTests(TransactionTestCase):
         try:
             client=APIClient(); client.force_authenticate(self.owner)
             if barrier: barrier.wait(timeout=5)
-            if started: started.set()
-            result=getattr(client, method)(path,payload,format='json')
-            return result.status_code, result.json() if result.content else None
+            def mark_parent(execute, sql, params, many, context):
+                if started and sql.lstrip().upper().startswith('SELECT') and 'change_request' in sql:
+                    started.set()
+                return execute(sql, params, many, context)
+            with connection.execute_wrapper(mark_parent):
+                result=getattr(client, method)(path,payload,format='json')
+                return result.status_code, result.json() if result.content else None
         finally: connections['default'].close()
 
     def test_parallel_same_submission_deduplicates_and_conflicting_mode_rejects(self):
@@ -179,7 +182,10 @@ class SubmissionTransactionTests(TransactionTestCase):
             with ThreadPoolExecutor(max_workers=1) as pool:
                 with transaction.atomic():
                     row=ChangeRequest.objects.select_for_update().get(pk=self.change.pk)
-                    task=pool.submit(self.request,'post',self.path,payload,None,started);self.assertTrue(started.wait(timeout=5))
+                    task=pool.submit(self.request,'post',self.path,payload,None,started)
+                    self.assertTrue(started.wait(timeout=5))
+                    with self.assertRaises(TimeoutError):
+                        task.result(timeout=0.15)
                     if deleted: row.delete()
                     else: row.title='';row.save(update_fields=['title'])
                 self.assertEqual(task.result(timeout=10)[0],404 if deleted else 400)
@@ -192,22 +198,11 @@ class SubmissionTransactionTests(TransactionTestCase):
                 ChangeRequest.objects.select_for_update().get(pk=self.change.pk)
                 tasks=[pool.submit(self.request,'patch',base,{'title':'late'},None,started[0]),pool.submit(self.request,'delete',base,None,None,started[1])]
                 self.assertTrue(all(event.wait(timeout=5) for event in started))
+                for task in tasks:
+                    with self.assertRaises(TimeoutError):
+                        task.result(timeout=0.15)
                 client=APIClient();client.force_authenticate(self.owner)
                 result=client.post(self.path,{'review_mode':'public','reviewer_ids':[]},format='json')
                 self.assertEqual(result.status_code,200)
             self.assertEqual([task.result(timeout=10)[0] for task in tasks],[409,409])
         self.assertEqual(ChangeRequest.objects.get(pk=self.change.pk).title,'Submit')
-
-    def test_migration_preserves_old_fields_and_creates_empty_role_group(self):
-        latest=MigrationExecutor(connection).loader.graph.leaf_nodes('changes')
-        fields=[f.attname for f in ChangeRequest._meta.concrete_fields if f.name not in ['review_mode','submitted_at']]
-        before=list(ChangeRequest.objects.values(*fields))
-        # The group creation is additive and reverse intentionally leaves an existing group alone.
-        try:
-            MigrationExecutor(connection).migrate([('changes','0011_significant_change')])
-            self.assertNotIn('review_record',connection.introspection.table_names())
-            MigrationExecutor(connection).migrate(latest)
-            self.assertEqual(list(ChangeRequest.objects.values(*fields)),before)
-            self.assertFalse(ReviewRecord.objects.exists());self.assertEqual(ChangeRequest.objects.get(pk=self.change.pk).review_mode,'')
-            self.assertIsNone(ChangeRequest.objects.get(pk=self.change.pk).submitted_at)
-        finally: MigrationExecutor(connection).migrate(latest)

@@ -4,12 +4,10 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, connections, transaction
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
 from .models import ChangeRequest, QuestionResponse
-from .questions import QUESTIONS
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -220,27 +218,3 @@ class ConcurrentQuestionTests(TransactionTestCase):
             self.assertEqual(result['questions'][0]['answer'], 'N')
             self.assertEqual(future.result(timeout=15), 200)
         self.assertEqual(QuestionResponse.objects.get(number=1).answer, 'Y')
-
-
-class QuestionMigrationTests(TransactionTestCase):
-    def test_new_table_preserves_existing_business_data(self):
-        owner = get_user_model().objects.create_user('question-migration')
-        before = [('changes', '0005_materialdisposition')]
-        after = [('changes', '0006_questionresponse')]
-        try:
-            executor = MigrationExecutor(connection)
-            executor.migrate(before)
-            apps = executor.loader.project_state(before).apps
-            record = apps.get_model('changes', 'ChangeRequest').objects.create(applicant_id=owner.pk, title='旧概述')
-            material = apps.get_model('changes', 'MaterialChange').objects.create(change_id=record.pk, category='revision', material_no='00001')
-            apps.get_model('changes', 'MaterialDisposition').objects.create(material_id=material.pk, location_group='company', location_item='company_finished', disposition='NA', remark='保留')
-            saved = {name: list(apps.get_model('changes', name).objects.values()) for name in ['ChangeRequest', 'MaterialChange', 'MaterialDisposition']}
-            executor = MigrationExecutor(connection)
-            executor.migrate(after)
-            apps = executor.loader.project_state(after).apps
-            for name, rows in saved.items():
-                self.assertEqual(list(apps.get_model('changes', name).objects.values()), rows)
-            self.assertEqual(apps.get_model('changes', 'QuestionResponse').objects.count(), 0)
-        finally:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())

@@ -5,7 +5,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.apps import apps
-from django.test import TestCase, override_settings
+from django.test import TestCase, override_settings, tag
 from rest_framework.test import APIClient
 
 from .models import ChangeRequest, ReviewIssue, ReviewIssueEvent
@@ -179,6 +179,7 @@ class ReviewIssueTests(TestCase):
         self.assertFalse(ReviewIssue.objects.exists()); self.assertFalse(ReviewIssueEvent.objects.exists())
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'pending')
 
+    @tag('migration')
     def test_reverse_migration_refuses_to_discard_opinion_history(self):
         guard = import_module('changes.migrations.0014_review_issues').prevent_history_loss
         guard(apps, None)

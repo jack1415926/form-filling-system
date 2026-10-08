@@ -75,7 +75,7 @@ test('rejected cold GET does not poison the query cache and a normal retry resto
   } finally { client.clear() }
 })
 
-test('one queue for main and drawer retains later answers and manual result changes in flight', async () => {
+test('assessment payload retains later answer and manual result edits while the queue is in flight', async () => {
   const baseline = significantFields(data)
   let release
   const queue = new Autosave(baseline, () => new Promise((resolve) => { release = resolve }), () => {})

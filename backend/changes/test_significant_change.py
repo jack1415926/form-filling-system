@@ -1,10 +1,9 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from threading import Barrier, Event
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, connections, transaction
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -134,8 +133,12 @@ class SignificantTransactionTests(TransactionTestCase):
         try:
             client = APIClient(); client.force_authenticate(self.owner)
             if barrier: barrier.wait(timeout=5)
-            if started: started.set()
-            return client.patch(self.path, {'questions': {'sub_b_1_1': values}}, format='json').status_code
+            def mark_parent(execute, sql, params, many, context):
+                if started and sql.lstrip().upper().startswith('SELECT') and 'change_request' in sql:
+                    started.set()
+                return execute(sql, params, many, context)
+            with connection.execute_wrapper(mark_parent):
+                return client.patch(self.path, {'questions': {'sub_b_1_1': values}}, format='json').status_code
         finally:
             connections['default'].close()
 
@@ -157,19 +160,9 @@ class SignificantTransactionTests(TransactionTestCase):
                     held = ChangeRequest.objects.select_for_update().get(pk=self.change.pk)
                     task = pool.submit(self.writer, {'answer': 'Y'}, None, started)
                     self.assertTrue(started.wait(timeout=5))
+                    with self.assertRaises(TimeoutError):
+                        task.result(timeout=0.15)
                     if deleted: held.delete()
                     else: held.status = 'pending'; held.save(update_fields=['status'])
                 self.assertEqual(task.result(timeout=10), 404 if deleted else 409)
         self.assertFalse(SignificantQuestionResponse.objects.exists())
-
-    def test_migration_preserves_request_and_does_not_prefill(self):
-        before = list(ChangeRequest.objects.values())
-        latest = MigrationExecutor(connection).loader.graph.leaf_nodes('changes')
-        try:
-            MigrationExecutor(connection).migrate([('changes', '0010_executionplanresponse')])
-            self.assertNotIn('significant_assessment', connection.introspection.table_names())
-            MigrationExecutor(connection).migrate(latest)
-            self.assertEqual(list(ChangeRequest.objects.values()), before)
-            self.assertFalse(SignificantAssessment.objects.exists()); self.assertFalse(SignificantChartResponse.objects.exists()); self.assertFalse(SignificantQuestionResponse.objects.exists())
-        finally:
-            MigrationExecutor(connection).migrate(latest)

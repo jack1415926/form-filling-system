@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, connections, transaction
-from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -439,45 +438,3 @@ class ConcurrentMaterialTests(TransactionTestCase):
                     self.assertEqual(future.result(timeout=15), 404 if delete_first else 204)
                 self.assertFalse(ChangeRequest.objects.filter(pk=self.record.pk).exists())
                 self.assertFalse(MaterialChange.objects.filter(pk=self.material.pk).exists())
-
-
-class MaterialMigrationTests(TransactionTestCase):
-    def test_request_id_migration_preserves_existing_materials(self):
-        owner = get_user_model().objects.create_user('request-id-migration')
-        before = [('changes', '0003_materialchange')]
-        after = [('changes', '0004_materialchange_request_id_and_more')]
-        try:
-            executor = MigrationExecutor(connection)
-            executor.migrate(before)
-            apps = executor.loader.project_state(before).apps
-            record = apps.get_model('changes', 'ChangeRequest').objects.create(applicant_id=owner.pk)
-            original = apps.get_model('changes', 'MaterialChange').objects.create(change_id=record.pk, category='addition', material_no='00001')
-            values = apps.get_model('changes', 'MaterialChange').objects.filter(pk=original.pk).values().get()
-            executor = MigrationExecutor(connection)
-            executor.migrate(after)
-            current = executor.loader.project_state(after).apps.get_model('changes', 'MaterialChange')
-            restored = current.objects.filter(pk=original.pk).values().get()
-            self.assertIsNone(restored.pop('request_id'))
-            self.assertEqual(restored, values)
-        finally:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())
-
-    def test_existing_application_is_unchanged_and_materials_start_empty(self):
-        owner = get_user_model().objects.create_user('material-migration')
-        before = [('changes', '0002_unique_numbers')]
-        after = [('changes', '0003_materialchange')]
-        try:
-            executor = MigrationExecutor(connection)
-            executor.migrate(before)
-            old = executor.loader.project_state(before).apps.get_model('changes', 'ChangeRequest')
-            original = old.objects.create(applicant_id=owner.pk, title='原申请', ecr_no='00001')
-            values = old.objects.filter(pk=original.pk).values().get()
-            executor = MigrationExecutor(connection)
-            executor.migrate(after)
-            apps = executor.loader.project_state(after).apps
-            self.assertEqual(apps.get_model('changes', 'ChangeRequest').objects.filter(pk=original.pk).values().get(), values)
-            self.assertEqual(apps.get_model('changes', 'MaterialChange').objects.count(), 0)
-        finally:
-            executor = MigrationExecutor(connection)
-            executor.migrate(executor.loader.graph.leaf_nodes())

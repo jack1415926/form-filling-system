@@ -4,7 +4,7 @@ import { Alert, Button, Descriptions, Modal, Radio, Select, Spin, Tag } from 'an
 import { api, type ChangeRequest, type User } from './api'
 import { newestResponse } from './latestResponse'
 import { canEdit } from './workflow'
-import { checkedReviewers, checkedSubmission, newestSubmission, recoverSubmissionFailure, submissionError, modeLabel, type SubmissionData, type SubmissionPayload } from './submission'
+import { checkedReviewers, checkedSubmission, newestSubmission, recoverSubmissionFailure, submissionConfirmed, submissionError, modeLabel, type SubmissionData, type SubmissionPayload } from './submission'
 
 type Props = {
   reviewDraftDirty?: boolean
@@ -74,8 +74,10 @@ export default function SubmissionEditor({ record, leaving, onDirty, onBusy, onP
     flight.current = true; setBusy(true)
     try {
       const result = checkedSubmission(await api<unknown>(path, 'GET', undefined, record.applicant), record)
-      accept(result)
-      if (active.current && canEdit(result.change)) setError('暂未查到新一轮提交完成；结果仍待确认，请按原请求重试。')
+      const latest = accept(result)
+      if (!active.current) return
+      if (unknown && submissionConfirmed(latest, record, unknown)) { setUnknown(null); setError(null) }
+      else if (canEdit(latest.change)) setError('暂未查到新一轮提交完成；结果仍待确认，请按原请求重试。')
     } catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : String(failure)) }
     finally { flight.current = false; if (active.current) setBusy(false) }
   }

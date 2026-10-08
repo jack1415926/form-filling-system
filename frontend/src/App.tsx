@@ -187,6 +187,13 @@ function ReviewerWorkspace({ user, error, retry }: { user: User; error: Error | 
   const { modal } = AntApp.useApp()
   const [reviewBusy, setReviewBusy] = useState(false), [reviewDirty, setReviewDirty] = useState(false)
   const [reauthenticate, setReauthenticate] = useState(false), [reauthBusy, setReauthBusy] = useState(false)
+  useEffect(() => {
+    const handleUnload = (event: BeforeUnloadEvent) => {
+      if (reviewDirty || reviewBusy) { event.preventDefault(); event.returnValue = '' }
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [reviewDirty, reviewBusy])
   const exit = useMutation({ mutationFn: () => api('/api/auth/logout/', 'POST', undefined, user.id), onSuccess: () => { queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' }); queryClient.setQueryData(['me'], null) } })
   return <div className="app-shell"><header className="topbar"><div className="brand"><strong>表单填报系统 · 审核员</strong></div><div className="user-menu"><span>{user.display_name}</span><Button disabled={exit.isPending} onClick={retry}>刷新身份</Button><Button disabled={reviewBusy} onClick={() => setReauthenticate(true)}>重新登录</Button><Button disabled={reviewBusy} loading={exit.isPending} onClick={() => { if (reviewDirty) modal.confirm({ title: "离开未发送的反馈？", content: "未发送的反馈或退回原因会丢失。", onOk: () => exit.mutate() }); else exit.mutate() }}>退出登录</Button></div></header>
     <main className="workspace">{(error || exit.error) && <Alert type="error" title={(error || exit.error)?.message} className="form-alert" />}

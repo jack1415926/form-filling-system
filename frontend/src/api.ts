@@ -91,4 +91,5 @@ export type MaterialValues = {
   detailed_class: string; discontinued_project: string; change_description: string
   dispositions: Dispositions
 }
+export type MaterialField = Exclude<keyof MaterialValues, 'dispositions'>
 export type Material = MaterialValues & { id: number; category: MaterialCategory }
