@@ -4,11 +4,14 @@ from rest_framework import serializers
 from .models import ChangeRequest, MaterialChange, MaterialDisposition, EcrActionResponse, EcoActionResponse
 from .dispositions import LOCATIONS, DISPOSITIONS
 from .questions import QUESTIONS
+from .dates import BusinessDateField
 
 NUMBER_ERRORS = {"ecr_no": "ECR 编号已存在，请使用其他编号。", "eco_no": "ECO 编号已存在，请使用其他编号。"}
 
 
 class ChangeRequestSerializer(serializers.ModelSerializer):
+    planned_eco_date = BusinessDateField(required=False, allow_null=True)
+
     class Meta:
         model = ChangeRequest
         fields = [
@@ -82,6 +85,8 @@ class QuestionValueSerializer(serializers.Serializer):
 
 
 class EcrActionSerializer(serializers.ModelSerializer):
+    date = BusinessDateField(required=False, allow_null=True)
+
     class Meta:
         model = EcrActionResponse
         fields = ["owner", "result", "status", "date"]
@@ -172,6 +177,8 @@ class MaterialChangeSerializer(serializers.ModelSerializer):
 
 
 class EcoActionSerializer(serializers.ModelSerializer):
+    date = BusinessDateField(required=False, allow_null=True)
+
     class Meta:
         model = EcoActionResponse
         fields = ["owner", "result", "status", "date"]

@@ -48,22 +48,25 @@ export function feedbackConfirmed(operation: FeedbackOperation, data: FeedbackDe
 export function newerFeedback(current: FeedbackDetail | undefined, incoming: FeedbackDetail) {
   return current?.id === incoming.id && current.version > incoming.version ? current : incoming
 }
-export function requestFeedbackDrawer(kind: 'system' | 'review', open: () => void) {
+export function requestFeedbackDrawer(kind: 'system' | 'review' | 'inbox', open: () => void) {
   const event = new CustomEvent('feedback-drawer-request', { cancelable: true, detail: { kind, open } })
   if (window.dispatchEvent(event)) open()
 }
 
 let reviewDrawerOpener: (() => void) | undefined
+let reviewDrawerCount = 0
 export const hasReviewDrawer = () => !!reviewDrawerOpener
+export const getReviewDrawerCount = () => reviewDrawerCount
 export const openReviewDrawer = () => reviewDrawerOpener?.()
 export function subscribeReviewDrawer(listener: () => void) {
   window.addEventListener('review-drawer-availability', listener)
   return () => window.removeEventListener('review-drawer-availability', listener)
 }
-export function registerReviewDrawer(opener: () => void) {
+export function registerReviewDrawer(opener: () => void, count = 0) {
   reviewDrawerOpener = opener
+  reviewDrawerCount = count
   window.dispatchEvent(new Event('review-drawer-availability'))
   return () => {
-    if (reviewDrawerOpener === opener) { reviewDrawerOpener = undefined; window.dispatchEvent(new Event('review-drawer-availability')) }
+    if (reviewDrawerOpener === opener) { reviewDrawerOpener = undefined; reviewDrawerCount = 0; window.dispatchEvent(new Event('review-drawer-availability')) }
   }
 }

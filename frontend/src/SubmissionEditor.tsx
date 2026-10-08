@@ -35,6 +35,7 @@ export default function SubmissionEditor({ record, leaving, onDirty, onBusy, onP
     queryClient.setQueryData(key, latest)
     queryClient.setQueryData<ChangeRequest>(['change', record.applicant, record.id], (current) => newestResponse(current, latest.change))
     void queryClient.invalidateQueries({ queryKey: ['changes', record.applicant] })
+    void queryClient.invalidateQueries({ queryKey: ['review-inbox', record.applicant] })
     if (latest.change.status === 'returned' && (latest.review_arrangement_locked || initialized.current !== latest.change.current_review_round)) {
       initialized.current = latest.change.current_review_round
       if (latest.review_arrangement_locked || !choiceEdited.current) { setMode(latest.change.review_mode || ''); setIds(latest.reviewers.map((row) => row.id)) }

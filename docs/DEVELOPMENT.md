@@ -85,11 +85,11 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 createsuperu
 
 ### 系统反馈升级与管理员配置（2026-10-08）
 
-当前系统反馈版本迁移链至 **0015_system_feedback**。升级须先备份并停写，再应用全部未执行迁移并重启前后端。下文0014内容保留为审核意见批次说明，不是当前迁移终点。
+当前版本迁移链至 **0016_review_inbox_read**，新增按账号保存审核消息已读状态。升级须先备份并停写，再应用全部未执行迁移并重启前后端。下文0014内容保留为审核意见批次说明，不是当前迁移终点。
 
 在Django后台把选定的有效账号加入“反馈管理员”组，再刷新身份或重新登录。该组为附加权限，账号仍是原填写员或审核员；superuser／staff不自动获得反馈管理权限。0015仅创建组，不自动加入任何账号。本机原三个填写员、三个审核员未被自动授权。
 
-填写员和审核员使用“系统反馈”悬浮入口；有组权限的账号还在顶部显示“反馈管理”。用户提交后原文只读，管理员说明对提交者公开，关闭或重新打开须填写说明。存在系统反馈时0015逆迁移拒绝直接删除数据。
+填写员和审核员从统一“意见与反馈”悬浮入口选择系统反馈或审核消息；有组权限的账号还在顶部显示“反馈管理”。用户提交后原文只读，管理员说明对提交者公开，关闭或重新打开须填写说明。存在系统反馈时0015逆迁移拒绝直接删除数据。
 
 前后端运行且已有Playwright／Edge可用时执行 `pwsh -NoProfile -File scripts/check-system-feedback.ps1`；可用`-PlaywrightModule`指定现有模块位置、`-BaseUrl`指定前端地址。回归创建独立临时账号，正常或失败结束均清理，并比较原21张业务表及已有用户／组成员摘要。证据位于忽略的`.local/system-feedback-browser/`。不复制其他设备的绝对模块路径。
 
@@ -106,7 +106,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 migrate --no
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 showmigrations changes
 ```
 
-当前迁移链至 **0015_system_feedback**。应用全部未执行迁移后重启后端和前端；尤其是 `--noreload` 后端不会自动载入源码更新。不要只更新前端或手工执行历史A/B SQL。
+当前迁移链至 **0016_review_inbox_read**。应用全部未执行迁移后重启后端和前端；尤其是 `--noreload` 后端不会自动载入源码更新。不要只更新前端或手工执行历史A/B SQL。
 
 迁移保护：
 

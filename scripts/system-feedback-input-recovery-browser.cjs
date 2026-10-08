@@ -1,3 +1,7 @@
+async function openSystemFeedback(page) {
+  if (!await page.getByRole('button', { name: '打开系统反馈', exact: true }).isVisible()) await page.getByRole('button', { name: '打开意见与反馈', exact: true }).click();
+  await page.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+}
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -34,6 +38,7 @@ async function checkInputRecovery() {
       }
       else if (path === '/api/system-feedback/701/') body = feedback;
       else if (path === '/api/system-feedback/') body = { count: feedback ? 1 : 0, next: null, previous: null, results: feedback ? [feedback] : [] };
+      else if (path === '/api/review/inbox/') body = { actor_id: user.id, role: user.role, count: 0, unread_count: 0, items: [] };
       else { status = 404; body = { detail: '模拟接口不存在' }; }
       await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     });
@@ -46,14 +51,14 @@ async function checkInputRecovery() {
     await p.getByRole('button', { name: '继续填写', exact: true }).click();
     await p.locator('#title').fill('仍未保存的申请标题');
     await p.getByText('模拟校验失败以保留未保存输入', { exact: true }).waitFor();
-    await p.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(p);
     await p.getByLabel('反馈内容', { exact: true }).fill('取消退出后应仍保留的反馈');
     await p.locator('.ant-drawer-open .ant-drawer-close').click();
     await p.getByRole('button', { name: '退出登录', exact: true }).click();
     await p.getByRole('button', { name: '放弃并离开', exact: true }).click();
     await p.getByText('离开前放弃未保存的修改？', { exact: true }).last().waitFor();
     await p.getByRole('dialog', { name: '离开前放弃未保存的修改？', exact: true }).getByRole('button', { name: '继续填写', exact: true }).click();
-    await p.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(p);
     results.cancel_final_navigation = { feedback_after_cancel: await p.getByLabel('反馈内容', { exact: true }).inputValue(), application_title: await p.locator('#title').inputValue(), logout_requests: first.calls.filter(call => call.path === '/api/auth/logout/').length };
     await p.screenshot({ path: folder+'/cancel-navigation.png', fullPage: true });
     assert.equal(results.cancel_final_navigation.feedback_after_cancel, '取消退出后应仍保留的反馈');
@@ -64,13 +69,13 @@ async function checkInputRecovery() {
     await p.getByRole('button', { name: '放弃并离开', exact: true }).click();
     await p.getByRole('dialog', { name: '离开前放弃未保存的修改？', exact: true }).getByRole('button', { name: '放弃修改并离开', exact: true }).click();
     await p.getByRole('heading', { name: '我的申请', exact: true }).waitFor();
-    await p.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(p);
     assert.equal(await p.getByLabel('反馈内容', { exact: true }).inputValue(), '');
     results.confirmed_navigation_discards_feedback = true;
     await first.context.close();
 
     const second = await scenario({ roleChange: true }); const q = second.page;
-    await q.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(q);
     await q.getByLabel('反馈内容', { exact: true }).fill('同账号角色变化不应丢失的反馈');
     await q.locator('.ant-drawer-open').getByRole('button', { name: '重新登录', exact: true }).click();
     const modal = q.locator('.ant-modal:visible');
@@ -78,13 +83,13 @@ async function checkInputRecovery() {
     await modal.getByLabel('密码', { exact: true }).fill('mock-only');
     await modal.getByRole('button', { name: /登\s*录/ }).click();
     await q.getByRole('heading', { name: '审核工作台', exact: true }).waitFor();
-    if (!await q.locator('.ant-drawer-open').count()) await q.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    if (!await q.locator('.ant-drawer-open').count()) await openSystemFeedback(q);
     results.same_account_role_change = { id_unchanged: true, feedback_after_login: await q.getByLabel('反馈内容', { exact: true }).inputValue() };
     assert.equal(results.same_account_role_change.feedback_after_login, '同账号角色变化不应丢失的反馈');
     await q.screenshot({ path: folder+'/same-account-role.png', fullPage: true });
     await second.context.close();
     const third = await scenario({ roleChange: true, unknownCreate: true }); const u = third.page;
-    await u.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(u);
     await u.getByLabel('反馈内容', { exact: true }).fill('未知请求保留原UUID');
     await u.getByRole('button', { name: '提交系统反馈', exact: true }).click();
     await u.getByText('操作结果未确认，原请求和输入已保留', { exact: true }).waitFor();
@@ -102,7 +107,7 @@ async function checkInputRecovery() {
     await third.context.close();
 
     const fourth = await scenario({ newAccount: true }); const v = fourth.page;
-    await v.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(v);
     await v.getByLabel('反馈内容', { exact: true }).fill('旧账号文字不得带入新账号');
     await v.locator('.ant-drawer-open').getByRole('button', { name: '重新登录', exact: true }).click();
     const differentAccount = v.locator('.ant-modal:visible');
@@ -110,7 +115,7 @@ async function checkInputRecovery() {
     await differentAccount.getByLabel('密码', { exact: true }).fill('mock-only');
     await differentAccount.getByRole('button', { name: /登\s*录/ }).click();
     await differentAccount.waitFor({ state: 'hidden' });
-    await v.getByRole('button', { name: '打开系统反馈', exact: true }).click();
+    await openSystemFeedback(v);
     assert.equal(await v.getByLabel('反馈内容', { exact: true }).inputValue(), '');
     results.account_change_clears_feedback = true;
     await fourth.context.close();

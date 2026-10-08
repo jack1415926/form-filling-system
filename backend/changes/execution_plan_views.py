@@ -8,9 +8,13 @@ from rest_framework.views import APIView
 
 from .execution_plan import PLAN_ACTIVITIES, PLAN_ACTIVITY_IDS
 from .models import ChangeRequest, ExecutionPlanResponse
+from .dates import BusinessDateField
 
 
 class PlanValueSerializer(serializers.ModelSerializer):
+    start_date = BusinessDateField(required=False, allow_null=True)
+    end_date = BusinessDateField(required=False, allow_null=True)
+
     class Meta:
         model = ExecutionPlanResponse
         fields = ["owner", "start_date", "end_date", "remark"]
