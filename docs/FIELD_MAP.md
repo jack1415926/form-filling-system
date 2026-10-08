@@ -154,4 +154,6 @@ returned新增为可填写状态，draft／returned仅本人可写；pending／a
 
 ## 正式审核修改意见（0014，已实现）
 
+独立系统反馈（0015）使用system_feedback及system_feedback_event，不属于Excel字段，不关联申请或审核轮次；反馈类型、文字、状态、公开处理记录及UUID／版本为系统新增字段。旧review_feedback仍只保留历史留言。完整字段与实际类型见[数据库ER图](design/DATABASE-ER-FULL.md)。
+
 系统新增内容，不属于Excel原字段。每条意见保存所属网页页签、可选题号／行动号／物料文字定位、具体问题、原提出者和来源轮次；定位不绑定可被删除的物料记录。review_issue保存状态和版本，review_issue_event追加回应、确认解决及继续修改过程。未解决项跨轮保留，重提保持原审核安排，原提出者确认解决后才允许正常批准。旧review_feedback只读保留，独立系统反馈仍待实现。[交付与验证](testing/REVIEW-ISSUES-2026-10-05.md)。

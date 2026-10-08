@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Descriptions, Drawer, FloatButton, Input, Modal, Select, Spin, Tag } from 'antd'
+import { Alert, App, Button, Descriptions, Drawer, FloatButton, Input, Modal, Select, Spin, Tag } from 'antd'
 import { api, type ChangeRequest } from './api'
 import { actorUser } from './workflow'
 import { newestResponse } from './latestResponse'
 import { saveResultUnconfirmed } from './questionDraft'
+import { requestFeedbackDrawer, registerReviewDrawer } from './systemFeedback'
 import { modeLabel } from './submission'
 import { checkedReview, actionConfirmed, actionCanRetry, editReply, type ReplyDraft, reviewPath, reviewStateLabels as labels, issueTabs, issueStateLabels, type IssueInput, type ReviewAction, type ReviewData } from './review'
 
@@ -12,6 +13,7 @@ type Props = { compact?: boolean; changeId: number; number: number; leaving?: bo
 
 export default function ReviewPanel({ compact = false, changeId, number, leaving = false, onBack, onReauthenticate, onBusy, onDirty, renderForm }: Props) {
   const client = useQueryClient(), actor = actorUser(client)
+  const { modal, message } = App.useApp()
   const key = ['review-round', actor.id, changeId, number], path = reviewPath(changeId, number)
   const active = useRef(true), flight = useRef(false), callbacks = useRef({ onBusy, onDirty })
   useEffect(() => { callbacks.current = { onBusy, onDirty } }, [onBusy, onDirty])
@@ -19,6 +21,21 @@ export default function ReviewPanel({ compact = false, changeId, number, leaving
   const [drafts, setDrafts] = useState<IssueInput[]>([]), [replies, setReplies] = useState<Record<number, ReplyDraft>>({}), [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
   const [confirm, setConfirm] = useState<'approve' | 'return' | null>(null), [unknown, setUnknown] = useState<ReviewAction | null>(null), [error, setError] = useState<string | null>(null)
+  const openReview = () => requestFeedbackDrawer('review', () => setOpen(true))
+  useEffect(() => registerReviewDrawer(() => requestFeedbackDrawer('review', () => setOpen(true))), [])
+  useEffect(() => {
+    const switchDrawer = (event: Event) => {
+      const request = event as CustomEvent<{ kind: string; open: () => void }>
+      if (request.detail.kind !== 'system' || (!open && !busy && !unknown && !confirm)) return
+      request.preventDefault()
+      if (busy || unknown || confirm) { message.warning('请先确认当前审核操作结果。'); return }
+      const next = () => { setOpen(false); request.detail.open() }
+      if (drafts.length || Object.values(replies).some((row) => !!row.text)) modal.confirm({ title: '保留审核意见并切换？', content: '未发送文字保留在当前申请中，返回审核意见后可继续填写。', okText: '保留并切换', cancelText: '继续填写', onOk: next })
+      else next()
+    }
+    window.addEventListener('feedback-drawer-request', switchDrawer)
+    return () => window.removeEventListener('feedback-drawer-request', switchDrawer)
+  }, [open, busy, unknown, confirm, drafts, replies, modal, message])
   const accept = (incoming: ReviewData) => {
     if (!active.current || actorUser(client)?.id !== actor.id) return incoming
     const latest = newestResponse(client.getQueryData<ReviewData>(key), incoming)
@@ -50,7 +67,7 @@ export default function ReviewPanel({ compact = false, changeId, number, leaving
     try { settle(action, checkedReview(await api<unknown>(path + action.kind + '/', 'POST', payload, actor.id), changeId, number)) }
     catch (failure) {
       if (!active.current) return
-      setOpen(true)
+      openReview()
       const known = client.getQueryData<ReviewData>(key)
       if (known && actionConfirmed(action, known, actor.id)) settle(action, known)
       else if (saveResultUnconfirmed(failure)) { setUnknown(action); setError('操作结果未确认，请查询或按原请求重试。') }
@@ -72,7 +89,7 @@ export default function ReviewPanel({ compact = false, changeId, number, leaving
   const blocked = leaving || busy || !!unknown || !!confirm
   const newAction = (kind: ReviewAction['kind'], fields: Partial<ReviewAction> = {}): ReviewAction => ({ kind, request_id: crypto.randomUUID(), ...fields })
   const validDrafts = drafts.length > 0 && drafts.every((row) => row.text.trim() && (row.issue_id || row.tab))
-  const add = () => { setOpen(true); setDrafts((current) => [...current, { tab: 'overview', location: '', text: '' }]) }
+  const add = () => { openReview(); setDrafts((current) => [...current, { tab: 'overview', location: '', text: '' }]) }
   return <>
     {query.error && <Alert type="error" title="审核记录读取失败" description={query.error.message} action={<Button disabled={busy} onClick={() => void query.refetch()}>重试</Button>} className="form-alert" />}
     {!data ? query.isPending && <Spin tip="正在读取审核轮次…"><div className="loading-space" /></Spin> : <>
@@ -81,13 +98,13 @@ export default function ReviewPanel({ compact = false, changeId, number, leaving
         <Descriptions column={1} items={[{ key: 'title', label: '提交时标题', children: data.round.title }, { key: 'numbers', label: '提交时编号', children: `ECR：${data.round.ecr_no} · ECO：${data.round.eco_no || '未填写'}` }, { key: 'mode', label: '方式', children: modeLabel(data.round.review_mode) }, { key: 'people', label: '指定人员', children: data.round.reviewers.map((row) => row.display_name).join('、') || '不指定人员' }, { key: 'approved', label: '个人通过', children: data.round.approvals.map((row) => `${row.display_name}（${new Date(row.approved_at).toLocaleString('zh-CN')}）`).join('、') || '尚无人通过' }]} />
         {data.round.returned_by && <Alert type="warning" title={`退回人：${data.round.returned_by.display_name}`} description={<div className="question-text">{data.round.return_reason}</div>} className="form-alert" />}
         {!data.can_view_form && actor.role === 'reviewer' && <Alert type="info" title="当前仅开放基本信息与意见记录；修订中的表单和历史完整表单不开放。" className="form-alert" />}
-        <div className="review-actions"><div className="form-actions">{data.is_current && data.round.state === 'pending' && actor.role === 'reviewer' && <Button type="primary" disabled={blocked || !data.can_approve || drafts.length > 0} onClick={() => setConfirm('approve')}>通过本轮</Button>}{data.can_return && <Button danger disabled={blocked} onClick={() => { setOpen(true); if (!drafts.length) add() }}>列出修改意见并退回</Button>}<Button disabled={busy} onClick={() => setOpen(true)}>查看审核意见（{data.unresolved_count}）</Button></div><Button disabled={busy || !!confirm} onClick={onReauthenticate}>重新登录</Button></div>
+        <div className="review-actions"><div className="form-actions">{data.is_current && data.round.state === 'pending' && actor.role === 'reviewer' && <Button type="primary" disabled={blocked || !data.can_approve || drafts.length > 0} onClick={() => setConfirm('approve')}>通过本轮</Button>}{data.can_return && <Button danger disabled={blocked} onClick={() => { openReview(); if (!drafts.length) setDrafts([{ tab: 'overview', location: '', text: '' }]) }}>列出修改意见并退回</Button>}<Button disabled={busy} onClick={openReview}>查看审核意见（{data.unresolved_count}）</Button></div><Button disabled={busy || !!confirm} onClick={onReauthenticate}>重新登录</Button></div>
         {data.unresolved_count > 0 && <Alert type="warning" title={`尚有 ${data.unresolved_count} 条未解决意见，全部解决后才能批准。`} className="form-alert" />}
       </section>}
       {renderForm && data.can_view_form && data.form && renderForm(data.form)}
       {!compact && <section className="panel list-panel material-section"><h2>审核过程</h2>{data.history.map((round) => <p key={round.number}>第{round.number}轮 · {labels[round.state]} · {modeLabel(round.review_mode)} · {new Date(round.submitted_at).toLocaleString('zh-CN')}{round.return_reason && ` · 退回原因：${round.return_reason}`}</p>)}</section>}
-      <FloatButton aria-label="打开审核意见" tooltip="审核修改意见，跨八表共用" description="审核意见" badge={{ count: data.unresolved_count }} onClick={() => setOpen(true)} style={{ right: 32, bottom: 32 }} />
-      <Drawer title={`审核修改意见 · 未解决 ${data.unresolved_count} 条`} open={open} size={640} onClose={() => { if (!busy && !unknown && !confirm) setOpen(false) }} closable={!busy && !unknown && !confirm} maskClosable={!busy && !unknown && !confirm} keyboard={!busy && !unknown && !confirm}>
+      <FloatButton aria-label="打开审核意见" tooltip="审核修改意见，跨八表共用" description="审核意见" badge={{ count: data.unresolved_count }} onClick={openReview} style={{ right: 32, bottom: 32 }} />
+      <Drawer title={`审核修改意见 · 未解决 ${data.unresolved_count} 条`} open={open} size={640} extra={<Button disabled={busy || !!unknown || !!confirm} onClick={() => window.dispatchEvent(new Event('system-feedback-open'))}>系统反馈</Button>} onClose={() => { if (!busy && !unknown && !confirm) setOpen(false) }} closable={!busy && !unknown && !confirm} maskClosable={!busy && !unknown && !confirm} keyboard={!busy && !unknown && !confirm}>
         <p className="muted">整份申请共用此意见清单。正式意见保留原提出者及轮次；填写员已回应不等于审核员已确认解决。</p>
         <Button disabled={blocked} onClick={() => void query.refetch()}>刷新意见</Button>
         {data.issue_blockers.map((text) => <Alert key={text} type="warning" title={text} className="form-alert" />)}

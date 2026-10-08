@@ -146,6 +146,44 @@ class ReviewIssueEvent(models.Model):
         constraints = [models.UniqueConstraint(fields=["change", "author", "request_id", "position"], name="review_issue_request")]
 
 
+class SystemFeedback(models.Model):
+    submitter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    category = models.CharField(max_length=16, db_collation='utf8mb4_bin', choices=[('problem', '问题'), ('suggestion', '建议'), ('other', '其他')])
+    content = models.TextField()
+    status = models.CharField(max_length=16, default='pending', db_collation='utf8mb4_bin')
+    request_id = models.UUIDField()
+    version = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'system_feedback'
+        constraints = [
+            models.UniqueConstraint(fields=['submitter', 'request_id'], name='sys_feedback_request'),
+            models.CheckConstraint(condition=models.Q(category__in=['problem', 'suggestion', 'other']), name='sys_feedback_category'),
+            models.CheckConstraint(condition=models.Q(status__in=['pending', 'processing', 'closed']), name='sys_feedback_status'),
+        ]
+
+
+class SystemFeedbackEvent(models.Model):
+    feedback = models.ForeignKey(SystemFeedback, on_delete=models.CASCADE, related_name='events')
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    text = models.TextField(blank=True)
+    from_status = models.CharField(max_length=16, db_collation='utf8mb4_bin')
+    to_status = models.CharField(max_length=16, db_collation='utf8mb4_bin')
+    request_id = models.UUIDField()
+    base_version = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'system_feedback_event'
+        constraints = [
+            models.UniqueConstraint(fields=['feedback', 'request_id'], name='sys_feedback_event_request'),
+            models.CheckConstraint(condition=models.Q(from_status__in=['pending', 'processing', 'closed']), name='sys_feedback_event_from'),
+            models.CheckConstraint(condition=models.Q(to_status__in=['pending', 'processing', 'closed']), name='sys_feedback_event_to'),
+        ]
+
+
 class MaterialChange(models.Model):
     class Category(models.TextChoices):
         REVISION = "revision", "升版"

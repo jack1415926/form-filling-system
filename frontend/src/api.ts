@@ -1,4 +1,4 @@
-export type User = { id: number; username: string; display_name: string; role: 'filler' | 'reviewer' }
+export type User = { id: number; username: string; display_name: string; role: 'filler' | 'reviewer'; can_manage_feedback?: boolean }
 export type Overview = {
   title: string; ecr_no: string; eco_no: string; affected_products: string
   affected_region: string; initiating_factory: string; affected_factories: string
@@ -70,7 +70,8 @@ async function request<T>(path: string, method: string, body: unknown, expectedU
   if (!response.ok) {
     if (data?.code === 'account_changed') window.dispatchEvent(new Event('account-changed'))
     if (data?.code === 'role_forbidden') window.dispatchEvent(new Event('role-changed'))
-    if (response.status === 401 || (response.status === 403 && data?.code !== 'role_forbidden' && data?.detail && !String(data.detail).includes('CSRF'))) {
+    if (data?.code === 'feedback_permission_changed') window.dispatchEvent(new CustomEvent('feedback-permission-changed', { detail: { expectedUserId } }))
+    if (response.status === 401 || (response.status === 403 && !['role_forbidden', 'feedback_permission_changed'].includes(data?.code) && data?.detail && !String(data.detail).includes('CSRF'))) {
       throw new ApiError(response.status, '登录已失效或尚未登录，请重新登录。未保存的填写内容仍保留。')
     }
     const message = data ? formatApiErrors(data.detail ?? data).join('；') : '请求验证失败，请重新登录后重试。'

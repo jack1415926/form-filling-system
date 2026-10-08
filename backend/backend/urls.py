@@ -22,8 +22,16 @@ from changes.execution_plan_views import ExecutionPlanDetail
 from changes.significant_change_views import SignificantChangeDetail
 from changes.submission_views import ReviewerList, SubmissionDetail
 from changes.review_views import ReviewList, ReviewDetail
+from changes.system_feedback_views import FeedbackList, FeedbackDetail, FeedbackRequest, ManagedList, ManagedDetail, ManagedAction, ManagedRequest
 
 urlpatterns = [
+    path('api/system-feedback/', FeedbackList.as_view()),
+    path('api/system-feedback/requests/<uuid:request_id>/', FeedbackRequest.as_view()),
+    path('api/system-feedback/manage/', ManagedList.as_view()),
+    path('api/system-feedback/manage/<int:pk>/', ManagedDetail.as_view()),
+    path('api/system-feedback/manage/<int:pk>/actions/', ManagedAction.as_view()),
+    path('api/system-feedback/manage/<int:pk>/requests/<uuid:request_id>/', ManagedRequest.as_view()),
+    path('api/system-feedback/<int:pk>/', FeedbackDetail.as_view()),
     path('admin/', admin.site.urls),
     path('api/auth/csrf/', views.csrf_view),
     path('api/auth/login/', views.login_view),

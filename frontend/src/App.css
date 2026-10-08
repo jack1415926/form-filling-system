@@ -22,6 +22,9 @@
 .assessment-conclusion { margin: 24px 0; }
 .assessment-conclusion h3 { margin: 20px 0 12px; }
 .assessment-source-note { margin-bottom: 20px; }
+.assessment-result-hint { color: #65756d; font-size: 13px; line-height: 1.6; margin: 8px 0 0; }
+.feedback-filters { margin: 16px 0; }
+.feedback-filters .ant-select { min-width: 135px; }
 .review-note { border-top: 1px solid #edf1ee; padding: 14px 0; }
 .review-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; border-top: 1px solid #edf1ee; margin-top: 20px; padding-top: 20px; }
 .review-actions .form-actions { flex-wrap: wrap; }

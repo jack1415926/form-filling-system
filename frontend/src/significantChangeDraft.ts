@@ -61,6 +61,12 @@ export function significantPayload(patch: Fields) {
 
 export const subResult = (row: SubRow, answer: string | null | undefined) => answer === 'Y' ? row.yes_result : answer === 'N' ? row.no_result : ''
 
+export function conclusionHint(row: ChartRow, applicability: string): string {
+  const notApplicable = '不适用时请选择 N/A。'
+  const applicable = `适用时，请根据子表评估选择${row.result_options.filter((option) => option.value !== 'not_applicable').map((option) => `“${option.label}”`).join('或')}。`
+  return applicability === 'N' ? notApplicable : applicability === 'Y' ? applicable : `${notApplicable}${applicable}`
+}
+
 export function needsConclusionReview(values: Fields, patch: Fields): boolean {
   return Object.entries(patch).some(([key, value]) => value !== values[key] && (key.endsWith('.answer') || key.endsWith('.reason') || key.endsWith('.applicability')))
     && Object.entries(values).some(([key, value]) => !!value && (key.endsWith('.result') || key === 'assessment.final_conclusion'))

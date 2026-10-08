@@ -20,11 +20,11 @@ from .eco import ECO_ACTIONS, ECO_ACTION_IDS
 from .questions import QUESTIONS
 from .dispositions import LOCATIONS
 from .permissions import account_changed
-from .roles import business_role
+from .roles import business_role, can_manage_feedback
 
 
 def user_data(user):
-    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "role": business_role(user)}
+    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "role": business_role(user), "can_manage_feedback": can_manage_feedback(user)}
 
 
 @require_GET

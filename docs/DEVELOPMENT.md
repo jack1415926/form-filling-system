@@ -83,6 +83,18 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 createsuperu
 
 ## 同步与迁移
 
+### 系统反馈升级与管理员配置（2026-10-08）
+
+当前系统反馈版本迁移链至 **0015_system_feedback**。升级须先备份并停写，再应用全部未执行迁移并重启前后端。下文0014内容保留为审核意见批次说明，不是当前迁移终点。
+
+在Django后台把选定的有效账号加入“反馈管理员”组，再刷新身份或重新登录。该组为附加权限，账号仍是原填写员或审核员；superuser／staff不自动获得反馈管理权限。0015仅创建组，不自动加入任何账号。本机原三个填写员、三个审核员未被自动授权。
+
+填写员和审核员使用“系统反馈”悬浮入口；有组权限的账号还在顶部显示“反馈管理”。用户提交后原文只读，管理员说明对提交者公开，关闭或重新打开须填写说明。存在系统反馈时0015逆迁移拒绝直接删除数据。
+
+前后端运行且已有Playwright／Edge可用时执行 `pwsh -NoProfile -File scripts/check-system-feedback.ps1`；可用`-PlaywrightModule`指定现有模块位置、`-BaseUrl`指定前端地址。回归创建独立临时账号，正常或失败结束均清理，并比较原21张业务表及已有用户／组成员摘要。证据位于忽略的`.local/system-feedback-browser/`。不复制其他设备的绝对模块路径。
+
+该入口同时执行system-feedback-input-recovery-browser.cjs：所有API在独立浏览器上下文中模拟，验证取消／确认离开、同账号角色变化及未知请求恢复、换账号清理、旧账号迟到权限响应。模拟部分不写真实业务库，与实际接口回归证据分别记录。
+
 2026-10-08本机同步的主分支基线为 `26c8168`（PR #3合并），包含审核意见闭环。当前应从主分支获取已合并功能，无需为这些功能切换到旧功能分支。恢复保护修复及测试整理随本次提交提供，其他设备从main拉取最新代码。
 
 更新前检查Git工作区，保留未提交内容以及各设备的 `.local`、前端本机配置、数据库和原始资料，不强行覆盖。
@@ -94,7 +106,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 migrate --no
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 showmigrations changes
 ```
 
-当前迁移链至 **0014_review_issues**。应用全部未执行迁移后重启后端和前端；尤其是 `--noreload` 后端不会自动载入源码更新。不要只更新前端或手工执行历史A/B SQL。
+当前迁移链至 **0015_system_feedback**。应用全部未执行迁移后重启后端和前端；尤其是 `--noreload` 后端不会自动载入源码更新。不要只更新前端或手工执行历史A/B SQL。
 
 迁移保护：
 
@@ -131,7 +143,7 @@ Pop-Location
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\backend.ps1 test changes --noinput --exclude-tag=migration
 ```
 
-该入口当前选择124项普通后端测试；5项特殊迁移/历史保护及结构升级链带有`migration`标签，可用`--tag=migration`单独执行。新建测试库仍执行所有安装迁移。修改模型/迁移或交付、合并前运行上方完整129项，不能用普通子集代替完整验证。
+该入口当前选择133项普通后端测试；6项迁移/历史保护及结构升级链带有`migration`标签，可用`--tag=migration`单独执行。新建测试库仍执行所有安装迁移。修改模型/迁移或交付、合并前运行上方完整139项，不能用普通子集代替完整验证。
 
 前后端服务运行且已有Playwright和Edge可用时，执行组件回归：
 
@@ -141,7 +153,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-review-recovery.ps
 
 默认从Node可解析的`playwright`模块加载；模块装在其他位置时，通过`-PlaywrightModule '当前设备的模块目录或入口文件'`指定，不复制另一设备路径。前端地址可用`-BaseUrl`覆盖。本次没有新增依赖，使用了本机已有模块。
 
-脚本创建独立临时账号和申请，检查刷新保护、审核/提交丢响应及查询恢复；正常结束或回归失败时自动清理，并核对原19张业务表摘要。日志与截图在`.local/review-recovery-browser`，不使用正在试填的六名测试账号。浏览器未启动或服务停止的错误不会把临时数据留作业务样例。
+脚本创建独立临时账号和申请，检查刷新保护、审核/提交丢响应及查询恢复；正常结束或回归失败时自动清理，并核对当前21张业务表摘要。日志与截图在`.local/review-recovery-browser`，不使用正在试填的六名测试账号。浏览器未启动或服务停止的错误不会把临时数据留作业务样例。
 
 八表修改停顿2秒自动保存，新物料首次创建仍需手动确认。切页的放弃只丢弃未保存修改，不撤销已自动保存内容。刷新/关闭保护用于未保存文字、请求在途或未知结果，不提供异常退出后的本地恢复。
 

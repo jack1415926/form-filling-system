@@ -1,6 +1,6 @@
 import { actorUser, canEdit, backLabel } from './workflow'
 import DateInput from './DateInput'
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App as AntApp, Button, ConfigProvider, Empty, Form, Input, Spin, Table, Tabs, Tag, Modal } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -22,6 +22,7 @@ import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
 import useAutosave, { discardSavedWarning } from './useAutosave'
 import { overviewFields } from './autosaveFields'
+import SystemFeedbackPanel, { type FeedbackHandle } from './SystemFeedbackPanel'
 
 const stateLabels = { draft: '草稿', pending: '待审核', approved: '已批准', returned: '待修订' }
 const stateColors = { draft: 'default', pending: 'gold', approved: 'green', returned: 'orange' }
@@ -162,10 +163,20 @@ function Workspace() {
   const { message } = AntApp.useApp()
   useEffect(() => {
     const refreshIdentity = () => { message.warning('登录账号已变化，本次操作未执行，正在切换工作台。'); void queryClient.invalidateQueries({ queryKey: ['me'] }) }
-    const refreshRole = () => { message.warning('账号角色已变化，正在刷新工作台。'); queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' }); void queryClient.invalidateQueries({ queryKey: ['me'] }) }
+    const refreshRole = () => { message.warning('账号角色或权限已变化，正在刷新工作台。'); queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' }); void queryClient.invalidateQueries({ queryKey: ['me'] }) }
+    const refreshFeedbackPermission = (event: Event) => {
+      const expectedUserId = (event as CustomEvent<{ expectedUserId?: number }>).detail?.expectedUserId
+      const current = queryClient.getQueryData<User>(['me'])
+      if (expectedUserId === undefined || current?.id !== expectedUserId) return
+      message.warning('反馈管理权限已变化，正在刷新身份；当前表单保持。')
+      queryClient.setQueryData<User>(['me'], (current) => current ? { ...current, can_manage_feedback: false } : current)
+      queryClient.removeQueries({ predicate: (query) => ['system-feedback-list', 'system-feedback-detail'].includes(String(query.queryKey[0])) && query.queryKey[1] === expectedUserId && query.queryKey[2] === 'manage' })
+      void queryClient.invalidateQueries({ queryKey: ['me'] })
+    }
     window.addEventListener('account-changed', refreshIdentity)
     window.addEventListener('role-changed', refreshRole)
-    return () => { window.removeEventListener('account-changed', refreshIdentity); window.removeEventListener('role-changed', refreshRole) }
+    window.addEventListener('feedback-permission-changed', refreshFeedbackPermission)
+    return () => { window.removeEventListener('account-changed', refreshIdentity); window.removeEventListener('role-changed', refreshRole); window.removeEventListener('feedback-permission-changed', refreshFeedbackPermission) }
   }, [queryClient, message])
   const user = useQuery({
     queryKey: ['me'], queryFn: async () => {
@@ -174,7 +185,7 @@ function Workspace() {
     }, retry: false, refetchOnWindowFocus: false,
   })
   if (user.isPending) return <div className="loading-page"><Spin tip="正在连接工作台…"><div className="loading-space" /></Spin></div>
-  if (user.data) return user.data.role === 'reviewer' ? <ReviewerWorkspace key={`${user.data.id}:${user.data.role}`} user={user.data} error={user.error} retry={() => { void user.refetch() }} /> : <UserWorkspace key={`${user.data.id}:${user.data.role}`} user={user.data} sessionError={user.error} sessionFetching={user.isFetching} retrySession={() => { void user.refetch() }} />
+  if (user.data) return <AuthenticatedWorkspace key={user.data.id} user={user.data} error={user.error} fetching={user.isFetching} retry={() => { void user.refetch() }} />
   if (user.error) return <div className="connection-error"><Alert type="error" showIcon title="无法连接工作台" description={user.error.message} action={<Button onClick={() => void user.refetch()}>重试</Button>} /></div>
   return <div className="app-shell"><header className="topbar"><div className="brand"><span className="brand-mark">变</span><div><strong>表单填报系统</strong><span>设计变更工作台</span></div></div></header><Login onLogin={(currentUser) => {
     queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' })
@@ -182,11 +193,34 @@ function Workspace() {
   }} /></div>
 }
 
-function ReviewerWorkspace({ user, error, retry }: { user: User; error: Error | null; retry: () => void }) {
+type BusinessWorkspaceProps = { user: User; feedbackRef: RefObject<FeedbackHandle | null>; reauthenticate: boolean; reauthBusy: boolean; onReauthenticate: () => void; onLeaving: (leaving: boolean) => void }
+
+function AuthenticatedWorkspace({ user, error, fetching, retry }: { user: User; error: Error | null; fetching: boolean; retry: () => void }) {
+  const queryClient = useQueryClient(), feedbackRef = useRef<FeedbackHandle>(null)
+  const [reauthenticate, setReauthenticate] = useState(false), [reauthBusy, setReauthBusy] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const workspaceProps = { user, feedbackRef, reauthenticate, reauthBusy, onReauthenticate: () => setReauthenticate(true), onLeaving: setLeaving }
+  return <>
+    {user.role === 'reviewer' ? <ReviewerWorkspace {...workspaceProps} error={error} retry={retry} /> : <UserWorkspace {...workspaceProps} sessionError={error} sessionFetching={fetching} retrySession={retry} />}
+    <SystemFeedbackPanel user={user} handleRef={feedbackRef} leaving={leaving || reauthenticate} onReauthenticate={() => setReauthenticate(true)} />
+    <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} maskClosable={false} keyboard={!reauthBusy} onCancel={() => setReauthenticate(false)}>
+      <p className="muted">使用原账号可继续系统反馈；切换账号会关闭原申请和反馈草稿。</p>
+      <Login compact onBusy={setReauthBusy} onLogin={(current) => {
+        if (current.id !== user.id) queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' })
+        else if (current.role !== user.role) queryClient.removeQueries({ predicate: (query) => !['me', 'system-feedback-list', 'system-feedback-detail'].includes(String(query.queryKey[0])) })
+        queryClient.setQueryData(['me'], current)
+        setReauthenticate(false)
+        if (current.id === user.id) window.dispatchEvent(new Event('editor-reauthenticated'))
+        for (const resource of ['changes', 'change', 'materials', 'questions', 'ecr-actions', 'eco-actions', 'emc', 'execution-plan', 'significant-change', 'submission', 'reviewers', 'review-list', 'review-round', 'system-feedback-list', 'system-feedback-detail']) void queryClient.invalidateQueries({ queryKey: [resource, current.id] })
+      }} />
+    </Modal>
+  </>
+}
+
+function ReviewerWorkspace({ user, error, retry, feedbackRef, reauthenticate, onReauthenticate, onLeaving }: BusinessWorkspaceProps & { error: Error | null; retry: () => void }) {
   const queryClient = useQueryClient()
   const { modal } = AntApp.useApp()
   const [reviewBusy, setReviewBusy] = useState(false), [reviewDirty, setReviewDirty] = useState(false)
-  const [reauthenticate, setReauthenticate] = useState(false), [reauthBusy, setReauthBusy] = useState(false)
   useEffect(() => {
     const handleUnload = (event: BeforeUnloadEvent) => {
       if (reviewDirty || reviewBusy) { event.preventDefault(); event.returnValue = '' }
@@ -195,22 +229,24 @@ function ReviewerWorkspace({ user, error, retry }: { user: User; error: Error | 
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [reviewDirty, reviewBusy])
   const exit = useMutation({ mutationFn: () => api('/api/auth/logout/', 'POST', undefined, user.id), onSuccess: () => { queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' }); queryClient.setQueryData(['me'], null) } })
-  return <div className="app-shell"><header className="topbar"><div className="brand"><strong>表单填报系统 · 审核员</strong></div><div className="user-menu"><span>{user.display_name}</span><Button disabled={exit.isPending} onClick={retry}>刷新身份</Button><Button disabled={reviewBusy} onClick={() => setReauthenticate(true)}>重新登录</Button><Button disabled={reviewBusy} loading={exit.isPending} onClick={() => { if (reviewDirty) modal.confirm({ title: "离开未发送的反馈？", content: "未发送的反馈或退回原因会丢失。", onOk: () => exit.mutate() }); else exit.mutate() }}>退出登录</Button></div></header>
+  useEffect(() => { onLeaving(exit.isPending); return () => onLeaving(false) }, [exit.isPending, onLeaving])
+  const logout = (discard: () => void) => {
+    const leave = () => { discard(); exit.mutate() }
+    if (reviewDirty) modal.confirm({ title: '离开未发送的审核意见？', content: '未发送的审核意见或退回原因会丢失。', onOk: leave }); else leave()
+  }
+  return <div className="app-shell"><header className="topbar"><div className="brand"><strong>表单填报系统 · 审核员</strong></div><div className="user-menu"><span>{user.display_name}</span>{user.can_manage_feedback && <Button onClick={() => feedbackRef.current?.manage()}>反馈管理</Button>}<Button disabled={exit.isPending} onClick={retry}>刷新身份</Button><Button disabled={reviewBusy} onClick={onReauthenticate}>重新登录</Button><Button disabled={reviewBusy} loading={exit.isPending} onClick={() => feedbackRef.current?.leave(logout)}>退出登录</Button></div></header>
     <main className="workspace">{(error || exit.error) && <Alert type="error" title={(error || exit.error)?.message} className="form-alert" />}
-      <ReviewWorkbench onBusy={setReviewBusy} onDirty={setReviewDirty} user={user} leaving={exit.isPending || reauthenticate} onReauthenticate={() => setReauthenticate(true)} renderForm={(record, onBack) => <ConfigProvider theme={reviewReadOnlyTheme}><ChangeEditor key={record.id} reviewOnly record={record} onDirty={() => {}} onBusy={() => {}} onLeaveMessage={() => {}} leaving={exit.isPending || reauthenticate || reviewBusy} onReauthenticate={() => setReauthenticate(true)} onBack={onBack} onSaved={() => {}} /></ConfigProvider>} />
+      <ReviewWorkbench onBusy={setReviewBusy} onDirty={setReviewDirty} user={user} leaving={exit.isPending || reauthenticate} onReauthenticate={onReauthenticate} renderForm={(record, onBack) => <ConfigProvider theme={reviewReadOnlyTheme}><ChangeEditor key={record.id} reviewOnly record={record} onDirty={() => {}} onBusy={() => {}} onLeaveMessage={() => {}} leaving={exit.isPending || reauthenticate || reviewBusy} onReauthenticate={onReauthenticate} onBack={onBack} onSaved={() => {}} /></ConfigProvider>} />
     </main>
-    <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} onCancel={() => setReauthenticate(false)}><Login compact onBusy={setReauthBusy} onLogin={(current) => { if (current.id !== user.id || current.role !== user.role) queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' }); queryClient.setQueryData(['me'], current); setReauthenticate(false); void queryClient.invalidateQueries({ queryKey: ['review-list', current.id] }); void queryClient.invalidateQueries({ queryKey: ['review-round', current.id] }) }} /></Modal>
   </div>
 }
 
-function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { user: User; sessionError: Error | null; retrySession: () => void; sessionFetching: boolean }) {
+function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feedbackRef, reauthenticate, reauthBusy, onReauthenticate, onLeaving }: BusinessWorkspaceProps & { sessionError: Error | null; sessionFetching: boolean; retrySession: () => void }) {
   const queryClient = useQueryClient()
   const { modal, message } = AntApp.useApp()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [reauthenticate, setReauthenticate] = useState(false)
-  const [reauthBusy, setReauthBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [leaveMessage, setLeaveMessage] = useState(discardSavedWarning)
   const records = useQuery({ queryKey: ['changes', user.id], queryFn: () => api<ChangeRequest[]>('/api/changes/', 'GET', undefined, user.id), enabled: !!user })
@@ -243,15 +279,17 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
     onSuccess: (_, id) => { refreshAfterRemoval(id); message.success('草稿申请已删除') },
     onError: (error, id) => { if (error instanceof ApiError && error.status === 404) refreshAfterRemoval(id) },
   })
+  useEffect(() => { onLeaving(exit.isPending || confirming); return () => onLeaving(false) }, [exit.isPending, confirming, onLeaving])
   const listBusy = create.isPending || exit.isPending || remove.isPending || reauthBusy
-  const navigate = (action: () => void) => {
+  const navigateApplication = (action: () => void) => {
     if (!dirty) { action(); return }
     if (saving) return
     setConfirming(true)
     modal.confirm({ title: '离开前放弃未保存的修改？', content: leaveMessage, okText: '放弃修改并离开', cancelText: '继续填写', onOk: () => { setConfirming(false); action() }, onCancel: () => setConfirming(false) })
   }
+  const navigate = (action: () => void) => feedbackRef.current?.leave((discard) => navigateApplication(() => { discard(); action() }))
   return <div className="app-shell">
-    <header className="topbar"><div className="brand"><span className="brand-mark">变</span><div><strong>表单填报系统</strong><span>设计变更工作台</span></div></div>{user && <div className="user-menu"><span>{user.display_name}</span><Button disabled={saving || listBusy} onClick={() => setReauthenticate(true)}>重新登录</Button><Button type="text" loading={exit.isPending} disabled={saving || listBusy} onClick={() => navigate(() => exit.mutate())}>退出登录</Button></div>}</header>
+    <header className="topbar"><div className="brand"><span className="brand-mark">变</span><div><strong>表单填报系统</strong><span>设计变更工作台</span></div></div>{user && <div className="user-menu"><span>{user.display_name}</span>{user.can_manage_feedback && <Button onClick={() => feedbackRef.current?.manage()}>反馈管理</Button>}<Button disabled={saving || listBusy} onClick={onReauthenticate}>重新登录</Button><Button type="text" loading={exit.isPending} disabled={saving || listBusy} onClick={() => navigate(() => exit.mutate())}>退出登录</Button></div>}</header>
     <main className="workspace">
       {sessionError && <Alert type="error" showIcon title="登录信息刷新失败，当前填写内容仍保留" description={sessionError.message} className="form-alert" action={<Button loading={sessionFetching} disabled={saving || exit.isPending} onClick={retrySession}>重试</Button>} />}
       {exit.error && <Alert type="error" title={exit.error.message} className="form-alert" />}
@@ -268,30 +306,10 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching }: { 
         ]} /></section>}
       </> : detail.data ? <>
         {detail.error && <Alert type="error" showIcon title="申请信息刷新失败，当前填写内容仍保留" description={detail.error.message} className="form-alert" action={<Button loading={detail.isFetching} disabled={saving || exit.isPending} onClick={() => void detail.refetch()}>重试</Button>} />}
-        <ChangeEditor onLeaveMessage={setLeaveMessage} key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={() => setReauthenticate(true)} onBack={() => navigate(() => { setDirty(false); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
+        <ChangeEditor onLeaveMessage={setLeaveMessage} key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBack={() => navigate(() => { setDirty(false); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
       </> : detail.isPending ? <Spin tip="正在读取草稿…"><div className="loading-space" /></Spin> : <Alert type="error" title={detail.error?.message ?? '无法读取申请。'} action={<><Button loading={detail.isFetching} disabled={exit.isPending} onClick={() => void detail.refetch()}>重试</Button><Button disabled={exit.isPending} onClick={() => { setSelectedId(null); setDirty(false) }}>返回列表</Button></>} />}
       <footer className="workspace-footer"><span className="muted">当前提供八张工作表填写、指定／公开提交及提交后锁定；支持按轮审核、退回修订和逐条审核意见复核。</span></footer>
     </main>
-    <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} maskClosable={false} keyboard={!reauthBusy} onCancel={() => setReauthenticate(false)}>
-      <p className="muted">使用原账号可继续当前填写；切换账号会关闭原申请。</p>
-      <Login compact onBusy={setReauthBusy} onLogin={(currentUser) => {
-        if (currentUser.id !== user.id || currentUser.role !== user.role) queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' })
-        queryClient.setQueryData(['me'], currentUser)
-        setReauthenticate(false)
-        if (currentUser.id === user.id) window.dispatchEvent(new Event('editor-reauthenticated'))
-        void queryClient.invalidateQueries({ queryKey: ['change', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['materials', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['questions', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['ecr-actions', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['eco-actions', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['emc', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['execution-plan', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['significant-change', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['submission', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['reviewers', currentUser.id] })
-        void queryClient.invalidateQueries({ queryKey: ['review-round', currentUser.id] })
-      }} />
-    </Modal>
   </div>
 }
 

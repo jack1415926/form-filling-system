@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { significantFields, significantPayload, subResult, needsConclusionReview } from '../src/significantChangeDraft.ts'
+import { significantFields, significantPayload, subResult, conclusionHint, needsConclusionReview } from '../src/significantChangeDraft.ts'
 import { Autosave } from '../src/autosave.ts'
 import { ApiError } from '../src/api.ts'
 import definition from '../../backend/changes/significant_change.json' with { type: 'json' }
@@ -29,6 +29,23 @@ test('branch hints have no result for unanswered and do not overwrite manual con
   assert.equal(needsConclusionReview(values, { 'sub_b_1_1.reason': 'before' }), false)
   assert.equal(needsConclusionReview(values, { 'chart_B.result': 'significant' }), false)
   assert.equal(values['assessment.final_conclusion'], 'significant'); assert.equal(values['chart_B.result'], 'continue')
+})
+
+test('conclusion hints follow each chart options and current applicability, ending at E', () => {
+  const targets = { A: 'B', B: 'C', C: 'D', D: 'E' }
+  for (const row of data.charts.filter((row) => row.id !== '0')) {
+    const applicable = conclusionHint(row, 'Y')
+    assert.equal(conclusionHint(row, 'N'), '不适用时请选择 N/A。')
+    assert.equal(conclusionHint(row, ''), `不适用时请选择 N/A。${applicable}`)
+    assert.ok(applicable.includes('“Significant Change”'))
+    assert.equal(applicable.includes('N/A'), false)
+    if (row.id === 'E') {
+      assert.ok(applicable.includes('“Non-significant Change”'))
+      assert.equal(applicable.includes('回答Chart'), false)
+    } else {
+      assert.deepEqual([...applicable.matchAll(/回答Chart ([A-E])的问题/g)].map((match) => match[1]), [targets[row.id]])
+    }
+  }
 })
 
 test('incomplete success responses cannot erase confirmed rows or manual conclusion fields', () => {

@@ -26,6 +26,17 @@ function mockEnvironment(t, fetcher, cookie = 'csrftoken=test-csrf') {
   t.after(() => { globalThis.fetch = previous.fetch; if (previous.document === undefined) delete globalThis.document; else globalThis.document = previous.document; if (previous.window === undefined) delete globalThis.window; else globalThis.window = previous.window })
 }
 
+test('feedback permission loss refreshes only its capability, without a business role or login failure', async (t) => {
+  mockEnvironment(t, async () => new Response(JSON.stringify({ detail: '反馈管理权限已取消', code: 'feedback_permission_changed' }), { status: 403 }))
+  let feedback = 0, role = 0, actor
+  window.addEventListener('feedback-permission-changed', (event) => { feedback++; actor = event.detail.expectedUserId })
+  window.addEventListener('role-changed', () => role++)
+  await assert.rejects(api('/api/system-feedback/manage/', 'GET', undefined, 7), (error) => error.status === 403 && error.message === '反馈管理权限已取消')
+  assert.equal(feedback, 1)
+  assert.equal(role, 0)
+  assert.equal(actor, 7)
+})
+
 test('30-second GET deadline rejects even if transport ignores cancellation', async (t) => {
   let signal, finished = false
   mockEnvironment(t, (_url, init) => { signal = init.signal; return new Promise(() => {}) })
