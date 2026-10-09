@@ -154,6 +154,73 @@ class SystemFeedbackTests(TestCase):
         with self.assertRaises(ProtectedError):
             self.owner.delete()
 
+    def test_followup_owner_only_replay_validation_and_closed_reopen(self):
+        row = self.create()
+        path = BASE + f'{row["id"]}/followups/'
+        values = {'text': '补充操作步骤', 'expected_version': 0, 'request_id': str(uuid.uuid4())}
+        for user in [self.other, self.reviewer, self.admin]:
+            self.assertEqual(client_for(user).post(path, values, format='json').status_code, 404)
+        first = self.owner_client.post(path, values, format='json')
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(first.data['events'][0]['kind'], 'followup')
+        self.assertEqual(first.data['status'], 'pending')
+        self.assertEqual(self.act(row, text='关闭', status='closed', expected_version=1).status_code, 200)
+        self.assertEqual(self.owner_client.post(path, values, format='json').status_code, 200)
+        self.assertEqual(SystemFeedbackEvent.objects.count(), 2)
+        self.assertEqual(self.owner_client.post(path, {**values, 'text': '改写'}, format='json').status_code, 409)
+        self.assertEqual(self.owner_client.post(path, {**values, 'request_id': str(uuid.uuid4())}, format='json').status_code, 409)
+        second = {**values, 'request_id': str(uuid.uuid4()), 'expected_version': 2, 'text': '仍然有问题'}
+        result = self.owner_client.post(path, second, format='json')
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.data['status'], 'processing')
+        self.assertEqual(result.data['content'], row['content'])
+        query = BASE + f'{row["id"]}/requests/{values["request_id"]}/'
+        self.assertEqual(self.owner_client.get(query).status_code, 200)
+        self.assertEqual(client_for(self.other).get(query).status_code, 404)
+        for invalid in [{'text': ''}, {'text': '字'*5001}, {'text': None}, {'status': 'closed'}, {'expected_version': True}]:
+            self.assertEqual(self.owner_client.post(path, {**second, **invalid}, format='json').status_code, 400)
+        self.assertEqual(list(ChangeRequest.objects.values()), self.before)
+
+    def test_notifications_read_persistence_new_updates_and_stale_snapshot(self):
+        row = self.create()
+        inbox, read = BASE+'inbox/', BASE+'inbox/read/'
+        self.assertEqual(self.owner_client.get(inbox).data['unread_count'], 0)
+        self.assertEqual(client_for(self.other).get(inbox).data['unread_count'], 0)
+        self.assertEqual(self.admin_client.get(inbox).data['unread_count'], 1)
+        self.assertEqual(self.admin_client.post(read, {'id': row['id'], 'message_version': 0}, format='json').status_code, 200)
+        self.assertEqual(self.act(row).status_code, 200)
+        item = self.owner_client.get(inbox).data['items'][0]
+        self.assertFalse(item['managed'])
+        self.assertEqual(item['message_version'], 1)
+        self.assertIsNone(item['read_version'])
+        self.assertEqual(client_for(self.other).post(read, {'id': row['id'], 'message_version': 1}, format='json').status_code, 404)
+        self.assertEqual(self.owner_client.post(read, {'id': row['id'], 'message_version': 1}, format='json').data['unread_count'], 0)
+        self.assertEqual(client_for(self.owner).get(inbox).data['unread_count'], 0)
+        values = {'text': '追加', 'expected_version': 1, 'request_id': str(uuid.uuid4())}
+        self.assertEqual(self.owner_client.post(BASE+f'{row["id"]}/followups/', values, format='json').status_code, 200)
+        self.assertEqual(self.owner_client.get(inbox).data['unread_count'], 0)
+        self.assertEqual(self.admin_client.get(inbox).data['items'][0]['message_version'], 2)
+        self.assertEqual(self.admin_client.post(read, {'id': row['id'], 'message_version': 0}, format='json').status_code, 409)
+        self.assertEqual(self.admin_client.get(inbox).data['unread_count'], 1)
+        self.assertEqual(self.act(row, text='已收到', expected_version=2).status_code, 200)
+        self.assertEqual(self.owner_client.get(inbox).data['items'][0]['message_version'], 3)
+        self.assertEqual(self.owner_client.get(inbox).data['items'][0]['read_version'], 1)
+        self.assertEqual(self.owner_client.post(read, {'id': row['id'], 'message_version': 1}, format='json').status_code, 409)
+        self.assertEqual(self.owner_client.get(inbox).data['unread_count'], 1)
+        self.admin.groups.remove(Group.objects.get(name=FEEDBACK_ADMIN_GROUP))
+        self.assertEqual(self.admin_client.get(inbox).data['unread_count'], 0)
+        self.assertEqual(self.admin_client.post(read, {'id': row['id'], 'message_version': 2}, format='json').status_code, 404)
+
+    def test_read_validation_and_followup_atomic_rollback(self):
+        row = self.create()
+        for values in [{}, {'id': True, 'message_version': 0}, {'id': row['id'], 'message_version': -1}, {'id': row['id'], 'message_version': 0, 'user_id': self.other.pk}]:
+            self.assertEqual(self.admin_client.post(BASE+'inbox/read/', values, format='json').status_code, 400)
+        with patch('changes.system_feedback_views.SystemFeedback.save', side_effect=RuntimeError('controlled')):
+            with self.assertRaises(RuntimeError):
+                self.owner_client.post(BASE+f'{row["id"]}/followups/', {'text': '补充', 'expected_version': 0, 'request_id': str(uuid.uuid4())}, format='json')
+        self.assertFalse(SystemFeedbackEvent.objects.exists())
+        self.assertEqual(SystemFeedback.objects.get(pk=row['id']).version, 0)
+
     def test_pagination_filters_and_order(self):
         for i in range(22):
             SystemFeedback.objects.create(submitter=self.owner, category='problem', content=str(i), request_id=uuid.uuid4())
@@ -177,7 +244,24 @@ class SystemFeedbackTests(TestCase):
         self.assertIn('can_manage_feedback', login.json()['user'])
         self.assertEqual(client.post(BASE, create_payload(), format='json').status_code, 403)
         self.assertEqual(client.post(BASE, create_payload(), format='json', HTTP_X_CSRFTOKEN=login.json()['csrfToken'], HTTP_X_EXPECTED_USER=str(self.other.pk)).status_code, 409)
-        self.assertEqual(client.post(BASE, create_payload(), format='json', HTTP_X_CSRFTOKEN=login.json()['csrfToken'], HTTP_X_EXPECTED_USER=str(self.reviewer.pk)).status_code, 201)
+        created = client.post(BASE, create_payload(), format='json', HTTP_X_CSRFTOKEN=login.json()['csrfToken'], HTTP_X_EXPECTED_USER=str(self.reviewer.pk))
+        self.assertEqual(created.status_code, 201)
+        path = BASE+str(created.data['id'])+'/followups/'
+        values = {'text': '会话追加', 'expected_version': 0, 'request_id': str(uuid.uuid4())}
+        self.assertEqual(client.post(path, values, format='json').status_code, 403)
+        self.assertEqual(client.post(path, values, format='json', HTTP_X_CSRFTOKEN=login.json()['csrfToken'], HTTP_X_EXPECTED_USER=str(self.other.pk)).status_code, 409)
+        self.assertEqual(client.post(path, values, format='json', HTTP_X_CSRFTOKEN=login.json()['csrfToken'], HTTP_X_EXPECTED_USER=str(self.reviewer.pk)).status_code, 200)
+        self.assertEqual(client.post(BASE+'inbox/read/', {'id': created.data['id'], 'message_version': 0}, format='json').status_code, 403)
+
+    @tag('migration')
+    def test_followup_migration_preserves_communication_type(self):
+        migration = import_module('changes.migrations.0017_feedback_followup_notifications')
+        schema = type('Schema', (), {'connection': connections['default']})()
+        migration.prevent_followup_loss(apps, schema)
+        row = self.create()
+        self.owner_client.post(BASE+f'{row["id"]}/followups/', {'text': '保留历史', 'expected_version': 0, 'request_id': str(uuid.uuid4())}, format='json')
+        with self.assertRaises(RuntimeError):
+            migration.prevent_followup_loss(apps, schema)
 
     @tag('migration')
     def test_migration_group_and_reverse_history_guard(self):

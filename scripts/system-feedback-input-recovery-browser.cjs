@@ -21,6 +21,7 @@ async function checkInputRecovery() {
       calls.push({ path, method: request.method() });
       let body = {}, status = 200;
       if (path === '/api/auth/me/') body = user;
+      else if (path === '/api/system-feedback/inbox/') body = { unread_count: 0, items: [] };
       else if (path === '/api/auth/csrf/') body = { csrfToken: 'mock-csrf' };
       else if (path === '/api/auth/login/') { if (roleChange) user = { ...user, role: 'reviewer' }; if (newAccount) user = { ...user, id: 202, username: 'mock-new-account' }; body = { user, csrfToken: 'mock-csrf' }; }
       else if (path === '/api/changes/') body = user.id === 101 ? [record] : [];

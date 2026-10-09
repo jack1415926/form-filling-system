@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { checkedFeedback, checkedFeedbackPage, feedbackConfirmed, newerFeedback } from '../src/systemFeedback.ts'
+import { checkedFeedback, checkedFeedbackPage, feedbackConfirmed, newerFeedback, checkedFeedbackInbox, feedbackMessageVersion, unreadFeedbackEvent } from '../src/systemFeedback.ts'
 const request = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'
 const actionRequest = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
 const initial = { id: 4, submitter: { id: 2, display_name: '用户' }, category: 'problem', content: '问题', status: 'pending', request_id: request, version: 0, created_at: '2026-10-08T01:00:00Z', updated_at: '2026-10-08T01:00:00Z', events: [] }
@@ -31,4 +31,43 @@ test('feedback lists reject cross-account rows and malformed pagination', () => 
   assert.throws(() => checkedFeedbackPage(page, 3))
   assert.throws(() => checkedFeedbackPage({ ...page, count: -1 }))
   assert.throws(() => checkedFeedbackPage({ ...page, next: 5 }))
+})
+
+test('followup confirms original event after a later state update without confusing manager replies', () => {
+  const event = { ...handled.events[0], kind: 'followup', actor: initial.submitter, text: '追问', to_status: 'pending' }
+  const result = { ...initial, version: 1, events: [event] }
+  const operation = { kind: 'followup', id: 4, text: '追问', status: 'closed', expected_version: 0, request_id: actionRequest }
+  assert.equal(checkedFeedback(result), result)
+  assert.equal(feedbackConfirmed(operation, result, 2), true)
+  assert.equal(feedbackConfirmed(operation, { ...result, events: [{ ...event, kind: 'manager' }] }, 2), false)
+  assert.equal(feedbackMessageVersion(result, 2), null)
+  assert.equal(feedbackMessageVersion(result, 3), 1)
+  assert.equal(feedbackMessageVersion(handled, 2), 1)
+  assert.equal(feedbackMessageVersion(initial, 3), 0)
+  assert.equal(feedbackMessageVersion(handled, 3), 0)
+})
+
+test('feedback unread snapshots reject invalid versions, duplicate items and malformed counts', () => {
+  const item = { id: 4, message_version: 0, read_version: null, content: '反馈', status: 'pending', managed: true }
+  const inbox = { unread_count: 1, items: [item] }
+  assert.equal(checkedFeedbackInbox(inbox), inbox)
+  for (const change of [{ unread_count: 0 }, { items: [{ ...item, message_version: -1 }] }, { items: [{ ...item, managed: 'yes' }] }, { items: [{ ...item, read_version: undefined }] }, { items: [{ ...item, read_version: 0 }] }, { unread_count: 2, items: [item, item] }]) {
+    assert.throws(() => checkedFeedbackInbox({ ...inbox, ...change }))
+  }
+})
+
+test('individual unread markers distinguish received events from old reads and own messages', () => {
+  const reply = { ...handled.events[0], kind: 'manager' }
+  const followup = { ...reply, kind: 'followup', actor: initial.submitter, text: '追加', base_version: 1 }
+  const nextReply = { ...reply, id: 10, base_version: 2 }
+  const ownerItem = { id: 4, message_version: 3, read_version: 1, managed: false }
+  assert.equal(unreadFeedbackEvent(reply, handled, ownerItem, 2), false)
+  assert.equal(unreadFeedbackEvent(nextReply, handled, ownerItem, 2), true)
+  assert.equal(unreadFeedbackEvent(followup, handled, ownerItem, 2), false)
+  assert.equal(unreadFeedbackEvent(nextReply, handled, undefined, 2), false)
+  assert.equal(unreadFeedbackEvent(nextReply, handled, { ...ownerItem, id: 5 }, 2), false)
+  const managerItem = { ...ownerItem, managed: true, message_version: 2, read_version: 0 }
+  assert.equal(unreadFeedbackEvent(followup, handled, managerItem, 3), true)
+  assert.equal(unreadFeedbackEvent(reply, handled, managerItem, 3), false)
+  assert.equal(unreadFeedbackEvent(reply, handled, { ...ownerItem, read_version: null }, 2), true)
 })

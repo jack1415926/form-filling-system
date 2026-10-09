@@ -176,7 +176,18 @@ class SystemFeedback(models.Model):
         ]
 
 
+class SystemFeedbackRead(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    feedback = models.ForeignKey(SystemFeedback, on_delete=models.CASCADE)
+    version = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = 'system_feedback_read'
+        constraints = [models.UniqueConstraint(fields=['user', 'feedback'], name='feedback_read_user_row')]
+
+
 class SystemFeedbackEvent(models.Model):
+    kind = models.CharField(max_length=16, default='manager', choices=[('manager', '管理员处理'), ('followup', '用户追加')])
     feedback = models.ForeignKey(SystemFeedback, on_delete=models.CASCADE, related_name='events')
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     text = models.TextField(blank=True)

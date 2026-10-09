@@ -24,15 +24,20 @@ from changes.submission_views import ReviewerList, SubmissionDetail
 from changes.review_views import ReviewList, ReviewDetail
 from changes.review_inbox import ReviewInbox, MarkInboxRead
 from changes.system_feedback_views import FeedbackList, FeedbackDetail, FeedbackRequest, ManagedList, ManagedDetail, ManagedAction, ManagedRequest
+from changes.system_feedback_views import FeedbackFollowup, FollowupRequest, FeedbackInbox, FeedbackMarkRead
 
 urlpatterns = [
     path('api/system-feedback/', FeedbackList.as_view()),
+    path('api/system-feedback/inbox/', FeedbackInbox.as_view()),
+    path('api/system-feedback/inbox/read/', FeedbackMarkRead.as_view()),
     path('api/system-feedback/requests/<uuid:request_id>/', FeedbackRequest.as_view()),
     path('api/system-feedback/manage/', ManagedList.as_view()),
     path('api/system-feedback/manage/<int:pk>/', ManagedDetail.as_view()),
     path('api/system-feedback/manage/<int:pk>/actions/', ManagedAction.as_view()),
     path('api/system-feedback/manage/<int:pk>/requests/<uuid:request_id>/', ManagedRequest.as_view()),
     path('api/system-feedback/<int:pk>/', FeedbackDetail.as_view()),
+    path('api/system-feedback/<int:pk>/followups/', FeedbackFollowup.as_view()),
+    path('api/system-feedback/<int:pk>/requests/<uuid:request_id>/', FollowupRequest.as_view()),
     path('admin/', admin.site.urls),
     path('api/auth/csrf/', views.csrf_view),
     path('api/auth/login/', views.login_view),

@@ -6,7 +6,7 @@ import FeedbackLauncher from './FeedbackLauncher'
 import { hasReviewDrawer, getReviewDrawerCount, openReviewDrawer, requestFeedbackDrawer, subscribeReviewDrawer } from './systemFeedback'
 import { checkedInbox, inboxNavigationEvent, type InboxItem, type InboxNavigation } from './reviewInboxData'
 
-export default function ReviewInbox({ user, leaving, onSystem }: { user: User; leaving: boolean; onSystem: () => void }) {
+export default function ReviewInbox({ user, leaving, onSystem, systemCount = 0 }: { user: User; leaving: boolean; onSystem: () => void; systemCount?: number }) {
   const client = useQueryClient(), { modal, message } = App.useApp()
   const [open, setOpen] = useState(false)
   const currentAvailable = useSyncExternalStore(subscribeReviewDrawer, hasReviewDrawer)
@@ -53,7 +53,7 @@ export default function ReviewInbox({ user, leaving, onSystem }: { user: User; l
     }))
   }
   return <>
-    <FeedbackLauncher reviewAvailable reviewCount={query.data?.unread_count ?? 0} onSystem={onSystem} onReview={openInbox} />
+    <FeedbackLauncher reviewAvailable reviewCount={query.data?.unread_count ?? 0} systemCount={systemCount} onSystem={onSystem} onReview={openInbox} />
     <Drawer title={`审核消息 · 未读 ${query.data?.unread_count ?? '…'} / 待处理 ${query.data?.count ?? '…'}`} open={open} onClose={() => setOpen(false)} size={680}
       extra={currentAvailable && <Button disabled={leaving} onClick={openReviewDrawer}>当前申请意见（{currentCount}）</Button>}>
       <p className="muted">红点表示未读消息。标为已读只清除提醒，不会批准申请、提交回应或删除待处理事项。</p>

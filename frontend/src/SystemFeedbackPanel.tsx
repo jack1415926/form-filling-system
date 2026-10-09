@@ -1,11 +1,12 @@
 import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Drawer, Input, Select, Spin, Table, Tabs, Tag } from 'antd'
+import { Alert, App, Badge, Button, Drawer, Input, Select, Spin, Table, Tabs, Tag } from 'antd'
 import ReviewInbox from './ReviewInbox'
 import { api, ApiError, type User } from './api'
 import { saveResultUnconfirmed } from './questionDraft'
 import { checkedFeedback, checkedFeedbackPage, feedbackCategories, feedbackStates, feedbackConfirmed, newerFeedback, requestFeedbackDrawer, hasReviewDrawer, openReviewDrawer, subscribeReviewDrawer,
   type Feedback, type FeedbackCategory, type FeedbackStatus, type FeedbackDetail, type FeedbackOperation } from './systemFeedback'
+import { checkedFeedbackInbox, feedbackMessageVersion, unreadFeedbackEvent, type FeedbackInboxItem } from './systemFeedback'
 
 export type FeedbackHandle = { leave: (action: (discard: () => void) => void) => void; manage: () => void }
 type Props = { user: User; leaving: boolean; onReauthenticate: () => void; handleRef: Ref<FeedbackHandle> }
@@ -30,6 +31,16 @@ export default function SystemFeedbackPanel({ user, leaving, onReauthenticate, h
   useEffect(() => { currentUser.current = user }, [user])
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const managed = mode === 'manage', allowed = !!user.can_manage_feedback
+  const inbox = useQuery({ queryKey: ['system-feedback-inbox', user.id, allowed], refetchInterval: 30_000,
+    queryFn: async () => checkedFeedbackInbox(await api<unknown>('/api/system-feedback/inbox/', 'GET', undefined, user.id)) })
+  const announced = useRef(new Set<string>())
+  useEffect(() => {
+    const signatures = inbox.data?.items.map(item => `${item.id}:${item.message_version}`) ?? []
+    if (signatures.some(signature => !announced.current.has(signature)) && client.getQueryData<User>(['me'])?.id === user.id) {
+      signatures.forEach(signature => announced.current.add(signature))
+      message.info(`你有 ${inbox.data!.unread_count} 条未读系统反馈更新，请从“意见与反馈 → 系统反馈”查看。`, 6)
+    }
+  }, [inbox.data, client, message, user.id])
   const revoked = managed && !allowed
   const dirty = !!content || !!draft?.text || !!draft && draft.status !== client.getQueryData<FeedbackDetail>(['system-feedback-detail', user.id, mode, selected])?.status
   const pending = busy || !!unknown
@@ -43,13 +54,15 @@ export default function SystemFeedbackPanel({ user, leaving, onReauthenticate, h
     const latest = newerFeedback(client.getQueryData<FeedbackDetail>(key), data)
     client.setQueryData(key, latest)
     void client.invalidateQueries({ queryKey: ['system-feedback-list', user.id] })
+    void client.invalidateQueries({ queryKey: ['system-feedback-inbox', user.id] })
     return latest
   }
-  const list = useQuery({ queryKey: ['system-feedback-list', user.id, mode, filterCategory, filterStatus, page], enabled: open && mode !== 'create' && !revoked,
+  const list = useQuery({ queryKey: ['system-feedback-list', user.id, mode, filterCategory, filterStatus, page], enabled: open && mode !== 'create' && selected === null && !revoked,
     refetchOnWindowFocus: false, queryFn: async () => checkedFeedbackPage(await api<unknown>(`${base}${managed ? 'manage/' : ''}?category=${filterCategory}&status=${filterStatus}&page=${page}`, 'GET', undefined, user.id), managed ? undefined : user.id) })
   const detail = useQuery({ queryKey: detailKey, enabled: open && selected !== null && !revoked, refetchOnWindowFocus: false,
     queryFn: async () => accept(checkedFeedback(await api<unknown>(detailPath, 'GET', undefined, user.id), { id: selected!, owner: managed ? undefined : user.id })) })
   const data = revoked ? undefined : detail.data
+  const unreadItem = inbox.data?.items.find(item => item.id === selected)
 
   useEffect(() => {
     const unload = (event: BeforeUnloadEvent) => { if (dirty || pending) { event.preventDefault(); event.returnValue = '' } }
@@ -87,31 +100,31 @@ export default function SystemFeedbackPanel({ user, leaving, onReauthenticate, h
     accept(result); setUnknown(null); setError(null)
     if (operation.kind === 'create') { setContent(''); setMode('mine'); setFilterStatus(''); setFilterCategory(''); setPage(1); setSelected(result.id) }
     else setDraft(null)
-    message.success(operation.kind === 'create' ? '系统反馈已提交' : '处理记录已保存')
+    message.success(operation.kind === 'create' ? '系统反馈已提交' : operation.kind === 'followup' ? '追加意见已发送' : '处理记录已保存')
   }
   const perform = async (operation: FeedbackOperation, query = false) => {
     if (flight.current || leaving || !validActor() || (operation.kind === 'action' && !currentUser.current.can_manage_feedback)) return
     flight.current = true; setBusy(true); setError(null)
     const { kind, ...payload } = operation
-    let path = kind === 'create' ? base : `${base}manage/${operation.id}/actions/`
-    if (query) path = kind === 'create' ? `${base}requests/${operation.request_id}/` : `${base}manage/${operation.id}/requests/${operation.request_id}/`
+    let path = kind === 'create' ? base : kind === 'followup' ? `${base}${operation.id}/followups/` : `${base}manage/${operation.id}/actions/`
+    if (query) path = kind === 'create' ? `${base}requests/${operation.request_id}/` : `${base}${kind === 'action' ? 'manage/' : ''}${operation.id}/requests/${operation.request_id}/`
     try {
-      const body = kind === 'create' ? payload : { text: operation.text, status: operation.status, expected_version: operation.expected_version, request_id: operation.request_id }
-      const response = checkedFeedback(await api<unknown>(path, query ? 'GET' : 'POST', query ? undefined : body, user.id), { id: kind === 'action' ? operation.id : undefined, owner: kind === 'create' ? user.id : undefined })
+      const body = kind === 'create' ? payload : { text: operation.text, ...(kind === 'action' ? { status: operation.status } : {}), expected_version: operation.expected_version, request_id: operation.request_id }
+      const response = checkedFeedback(await api<unknown>(path, query ? 'GET' : 'POST', query ? undefined : body, user.id), { id: kind !== 'create' ? operation.id : undefined, owner: kind !== 'action' ? user.id : undefined })
       settle(operation, response)
     } catch (failure) {
       if (!validActor()) return
       setError(query && failure instanceof ApiError && failure.status === 404 ? '尚未查到原请求，结果仍未确认；请稍后查询或按原请求重试。' : failure instanceof Error ? failure.message : String(failure))
       if (!query && saveResultUnconfirmed(failure)) setUnknown(operation)
       if (!query && failure instanceof ApiError && [400, 409].includes(failure.status)) setUnknown(null)
-      if (!query && failure instanceof ApiError && failure.status === 409 && kind === 'action') void detail.refetch()
+      if (!query && failure instanceof ApiError && failure.status === 409 && kind !== 'create') void detail.refetch()
       if (!query && failure instanceof ApiError && failure.status === 403 && kind === 'action') void client.invalidateQueries({ queryKey: ['me'] })
     } finally { flight.current = false; if (active.current) setBusy(false) }
   }
   const changeMode = (next: 'create' | 'mine' | 'manage') => {
     if (next === mode) return
     // An administrator draft belongs to its original feedback and version.
-    if (draft && next !== 'manage') {
+    if (draft) {
       confirmLeave(() => { setDraft(null); setSelected(null); setMode(next); setFilterStatus(''); setFilterCategory(''); setPage(1) }, true)
     } else { setSelected(null); setMode(next); setFilterStatus(next === 'manage' ? 'pending' : ''); setFilterCategory(''); setPage(1) }
   }
@@ -125,15 +138,40 @@ export default function SystemFeedbackPanel({ user, leaving, onReauthenticate, h
   const updateDraft = (patch: Partial<{ text: string; status: FeedbackStatus }>) => {
     if (data) setDraft((current) => ({ text: current?.text ?? '', status: current?.status ?? data.status, version: current?.version ?? data.version, ...patch }))
   }
+  const viewUpdate = (item: FeedbackInboxItem) => {
+    if (pending || leaving || (item.managed && !allowed)) return
+    if (selected === item.id && mode === (item.managed ? 'manage' : 'mine')) {
+      setOpen(true)
+      void detail.refetch()
+      return
+    }
+    confirmLeave(() => { setDraft(null); setSelected(item.id); setMode(item.managed ? 'manage' : 'mine'); setOpen(true) }, !!draft)
+  }
+  const [marking, setMarking] = useState(false)
+  const markRead = async () => {
+    if (!data || marking || leaving || pending) return
+    const version = feedbackMessageVersion(data, user.id)
+    if (version === null) return
+    setMarking(true)
+    try {
+      await api(`${base}inbox/read/`, 'POST', { id: data.id, message_version: version }, user.id)
+      if (validActor()) await inbox.refetch()
+    } catch (failure) {
+      if (validActor()) { message.warning(failure instanceof Error ? failure.message : String(failure)); void inbox.refetch(); void detail.refetch() }
+    } finally { if (active.current) setMarking(false) }
+  }
   return <>
-    <ReviewInbox user={user} leaving={leaving} onSystem={openDrawer} />
+    <ReviewInbox user={user} leaving={leaving} onSystem={openDrawer} systemCount={inbox.data?.unread_count ?? 0} />
     <Drawer title={managed ? '系统反馈 · 反馈管理' : '系统反馈'} open={open} size={760} onClose={() => { if (!flight.current && (!unknown || revoked)) setOpen(false) }}
       closable={!busy && (!unknown || revoked)} maskClosable={!busy && (!unknown || revoked)} keyboard={!busy && (!unknown || revoked)}
-      extra={<div className="form-actions">{reviewAvailable && <Button disabled={pending && !revoked} onClick={openReviewDrawer}>审核修改意见</Button>}<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button></div>}>
-      <p className="muted">系统使用问题与建议独立记录，不影响申请审核。提交后原文只读，管理员处理过程可在这里查看。</p>
+      extra={<div className="form-actions"><Button loading={inbox.isFetching} onClick={() => void inbox.refetch()}>刷新提醒</Button>{reviewAvailable && <Button disabled={pending && !revoked} onClick={openReviewDrawer}>审核修改意见</Button>}<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button></div>}>
+      <p className="muted">系统反馈独立于申请审核。原文只读，可以在同一反馈中追问或追加意见；回复和状态更新会提醒相关人员。</p>
+      {inbox.error && <Alert type="warning" title="反馈提醒读取失败" action={<Button onClick={() => void inbox.refetch()}>重试</Button>} className="form-alert" />}
+      {!!inbox.data?.unread_count && <Alert type="info" title={`系统反馈有 ${inbox.data.unread_count} 条未读更新`} className="form-alert"
+        description={<div>{inbox.data.items.map(item => <Button key={item.id} disabled={pending || leaving} onClick={() => viewUpdate(item)}>查看 #{item.id} · {item.content.slice(0, 20)}</Button>)}</div>} />}
       <Tabs activeKey={mode} onChange={(key) => changeMode(key as typeof mode)} items={[
-        { key: 'create', label: '提交反馈', disabled: pending && !revoked }, { key: 'mine', label: '我的反馈', disabled: pending && !revoked },
-        ...(allowed || revoked ? [{ key: 'manage', label: '反馈管理', disabled: pending && !revoked }] : []),
+        { key: 'create', label: '提交反馈', disabled: pending && !revoked }, { key: 'mine', label: <Badge count={inbox.data?.items.filter(item => !item.managed).length ?? 0}>我的反馈</Badge>, disabled: pending && !revoked },
+        ...(allowed || revoked ? [{ key: 'manage', label: <Badge count={inbox.data?.items.filter(item => item.managed).length ?? 0}>反馈管理</Badge>, disabled: pending && !revoked }] : []),
       ]} />
       {revoked && <Alert type="warning" title="反馈管理权限已取消" description="管理记录已清除，未发送文字可复制。原未知操作可能已执行，请联系反馈管理员核对。" className="form-alert" />}
       {error && <Alert type="error" title={error} className="form-alert" />}
@@ -146,7 +184,7 @@ export default function SystemFeedbackPanel({ user, leaving, onReauthenticate, h
         <label htmlFor="system-feedback-content">反馈内容</label><Input.TextArea id="system-feedback-content" aria-label="反馈内容" value={content} maxLength={5000} showCount autoSize={{ minRows: 6, maxRows: 16 }} disabled={blocked} onChange={(event) => setContent(event.target.value)} placeholder="描述遇到的问题、操作步骤或建议。请勿填写密码。" />
         <div className="form-footer"><Button disabled={blocked || !content} onClick={() => setContent('')}>清除未发送文字</Button><Button type="primary" loading={busy} disabled={blocked || !content.trim()} onClick={() => void perform({ kind: 'create', category, content: content.trim(), request_id: crypto.randomUUID() })}>提交系统反馈</Button></div>
       </> : <>
-        {!revoked && <div className="form-actions feedback-filters">
+        {!revoked && selected === null && <div className="form-actions feedback-filters">
           <Select aria-label="筛选反馈类型" value={filterCategory} disabled={pending} options={[{ value: '', label: '全部类型' }, ...options(feedbackCategories)]} onChange={(value) => { setFilterCategory(value); setPage(1) }} />
           <Select aria-label="筛选反馈状态" value={filterStatus} disabled={pending} options={[{ value: '', label: '全部状态' }, ...options(feedbackStates)]} onChange={(value) => { setFilterStatus(value); setPage(1) }} />
           <Button disabled={pending} onClick={() => { void list.refetch(); if (selected) void detail.refetch() }}>刷新反馈</Button>
@@ -157,17 +195,27 @@ export default function SystemFeedbackPanel({ user, leaving, onReauthenticate, h
             { title: '编号／内容', render: (_, row) => <Button type="link" disabled={pending} onClick={() => selectRow(row.id)}>#{row.id} · {row.content.slice(0, 32)}</Button> },
             ...(managed ? [{ title: '提交者', render: (_: unknown, row: Feedback) => row.submitter.display_name }] : []),
             { title: '类型', render: (_, row) => feedbackCategories[row.category] }, { title: '状态', render: (_, row) => <Tag>{feedbackStates[row.status]}</Tag> },
+            { title: '消息', render: (_, row) => inbox.error ? <Tag>读取失败</Tag> : inbox.isPending ? <Tag>读取中</Tag> : <Tag color={inbox.data?.items.some(item => item.id === row.id) ? 'red' : undefined}>{inbox.data?.items.some(item => item.id === row.id) ? '未读' : '无未读'}</Tag> },
             { title: '提交时间', dataIndex: 'created_at', render: time },
           ]} />
         </>}
         {selected !== null && !revoked && <>
-          <Button disabled={pending} onClick={() => selectRow(null)}>返回反馈列表</Button>
+          <div className="form-actions"><Button disabled={pending} onClick={() => selectRow(null)}>返回反馈列表</Button>
+            <Button disabled={pending} loading={detail.isFetching} onClick={() => void detail.refetch()}>刷新详情</Button>
+            {inbox.data?.items.some(item => item.id === selected) && <Button disabled={pending || !data || marking} loading={marking} onClick={() => void markRead()}>标为已读</Button>}</div>
           {detail.error && <Alert type="error" title="读取失败，当前输入仍保留" description={detail.error.message} className="form-alert" />}
           {!data ? <Spin /> : <>
             <h3>反馈 #{data.id} <Tag>{feedbackCategories[data.category]}</Tag><Tag>{feedbackStates[data.status]}</Tag></h3>
-            <p className="muted">{data.submitter.display_name} · {time(data.created_at)}</p><p className="question-text">{data.content}</p>
-            <h3>处理记录</h3>{data.events.length === 0 && <p className="muted">尚无处理记录。</p>}
-            {data.events.map((event) => <section className="review-note" key={event.id}><strong>{event.actor.display_name}</strong><span className="muted"> · {time(event.created_at)}</span><p>{feedbackStates[event.from_status]} → {feedbackStates[event.to_status]}</p><p className="question-text">{event.text || '开始处理'}</p></section>)}
+            <p className="muted">{data.submitter.display_name} · {time(data.created_at)}{unreadItem?.read_version == null && unreadItem?.managed && <Tag color="red">初始反馈未读</Tag>}</p><p className="question-text">{data.content}</p>
+            <h3>沟通与处理记录</h3>{data.events.length === 0 && <p className="muted">尚无沟通与处理记录。</p>}
+            {data.events.map((event) => <section className={`review-note${unreadFeedbackEvent(event, data, unreadItem, user.id) ? ' feedback-unread-note' : ''}`} key={event.id}><strong>{event.actor.display_name}</strong><Tag>{event.kind === 'followup' ? '用户追加' : '管理员处理'}</Tag>{unreadFeedbackEvent(event, data, unreadItem, user.id) && <Tag color="red">未读</Tag>}<span className="muted"> · {time(event.created_at)}</span><p>{feedbackStates[event.from_status]} → {feedbackStates[event.to_status]}</p><p className="question-text">{event.text || '开始处理'}</p></section>)}
+            {!managed && <>
+              <h3>追问／追加意见</h3><p className="muted">追加内容向反馈管理员公开；已关闭的反馈会重新转为处理中。</p>
+              <Input.TextArea aria-label="追问或追加意见" value={draft?.text ?? ''} maxLength={5000} showCount autoSize={{ minRows: 4, maxRows: 12 }} disabled={blocked} onChange={event => updateDraft({ text: event.target.value })} />
+              {draftStale && <Alert type="warning" title="反馈已有更新，文字仍保留；核对后清除草稿并重新填写。" className="form-alert" />}
+              <div className="form-footer"><Button disabled={blocked || !draft} onClick={() => setDraft(null)}>清除追加草稿</Button><Button type="primary" loading={busy} disabled={blocked || !draft?.text.trim() || draftStale}
+                onClick={() => { if (draft) void perform({ kind: 'followup', id: data.id, text: draft.text.trim(), status: data.status, expected_version: draft.version, request_id: crypto.randomUUID() }) }}>发送追加意见</Button></div>
+            </>}
             {managed && <>
               <h3>回复与更新状态</h3><Select aria-label="处理状态" disabled={blocked} value={draft?.status ?? data.status} options={options(feedbackStates).filter((item) => data.status === 'pending' || item.value !== 'pending')} onChange={(status) => updateDraft({ status })} style={{ width: '100%', marginBottom: 12 }} />
               <Input.TextArea aria-label="管理员处理说明" value={draft?.text ?? ''} maxLength={5000} showCount autoSize={{ minRows: 4, maxRows: 12 }} disabled={blocked} onChange={(event) => updateDraft({ text: event.target.value })} placeholder="回复对用户公开；关闭或重新打开须说明处理结果或原因。" />

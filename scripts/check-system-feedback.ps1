@@ -20,6 +20,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Feedback browser regression failed' }
     & node (Join-Path $PSScriptRoot 'system-feedback-input-recovery-browser.cjs')
     if ($LASTEXITCODE -ne 0) { throw 'Feedback input recovery regression failed' }
+    & node (Join-Path $PSScriptRoot 'feedback-unread-browser.cjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Feedback unread detail regression failed' }
 } finally {
     try {
         if ($taskPrepared) {

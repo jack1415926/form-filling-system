@@ -7,8 +7,8 @@ const clamp = ({ x, y }: Position): Position => ({
   y: Math.max(8, Math.min(y, window.innerHeight - 64)),
 })
 
-export default function FeedbackLauncher({ reviewAvailable, reviewCount, onSystem, onReview }: {
-  reviewAvailable: boolean; reviewCount: number; onSystem: () => void; onReview: () => void
+export default function FeedbackLauncher({ reviewAvailable, reviewCount, systemCount = 0, onSystem, onReview }: {
+  reviewAvailable: boolean; reviewCount: number; systemCount?: number; onSystem: () => void; onReview: () => void
 }) {
   const [position, setPosition] = useState<Position | null>(null), [open, setOpen] = useState(false)
   const hintId = useId(), menuHeight = reviewAvailable ? 94 : 128
@@ -32,12 +32,12 @@ export default function FeedbackLauncher({ reviewAvailable, reviewCount, onSyste
       position: 'fixed', left: Math.max(8, Math.min(position.x, window.innerWidth - 208)), right: 'auto',
       top: Math.max(8, Math.min(position.y >= menuHeight + 16 ? position.y - menuHeight - 8 : position.y + 64, window.innerHeight - menuHeight - 8)), bottom: 'auto',
     } : undefined}>
-      <Button aria-label="打开系统反馈" onClick={() => { setOpen(false); onSystem() }}>系统反馈</Button>
+      <Button aria-label="打开系统反馈" onClick={() => { setOpen(false); onSystem() }}>系统反馈<Badge count={systemCount} style={{ marginLeft: 8 }} /></Button>
       <Button aria-label="打开审核意见" disabled={!reviewAvailable} aria-describedby={!reviewAvailable ? hintId : undefined}
         onClick={() => { setOpen(false); onReview() }}>审核意见<Badge count={reviewAvailable ? reviewCount : 0} style={{ marginLeft: 8 }} /></Button>
       {!reviewAvailable && <p id={hintId} className="feedback-launcher-hint">请先打开已提交的申请</p>}
     </div>}
-    <Badge count={!open && reviewAvailable ? reviewCount : 0}><button type="button" className="feedback-launcher-button" aria-label="打开意见与反馈" aria-expanded={open}
+    <Badge count={!open ? (reviewAvailable ? reviewCount : 0) + systemCount : 0}><button type="button" className="feedback-launcher-button" aria-label="打开意见与反馈" aria-expanded={open}
       title="点击打开意见与反馈；按住拖动可移动" onPointerDown={event => {
         if (event.button !== 0) return
         const rect = event.currentTarget.getBoundingClientRect()
