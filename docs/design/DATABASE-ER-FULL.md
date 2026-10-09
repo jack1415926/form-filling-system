@@ -1,12 +1,14 @@
-# 数据库字段 ER 图（0015快照及0016／0017补充）
+# 当前数据库完整字段 ER 图
 
-原图生成日期：2026-10-08，记录0015时本机MySQL的21张业务表。2026-10-09当前迁移已至0017，共23张业务表；0016新增review_inbox_read，0017新增system_feedback_read及沟通事件kind，见下方补充。原图保留其快照含义，不再将21张称作当前总量。
+生成日期：2026-10-09。23张业务表、186个实际字段、27条业务表间外键；迁移基线0017。直接读取本机 MySQL 的23张业务表字段，并与当前 Django 模型逐表核对；仅执行只读结构查询。
 
 包含全部实际列（含隐式主键、外键列、UUID、时间、JSON及存储生成列）。不包含 Django 用户、会话、权限及迁移等系统表。用户外键在字段注释中注明目标表。
 
 PK为主键，FK为外键，UK仅表示单列唯一；联合唯一单独列在图后。SQL类型采用本机数据库实际类型，NOT NULL和NULL允许指数据库可空性，NOT NULL文字字段仍可能允许空字符串。创建和更新时间由Django处理，不表示数据库触发器或自动更新时间约束。
 
 关系线标签是实际外键列名；可空外键用零或一个，必填外键用恰好一个。实体之间均使用实线，未进一步区分识别与非识别关系。
+
+[Mermaid源文件](DATABASE-ER-FULL.mmd) · [完整SVG（可放大）](images/DATABASE-ER-FULL.svg) · [PNG](images/DATABASE-ER-FULL.png)
 
 ```mermaid
 erDiagram
@@ -270,9 +272,27 @@ erDiagram
         datetime(6) created_at "NOT NULL；创建时自动填写"
         int actor_id FK "关联 auth_user；NOT NULL"
         bigint feedback_id FK "关联 system_feedback；NOT NULL"
+        varchar(16) kind "NOT NULL"
     }
 
-    %% 全部业务表间外键；用户外键已在字段中注明，系统用户表不计入21张业务表
+    %% 审核消息已读
+    review_inbox_read {
+        bigint id PK "NOT NULL；自增"
+        varchar(64) signature "NOT NULL"
+        datetime(6) read_at "NOT NULL；保存时自动更新"
+        bigint round_id FK "关联 review_round；NOT NULL"
+        int user_id FK "关联 auth_user；NOT NULL"
+    }
+
+    %% 系统反馈已读
+    system_feedback_read {
+        bigint id PK "NOT NULL；自增"
+        int_unsigned version "NOT NULL"
+        bigint feedback_id FK "关联 system_feedback；NOT NULL"
+        int user_id FK "关联 auth_user；NOT NULL"
+    }
+
+    %% 全部业务表间外键；用户外键已在字段中注明，系统用户表不计入23张业务表
     change_request ||--o{ material_change : "change_id"
     material_change ||--o{ material_disposition : "material_id"
     change_request ||--o{ question_response : "change_id"
@@ -298,6 +318,8 @@ erDiagram
     review_issue |o--o{ review_issue_event : "issue_id"
     review_round ||--o{ review_issue_event : "round_id"
     system_feedback ||--o{ system_feedback_event : "feedback_id"
+    review_round ||--o{ review_inbox_read : "round_id"
+    system_feedback ||--o{ system_feedback_read : "feedback_id"
 ```
 
 ## 联合唯一约束
@@ -322,27 +344,8 @@ erDiagram
 - `review_issue_event`：`(change_id, author_id, request_id, position)` 联合唯一。
 - `system_feedback`：`(submitter_id, request_id)` 联合唯一。
 - `system_feedback_event`：`(feedback_id, request_id)` 联合唯一。
-
-## 0016已读表补充
-
-`review_inbox_read`保存id（PK）、user_id（FK至auth_user）、round_id（FK至review_round）、signature（64字符消息批签名）、read_at（已读时间）。`(user_id, round_id)`联合唯一；用户或轮次删除时级联删除。它只记录提醒状态，不修改申请、意见或批准结果。字段依据当前models.py及0016迁移，0016阶段原图的21张表另加此表共22张；0017另增下述反馈已读表。
-
-```mermaid
-erDiagram
-    auth_user ||--o{ review_inbox_read : user_id
-    review_round ||--o{ review_inbox_read : round_id
-    review_inbox_read {
-        bigint id PK
-        int user_id FK
-        bigint round_id FK
-        varchar signature
-        datetime read_at
-    }
-```
-
-## 0017反馈沟通与已读补充
-
-system_feedback_event新增kind（varchar(16)），manager为管理员处理，followup为用户追加；历史事件回填manager。system_feedback_read保存id（PK）、user_id（FK至auth_user）、feedback_id（FK至system_feedback）、version（unsigned int，已读入站消息版本），用户／反馈联合唯一；用户或反馈删除时级联删除。原21表加两张已读表即为当前23张。
+- `review_inbox_read`：`(user_id, round_id)` 联合唯一。
+- `system_feedback_read`：`(user_id, feedback_id)` 联合唯一。
 
 ## EMC复合外键
 

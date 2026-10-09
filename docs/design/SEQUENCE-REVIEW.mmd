@@ -1,0 +1,51 @@
+sequenceDiagram
+    actor U as 填写员
+    actor R as 有权审核员
+    participant F as React网页
+    participant A as Django DRF
+    participant D as MySQL
+    U->>F: 保存表单，选择指定或公开审核
+    F->>A: POST submission，expected_round与新UUID
+    A->>D: 锁定申请，核对本人、状态、标题和ECR编号
+    A->>A: 校验有效审核员及未解决意见的回应/审核安排
+    A->>D: 新建review_round与review_record，申请置pending
+    A-->>F: 返回轮次、方式及名单，八表锁定
+    R->>F: 打开指定或公开任务
+    F->>A: GET当前有权轮次及八表
+    A-->>F: 返回授权内容，只读展示
+    alt 需要修改
+        R->>F: 列出多条意见，确认退回
+        F->>A: POST退回，当前轮次与UUID
+        A->>D: 锁申请，保存review_issue/event及退回原因，置returned
+        A-->>F: 通知最新状态
+        U->>F: 修订八表并逐条回应
+        F->>A: PATCH表单，POST意见回应及原版本
+        A->>D: 保存修订与review_issue_event
+        Note over R,D: 退回期间审核员可看意见/回应，不可读取修订中的八表正文
+        U->>F: 重提，未解决意见存在时沿用审核安排
+        F->>A: POST submission，新UUID与expected_round
+        A->>D: 新建审核轮次，个人批准重新计数，置pending
+        R->>F: 原提出者复核自己的意见
+        F->>A: POST确认解决或继续修改，轮次/版本/UUID
+        A->>D: 锁申请并追加意见处理事件
+    else 内容可以批准
+        Note over R,F: 无需退回，直接进入下方个人批准操作
+    end
+    R->>F: 意见均解决后，本人同意批准
+    F->>A: POST批准，当前轮次与UUID
+    A->>D: 锁申请，重检权限、状态和未解决意见，记录个人批准
+    alt 指定人员全部批准，或公开两名不同审核员批准
+        A->>D: 当前轮及申请置approved
+        A-->>F: 整单审核通过，保持只读
+    else 尚未达到整单条件
+        A-->>F: 个人批准已记录，整单仍pending
+    end
+    Note over A,D: 旧轮请求拒绝；重复请求去重；最终批准与退回按同一申请锁串行
+    loop 每30秒、聚焦或手工刷新审核消息
+        F->>A: GET /api/review/inbox/
+        A-->>F: 本人待办及未读批次签名
+    end
+    U->>F: 或审核员标为已读
+    F->>A: POST审核已读，申请/轮次/签名
+    A->>D: 锁申请，核对快照，保存review_inbox_read
+    A-->>F: 清除对应提醒，业务待办保留

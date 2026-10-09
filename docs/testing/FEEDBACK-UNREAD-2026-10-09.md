@@ -19,4 +19,4 @@
 - 既有真实反馈17组及模拟恢复6组重新回归，临时账号／申请／反馈自动清理并核对原23张业务表和用户／组关系一致。回归入口check-system-feedback.ps1增加feedback-unread-browser.cjs，以后可重复执行本批场景。
 - 本机后端重启至127.0.0.1:8000载入响应字段；前端localhost:5173继续运行。未修改业务数据、账号授权或数据库结构。
 
-截图与验证JSON在忽略的`.local/system-feedback-browser/`，本机后端日志在`.local/feedback-unread-20261009/`。当前源码及文档尚未提交／推送；人工业务验收保持独立。
+截图与验证JSON在忽略的`.local/system-feedback-browser/`，本机后端日志在`.local/feedback-unread-20261009/`。源码及相关文档已通过[61c4ef7](https://github.com/jack1415926/form-filling-system/commit/61c4ef7)推送至GitHub的main（2026-10-09）；人工业务验收保持独立。推送未额外运行测试或校验，验证结果仍为上述功能交付批次的证据。

@@ -1,0 +1,39 @@
+sequenceDiagram
+    actor U as 填写员或审核员
+    actor M as 反馈管理员
+    participant F as React网页
+    participant A as Django DRF
+    participant D as MySQL
+    U->>F: 提交问题/建议/其他及文字
+    F->>A: POST system-feedback，UUID
+    A->>D: 创建system_feedback，状态pending，重复UUID去重
+    A-->>F: 返回本人反馈详情，原文只读
+    M->>F: 查看反馈管理列表和详情
+    F->>A: GET manage，后端核对反馈管理员组
+    A-->>F: 返回有权反馈及公开时间线
+    M->>F: 回复或更新状态
+    F->>A: POST actions，UUID与expected_version
+    A->>D: 锁反馈，重检版本，追加manager事件并更新状态
+    Note over A,D: 关闭或重新打开须说明，反馈不改变申请审核
+    loop 30秒轮询、聚焦或手工刷新
+        F->>A: GET system-feedback/inbox
+        A->>D: 查询用户入站事件及system_feedback_read
+        A-->>F: 未读反馈、message_version、read_version
+        F->>F: 提示与红点；列表逐条标未读
+    end
+    U->>F: 点击同一反馈的新消息
+    F->>A: 主动GET详情，即使该反馈已打开
+    A-->>F: 返回新时间线
+    F->>F: 保留原草稿；按已读边界突出未读回复
+    U->>F: 追问或追加意见
+    F->>A: POST followups，UUID与expected_version
+    A->>D: 锁本人反馈，追加followup事件
+    opt 原反馈已关闭
+        A->>D: 自动转为processing
+    end
+    A-->>F: 返回完整时间线；管理人员收到新入站提醒
+    Note over F,D: 本人发送不标未读；过期版本不写入，输入保留；未知结果查询或原请求重试
+    U->>F: 或反馈管理员标为已读
+    F->>A: POST inbox/read，反馈ID与message_version
+    A->>D: 锁反馈，核对入站快照，保存system_feedback_read
+    A-->>F: 列表与详情未读消失，反馈状态不改变

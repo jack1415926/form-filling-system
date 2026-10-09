@@ -259,9 +259,27 @@ erDiagram
         datetime(6) created_at "NOT NULL；创建时自动填写"
         int actor_id FK "关联 auth_user；NOT NULL"
         bigint feedback_id FK "关联 system_feedback；NOT NULL"
+        varchar(16) kind "NOT NULL"
     }
 
-    %% 全部业务表间外键；用户外键已在字段中注明，系统用户表不计入21张业务表
+    %% 审核消息已读
+    review_inbox_read {
+        bigint id PK "NOT NULL；自增"
+        varchar(64) signature "NOT NULL"
+        datetime(6) read_at "NOT NULL；保存时自动更新"
+        bigint round_id FK "关联 review_round；NOT NULL"
+        int user_id FK "关联 auth_user；NOT NULL"
+    }
+
+    %% 系统反馈已读
+    system_feedback_read {
+        bigint id PK "NOT NULL；自增"
+        int_unsigned version "NOT NULL"
+        bigint feedback_id FK "关联 system_feedback；NOT NULL"
+        int user_id FK "关联 auth_user；NOT NULL"
+    }
+
+    %% 全部业务表间外键；用户外键已在字段中注明，系统用户表不计入23张业务表
     change_request ||--o{ material_change : "change_id"
     material_change ||--o{ material_disposition : "material_id"
     change_request ||--o{ question_response : "change_id"
@@ -287,3 +305,5 @@ erDiagram
     review_issue |o--o{ review_issue_event : "issue_id"
     review_round ||--o{ review_issue_event : "round_id"
     system_feedback ||--o{ system_feedback_event : "feedback_id"
+    review_round ||--o{ review_inbox_read : "round_id"
+    system_feedback ||--o{ system_feedback_read : "feedback_id"

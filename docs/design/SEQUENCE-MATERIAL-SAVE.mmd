@@ -1,0 +1,21 @@
+sequenceDiagram
+    actor U as 填写员
+    participant F as MaterialForm及自动保存调度
+    participant A as api.ts
+    participant V as Django DRF
+    participant D as MySQL
+    U->>F: 清空一个位置的备注，保留处置NA
+    F->>F: 记录修改字段与当前基线
+    F->>A: 停顿2秒或手动保存，仅PATCH变化的备注
+    A->>V: Cookie、CSRF、X-Expected-User
+    V->>D: 事务锁定父申请，核对本人及draft/returned状态
+    V->>V: 校验类别、位置、处置选项及字段
+    V->>D: 更新备注，省略的处置NA保持，更新时间
+    D-->>V: 提交事务
+    V-->>A: 返回物料、处置和updated_at
+    A-->>F: 已验证响应
+    F->>F: 更新已保存基线，保留请求期间新输入
+    opt 失败或结果未确认
+        A-->>F: 错误或30秒超时
+        F->>F: 保留输入与请求信息，有限重试或人工处理
+    end

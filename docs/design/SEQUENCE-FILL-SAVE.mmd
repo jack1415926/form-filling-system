@@ -1,0 +1,38 @@
+sequenceDiagram
+    actor U as 填写员
+    participant F as React网页
+    participant A as Django DRF
+    participant C as 固定配置JSON与代码
+    participant D as MySQL
+    U->>F: 登录并新建申请
+    F->>A: Session登录，POST /api/changes/
+    A->>D: 新建change_request，status=draft
+    D-->>A: 申请ID与概述
+    A-->>F: 返回本人草稿
+    U->>F: 打开各填写页签
+    F->>A: GET问题、ECR、ECO、EMC、计划、实质性评估
+    A->>C: 读取固定题目、行动映射和参考规则
+    A->>D: 读取已保存答案与各模块结果
+    A-->>F: 合并固定定义和填写结果
+    Note over F,D: 查看不创建填写数据；EMC首次实际保存形成本单参考副本
+    loop 实际修改后停顿2秒，或手动保存
+        U->>F: 填写或修改业务字段
+        F->>F: 校验日期，计算实际字段差异，串行调度
+        F->>A: 局部PATCH，Cookie、CSRF、X-Expected-User
+        A->>D: 事务锁定父申请，重检本人及draft/returned状态
+        A->>A: 校验字段、选项、日期及模块完整性
+        A->>D: 更新该模块填写与申请时间，提交事务
+        A-->>F: 返回完整模块结果与updated_at
+        F->>F: 校验响应，更新基线，保留在途新增输入
+    end
+    Note over F,A: 新物料首次创建须手动确认；UUID保证同一新增请求不重复
+    Note over C,F: ECR/ECO各61行动按已保存问题触发；隐藏不删除旧填写
+    Note over F,D: 实质性评估为主表及A到E抽屉，结论人工填写，不强制逐题向导
+    opt 保存失败或结果未确认
+        A-->>F: 校验失败、网络错误或30秒超时
+        F->>F: 保留输入；有限重试或原请求查询/重试
+    end
+    U->>F: 重开申请或同账号重登
+    F->>A: GET本人申请与模块
+    A->>D: 读取已保存结果
+    A-->>F: 恢复填写；脏输入受保护，旧响应不覆盖新基线
