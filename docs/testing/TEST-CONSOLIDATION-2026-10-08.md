@@ -41,4 +41,4 @@
 
 普通开发可按受影响模块或--exclude-tag=migration运行；模型/迁移变更、交付或合并前执行完整test changes。npm.cmd test仍运行全部前端测试，已删除失效的test:ecr-draft/test:eco-draft/test:form-draft脚本入口。
 
-组件回归执行方法见[开发说明](../DEVELOPMENT.md#检查)。源码、测试及本记录随本次提交提供。原测试耗时证据和本轮日志保存在.local，测试账号密码/截图不作为业务样例加入仓库。
+组件回归执行方法见[开发说明](../DEVELOPMENT.md#检查与排障)。源码、测试及本记录随本次提交提供。原测试耗时证据和本轮日志保存在.local，测试账号密码/截图不作为业务样例加入仓库。

@@ -5,8 +5,10 @@ export type Overview = {
   ccb_owner: string; change_owner: string; planned_eco_date: string | null; change_reason: string
 }
 export type ChangeRequest = Overview & {
-  stage?: 'legacy' | 'ecr'; publisher_id?: number | null
-  id: number; applicant: number; status: 'draft' | 'pending' | 'approved' | 'returned'; created_at: string; updated_at: string
+  stage?: 'legacy' | 'ecr' | 'eco'; publisher_id?: number | null
+  source_ecr_id?: number | null; source_ecr_no?: string | null; eco_creation_request_id?: string | null
+  published_by_id?: number | null; published_at?: string | null; publication_request_id?: string | null
+  id: number; applicant: number; status: 'draft' | 'pending' | 'approved' | 'returned' | 'published'; created_at: string; updated_at: string
   current_review_round: number
   review_mode: '' | 'designated' | 'public'; submitted_at: string | null
 }

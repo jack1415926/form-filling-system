@@ -17,6 +17,8 @@ import SignificantChangeEditor from './SignificantChangeEditor'
 import SubmissionEditor from './SubmissionEditor'
 import ReviewWorkbench from './ReviewWorkbench'
 import ReviewPanel from './ReviewPanel'
+import PublicationPanel from './PublicationPanel'
+import StageNavigation, { SourceOverview } from './StageNavigation'
 import { submissionChoiceWarning } from './submission'
 import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
@@ -26,8 +28,8 @@ import SystemFeedbackPanel, { type FeedbackHandle } from './SystemFeedbackPanel'
 import { inboxNavigationEvent, type InboxNavigation } from './reviewInboxData'
 import { openReviewDrawer } from './systemFeedback'
 
-const stateLabels = { draft: '草稿', pending: '待审核', approved: '已批准', returned: '待修订' }
-const stateColors = { draft: 'default', pending: 'gold', approved: 'green', returned: 'orange' }
+const stateLabels = { draft: '草稿', pending: '待审核', approved: '已批准', returned: '待修订', published: '已发布' }
+const stateColors = { draft: 'default', pending: 'gold', approved: 'green', returned: 'orange', published: 'blue' }
 const reviewReadOnlyTheme = { components: {
   Input: { colorTextDisabled: '#243731', colorBgContainerDisabled: '#f8faf9' },
   Select: { colorTextDisabled: '#243731', colorBgContainerDisabled: '#f8faf9' },
@@ -103,14 +105,14 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onN
     { key: 'change_owner', label: '设计负责人／变更发起人' },
   ]
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{record.stage === 'ecr' && record.status === 'pending' ? '处理中' : stateLabels[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div><Button onClick={onBack} disabled={(save.pending || save.manual) || leaving}>{backLabel(queryClient)}</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{['ecr', 'eco'].includes(record.stage ?? '') && record.status === 'pending' ? '处理中' : stateLabels[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div><Button onClick={onBack} disabled={(save.pending || save.manual) || leaving}>{backLabel(queryClient)}</Button></div>
     <section className="panel overview-panel">
       <div className="section-heading"><div><h2>概述基本信息</h2><p className="muted">申请者由登录账号确定，业务负责人单独填写。</p></div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.status}</span></div>
       {locked && <Alert type="info" title="申请已锁定，概述仅供查看。" className="form-alert" />}
       <Form form={form} initialValues={{ ...record, planned_eco_date: record.planned_eco_date ?? '' }} layout="vertical" onValuesChange={changed} onFinish={save.clickSave} disabled={locked || save.manual || leaving} {...save.composition} requiredMark={false}>
         <Form.Item name="title" label="ECR/ECO 标题" rules={[{ max: 255, message: '标题最多 255 个字符' }]}><Input placeholder="填写这项设计变更的标题" maxLength={255} /></Form.Item>
         <Form.Item name="affected_products" label="受影响产品和型号"><Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="填写涉及的产品及型号" /></Form.Item>
-        <div className="form-grid">{fields.map((field) => <Form.Item key={field.key} name={field.key} label={field.label} rules={[{ max: field.key.endsWith('_no') ? 64 : 255, message: '内容超过允许长度' }]}><Input placeholder={record.stage === 'ecr' && field.key === 'eco_no' ? 'ECO尚未启动' : field.placeholder} disabled={locked || save.manual || leaving || record.stage === 'ecr' && field.key === 'eco_no'} /></Form.Item>)}</div>
+        <div className="form-grid">{fields.map((field) => <Form.Item key={field.key} name={field.key} label={record.stage === 'eco' && field.key === 'ecr_no' ? '来源ECR编号（见上方关联）' : field.label} rules={[{ max: field.key.endsWith('_no') ? 64 : 255, message: '内容超过允许长度' }]}><Input placeholder={record.stage === 'ecr' && field.key === 'eco_no' ? 'ECO尚未启动' : field.placeholder} disabled={locked || save.manual || leaving || record.stage === 'ecr' && field.key === 'eco_no' || record.stage === 'eco' && field.key === 'ecr_no'} /></Form.Item>)}</div>
         <div className="form-grid"><Form.Item name="affected_factories" label="受影响工厂"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item><Form.Item name="planned_eco_date" label="ECO 计划完成时间" getValueFromEvent={(event) => { const invalid = !event.target.validity.valid; setDateInvalid(invalid); const value = invalid ? form.getFieldValue('planned_eco_date') : event.target.value; if (!invalid) save.update({ planned_eco_date: value || null }); return value }} rules={[{ validator: () => dateInvalid ? Promise.reject(new Error('请修正日期或清空日期后保存')) : Promise.resolve() }]}><DateInput /></Form.Item></div>
         <Form.Item name="change_reason" label="变更原因"><Input.TextArea autoSize={{ minRows: 4, maxRows: 12 }} placeholder="说明变更来源、原因分析和解决措施" /></Form.Item>
         {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
@@ -120,33 +122,34 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onN
   </>
 }
 
-function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMessage: (message: string) => void; reviewOnly?: boolean; initialReviewOpen?: boolean }) {
+function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMessage: (message: string) => void; reviewOnly?: boolean; initialReviewOpen?: boolean; onOpenChange?: (id: number) => void }) {
   const [tab, setTab] = useState('overview')
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [issueBusy, setIssueBusy] = useState(false), [issueDirty, setIssueDirty] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [publicationBusy, setPublicationBusy] = useState(false)
   const saveRef = useRef<SaveHandle>(null)
   const { modal } = AntApp.useApp()
   const { onLeaveMessage } = props
   useEffect(() => { onLeaveMessage(tab === 'submission' ? submissionChoiceWarning : discardSavedWarning); return () => onLeaveMessage(discardSavedWarning) }, [tab, onLeaveMessage])
   useEffect(() => {
     const handleUnload = (event: BeforeUnloadEvent) => {
-      if (dirty || busy || issueDirty || issueBusy) { event.preventDefault(); event.returnValue = '' }
+      if (dirty || busy || issueDirty || issueBusy || publicationBusy) { event.preventDefault(); event.returnValue = '' }
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [dirty, busy, issueDirty, issueBusy])
+  }, [dirty, busy, issueDirty, issueBusy, publicationBusy])
   const editorProps = { ...props,
-    leaving: props.leaving || issueBusy,
+    leaving: props.leaving || issueBusy || publicationBusy,
     saveRef,
     paused: confirming,
     onDirty: (value: boolean) => { setDirty(value); props.onDirty(value || issueDirty) },
-    onBusy: (value: boolean) => { setBusy(value); props.onBusy(value || issueBusy) },
+    onBusy: (value: boolean) => { setBusy(value); props.onBusy(value || issueBusy || publicationBusy) },
   }
   const switchTab = (key: string) => {
-    if (busy || issueBusy || editorOpen || props.leaving || key === tab) return
+    if (busy || issueBusy || publicationBusy || editorOpen || props.leaving || key === tab) return
     const change = () => { setDirty(false); props.onDirty(issueDirty); setTab(key); window.scrollTo({ top: 0 }) }
     if (!dirty) { change(); return }
     setConfirming(true)
@@ -159,9 +162,12 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
       switchPage={change} discard={() => { setConfirming(false); change(); dialog.destroy() }} close={() => { setConfirming(false); dialog.destroy() }}
     /> })
   }
-  return <>{!props.reviewOnly && !!props.record.current_review_round && <ReviewPanel compact initialOpen={props.initialReviewOpen} key={`${props.record.id}:${props.record.current_review_round}`} changeId={props.record.id} number={props.record.current_review_round} leaving={props.leaving || busy || confirming} onReauthenticate={props.onReauthenticate} onBusy={(value) => { setIssueBusy(value); props.onBusy(value || busy) }} onDirty={(value) => { setIssueDirty(value); props.onDirty(value || dirty) }} />}
-    <Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }, { key: 'execution-plan', label: '执行计划' }, { key: 'significant-change', label: '实质性变更评估' }, { key: 'submission', label: '提交审核' }].filter((item) => !props.reviewOnly || item.key !== 'submission').map((item) => ({ ...item, disabled: busy || issueBusy || editorOpen || props.leaving }))} />
-    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setEditorOpen} onNext={() => switchTab('questions')} /> : tab === 'questions' ? <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} onNext={() => switchTab('ecr')} /> : tab === 'ecr' ? <EcrEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('questions')} onNext={() => switchTab('eco')} /> : tab === 'eco' && props.record.stage === 'ecr' ? <Alert type="info" title="ECO阶段尚未启动，发布与ECO创建在下一批交付。" action={<Button onClick={() => switchTab('emc')}>继续填写EMC</Button>} /> : tab === 'eco' ? <EcoEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('ecr')} onNext={() => switchTab('emc')} /> : tab === 'emc' ? <EmcEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('eco')} onNext={() => switchTab('execution-plan')} /> : tab === 'execution-plan' ? <ExecutionPlanEditor {...editorProps} onPrevious={() => switchTab('emc')} onNext={() => switchTab('significant-change')} /> : tab === 'significant-change' ? <SignificantChangeEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('execution-plan')} onNext={props.reviewOnly ? undefined : () => switchTab('submission')} /> : <SubmissionEditor {...editorProps} reviewDraftDirty={issueDirty} onPrevious={() => switchTab('significant-change')} />}
+  return <>{['ecr', 'eco'].includes(props.record.stage ?? '') && <StageNavigation record={props.record} leaving={props.leaving || busy || issueBusy || publicationBusy || editorOpen} onOpenChange={props.onOpenChange} />}
+    {['ecr', 'eco'].includes(props.record.stage ?? '') && <PublicationPanel record={props.record} leaving={props.leaving || busy || issueBusy || dirty || issueDirty || editorOpen} onBusy={value => { setPublicationBusy(value); props.onBusy(value || busy || issueBusy) }} onReauthenticate={props.onReauthenticate} onOpenChange={props.onOpenChange} />}
+    {props.record.stage === 'eco' && <SourceOverview record={props.record} />}
+    {!props.reviewOnly && !!props.record.current_review_round && <ReviewPanel compact initialOpen={props.initialReviewOpen} key={`${props.record.id}:${props.record.current_review_round}`} changeId={props.record.id} number={props.record.current_review_round} leaving={props.leaving || busy || confirming} onReauthenticate={props.onReauthenticate} onBusy={(value) => { setIssueBusy(value); props.onBusy(value || busy || publicationBusy) }} onDirty={(value) => { setIssueDirty(value); props.onDirty(value || dirty) }} />}
+    <Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }, { key: 'execution-plan', label: '执行计划' }, { key: 'significant-change', label: '实质性变更评估' }, { key: 'submission', label: '提交审核' }].filter((item) => !props.reviewOnly || item.key !== 'submission').map((item) => ({ ...item, disabled: busy || issueBusy || publicationBusy || editorOpen || props.leaving }))} />
+    {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setEditorOpen} onNext={() => switchTab('questions')} /> : tab === 'questions' ? <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} onNext={() => switchTab('ecr')} /> : tab === 'ecr' ? <EcrEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('questions')} onNext={() => switchTab('eco')} /> : tab === 'eco' && props.record.stage === 'ecr' ? <Alert type="info" title="ECO需从已发布ECR明确创建；请使用上方发布与创建入口。" action={<Button onClick={() => switchTab('emc')}>继续填写EMC</Button>} /> : tab === 'eco' ? <EcoEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('ecr')} onNext={() => switchTab('emc')} /> : tab === 'emc' ? <EmcEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('eco')} onNext={() => switchTab('execution-plan')} /> : tab === 'execution-plan' ? <ExecutionPlanEditor {...editorProps} onPrevious={() => switchTab('emc')} onNext={() => switchTab('significant-change')} /> : tab === 'significant-change' ? <SignificantChangeEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('execution-plan')} onNext={props.reviewOnly ? undefined : () => switchTab('submission')} /> : <SubmissionEditor {...editorProps} reviewDraftDirty={issueDirty} onPrevious={() => switchTab('significant-change')} />}
   </>
 }
 
@@ -218,7 +224,7 @@ function AuthenticatedWorkspace({ user, error, fetching, retry }: { user: User; 
         queryClient.setQueryData(['me'], current)
         setReauthenticate(false)
         if (current.id === user.id) window.dispatchEvent(new Event('editor-reauthenticated'))
-        for (const resource of ['changes', 'change', 'materials', 'questions', 'ecr-actions', 'eco-actions', 'emc', 'execution-plan', 'significant-change', 'submission', 'stage-workflow', 'reviewers', 'review-list', 'review-round', 'review-inbox', 'system-feedback-list', 'system-feedback-detail']) void queryClient.invalidateQueries({ queryKey: [resource, current.id] })
+        for (const resource of ['changes', 'change', 'materials', 'questions', 'ecr-actions', 'eco-actions', 'emc', 'execution-plan', 'significant-change', 'submission', 'stage-workflow', 'publication', 'publications', 'ecr-publications', 'stage-navigation', 'source-ecr', 'reviewers', 'review-list', 'review-round', 'review-inbox', 'system-feedback-list', 'system-feedback-detail']) void queryClient.invalidateQueries({ queryKey: [resource, current.id] })
       }} />
     </Modal>
   </>
@@ -317,20 +323,20 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
         <div className="page-heading"><div><span className="eyebrow">工作台</span><h1>{user.display_name}，欢迎回来</h1><p className="muted">在这里发起自己的变更申请{reviewAllowed ? '，也可以处理交给你的审核事项。' : '。'}</p></div></div>
         <div className="workspace-cards"><button className="workspace-card panel" disabled={listBusy} onClick={() => changeSection('mine')}><span className="workspace-card-icon">＋</span><h2>我的申请</h2><p className="muted">新建申请、继续填写，或查看本人申请的进度。</p><span className="workspace-card-link">进入我的申请 →</span></button>
           {reviewAllowed && <button className="workspace-card panel" disabled={listBusy} onClick={() => changeSection('review')}><span className="workspace-card-icon">✓</span><h2>待我处理</h2><p className="muted">查看有权处理的他人申请，记录审核意见与决定。</p><span className="workspace-card-link">进入待我处理 →</span></button>}</div>
-      </> : section === 'review' ? reviewAllowed ? <ReviewWorkbench user={user} target={reviewTarget} onSelect={setReviewTarget} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBusy={setSaving} onDirty={setDirty} renderForm={(record, onBack, formState) => <ConfigProvider theme={reviewReadOnlyTheme}><ChangeEditor key={record.id} reviewOnly record={record} onDirty={formState.onDirty} onBusy={formState.onBusy} onLeaveMessage={() => {}} leaving={formState.leaving} onReauthenticate={onReauthenticate} onBack={onBack} onSaved={() => {}} /></ConfigProvider>} /> : <Alert type="warning" title="处理权限已撤销，不能继续访问他人申请。" action={<Button onClick={() => changeSection('home')}>返回工作台首页</Button>} /> : selectedId === null ? <>
+      </> : section === 'review' ? reviewAllowed ? <ReviewWorkbench user={user} target={reviewTarget} onSelect={setReviewTarget} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBusy={setSaving} onDirty={setDirty} renderForm={(record, onBack, formState) => <ConfigProvider theme={reviewReadOnlyTheme}><ChangeEditor key={record.id} reviewOnly record={record} onOpenChange={id => navigate(() => { setReviewTarget(null); setSection('mine'); setSelectedId(id) })} onDirty={formState.onDirty} onBusy={formState.onBusy} onLeaveMessage={() => {}} leaving={formState.leaving} onReauthenticate={onReauthenticate} onBack={onBack} onSaved={() => {}} /></ConfigProvider>} /> : <Alert type="warning" title="处理权限已撤销，不能继续访问他人申请。" action={<Button onClick={() => changeSection('home')}>返回工作台首页</Button>} /> : selectedId === null ? <>
         <div className="page-heading"><div><span className="eyebrow">工作台</span><h1>我的申请</h1><p className="muted">查看已保存的变更记录，或开始一项新的申请。</p></div><Button type="primary" size="large" loading={create.isPending} disabled={listBusy} onClick={() => create.mutate()}>＋ 新建草稿</Button></div>
         {create.error && <Alert type="error" title={create.error.message} className="form-alert" />}
         {remove.error && <Alert type="error" showIcon title={remove.error instanceof ApiError && remove.error.status === 404 ? '申请已不存在或不可访问，列表已刷新' : '删除失败，申请记录仍保留'} description={remove.error instanceof ApiError && remove.error.status === 404 ? undefined : remove.error.message} className="form-alert" />}
         {records.error ? <Alert type="error" title={records.error.message} action={<Button onClick={() => void records.refetch()}>重试</Button>} /> : <section className="panel list-panel"><div className="section-heading"><h2>申请记录</h2><span className="muted">{records.data?.length ?? 0} 项申请</span></div><Table<ChangeRequest> rowKey="id" loading={records.isPending} dataSource={records.data ?? []} pagination={{ pageSize: 10, hideOnSinglePage: true }} scroll={{ x: 720 }} locale={{ emptyText: <Empty description="还没有申请，点击“新建草稿”开始填写" /> }} columns={[
           { title: '变更标题', dataIndex: 'title', render: (title: string, record) => <Button type="link" className="record-title" disabled={listBusy} onClick={() => setSelectedId(record.id)}>{title || '未命名申请'}</Button> },
-          { title: 'ECR / ECO 编号', render: (_, record) => <div className="record-number">{record.ecr_no || '—'}{record.eco_no && <span>{record.eco_no}</span>}</div> },
+          { title: 'ECR / ECO 编号', render: (_, record) => <div className="record-number">{record.stage === 'eco' ? `来源 ${record.source_ecr_no}` : record.ecr_no || '—'}{record.eco_no && <span>{record.eco_no}</span>}</div> },
           { title: '状态', dataIndex: 'status', render: (value: ChangeRequest['status']) => <Tag color={stateColors[value]}>{stateLabels[value]}</Tag> },
           { title: '更新时间', dataIndex: 'updated_at', render: dateTime },
-          { title: '操作', render: (_, record) => <div className="form-actions"><Button disabled={listBusy} onClick={() => setSelectedId(record.id)}>{canEdit(record) ? (record.status === 'returned' ? '继续修订' : '继续填写') : '查看申请'}</Button>{record.status === 'draft' && <Button danger loading={remove.isPending && remove.variables === record.id} disabled={listBusy} onClick={() => { remove.reset(); modal.confirm({ title: '删除这条草稿申请？', content: <><p>{record.title || '未命名申请'}</p><p>ECR：{record.ecr_no || '未填写'}；ECO：{record.eco_no || '未填写'}</p><p>申请和所有已保存的关联数据会永久删除，无法恢复。</p></>, okText: '永久删除', cancelText: '取消', okButtonProps: { danger: true }, onOk: async () => { try { await remove.mutateAsync(record.id) } catch { /* Render the deletion error beside the list. */ } } }) }}>删除</Button>}</div> },
+          { title: '操作', render: (_, record) => <div className="form-actions"><Button disabled={listBusy} onClick={() => setSelectedId(record.id)}>{canEdit(record) ? (record.status === 'returned' ? '继续修订' : '继续填写') : '查看申请'}</Button>{record.status === 'draft' && record.stage !== 'eco' && <Button danger loading={remove.isPending && remove.variables === record.id} disabled={listBusy} onClick={() => { remove.reset(); modal.confirm({ title: '删除这条草稿申请？', content: <><p>{record.title || '未命名申请'}</p><p>ECR：{record.ecr_no || '未填写'}；ECO：{record.eco_no || '未填写'}</p><p>申请和所有已保存的关联数据会永久删除，无法恢复。</p></>, okText: '永久删除', cancelText: '取消', okButtonProps: { danger: true }, onOk: async () => { try { await remove.mutateAsync(record.id) } catch { /* Render the deletion error beside the list. */ } } }) }}>删除</Button>}</div> },
         ]} /></section>}
       </> : detail.data ? <>
         {detail.error && <Alert type="error" showIcon title="申请信息刷新失败，当前填写内容仍保留" description={detail.error.message} className="form-alert" action={<Button loading={detail.isFetching} disabled={saving || exit.isPending} onClick={() => void detail.refetch()}>重试</Button>} />}
-        <ChangeEditor initialReviewOpen={inboxTargetId === selectedId} onLeaveMessage={setLeaveMessage} key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBack={() => navigate(() => { setDirty(false); setInboxTargetId(null); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
+        <ChangeEditor onOpenChange={id => navigate(() => { setInboxTargetId(null); setSelectedId(id) })} initialReviewOpen={inboxTargetId === selectedId} onLeaveMessage={setLeaveMessage} key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBack={() => navigate(() => { setDirty(false); setInboxTargetId(null); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
       </> : detail.isPending ? <Spin tip="正在读取草稿…"><div className="loading-space" /></Spin> : <Alert type="error" title={detail.error?.message ?? '无法读取申请。'} action={<><Button loading={detail.isFetching} disabled={exit.isPending} onClick={() => void detail.refetch()}>重试</Button><Button disabled={exit.isPending} onClick={() => { setSelectedId(null); setDirty(false) }}>返回列表</Button></>} />}
       <footer className="workspace-footer"><span className="muted">填写八张工作表，选择审核人员并提交；支持退回修订、再次提交和逐条意见复核。</span></footer>
     </main>

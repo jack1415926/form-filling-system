@@ -101,6 +101,8 @@ class ChangeDetail(generics.RetrieveUpdateAPIView):
     def delete(self, request, *args, **kwargs):
         with transaction.atomic():
             record = get_object_or_404(self.get_queryset().select_for_update(), pk=kwargs["pk"])
+            if record.stage == 'eco':
+                return Response({'detail': '关联ECO不能删除，请在草稿中修订。'}, status=409)
             if record.status != ChangeRequest.Status.DRAFT:
                 return Response({"detail": "只能删除草稿申请。"}, status=status.HTTP_409_CONFLICT)
             record.delete()
@@ -226,6 +228,8 @@ class EcrActionList(APIView):
     def get(self, request, pk):
         with transaction.atomic():
             record = readable_change(request, pk)
+            if record.stage == 'eco':
+                return Response({**self.data(record.source_ecr), 'source_ecr_id': record.source_ecr_id})
             return Response(self.data(record))
 
 
@@ -235,13 +239,15 @@ class EcrActionDetail(APIView):
     def patch(self, request, pk, action_key):
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            if record.stage == 'eco':
+                return Response({'detail': '来源ECR评估只读。'}, status=409)
             if action_key not in ECR_ACTION_IDS:
                 return Response({"detail": "行动不存在。"}, status=404)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改 ECR 评估。"}, status=409)
             if record.stage == 'ecr' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'extra_required'}):
                 return Response({'detail': '发起人仅可分配负责人和补充任务；结果由负责人在处理中填写。'}, status=400)
-            if 'extra_required' in request.data and type(request.data['extra_required']) is not bool:
+            if isinstance(request.data, dict) and 'extra_required' in request.data and type(request.data['extra_required']) is not bool:
                 return Response({'detail': '补充任务标记必须为布尔值。'}, status=400)
             existing = record.ecr_responses.filter(action_key=action_key).first()
             instance = existing or EcrActionResponse(change=record, action_key=action_key)
@@ -270,7 +276,7 @@ class EcoActionList(APIView):
         responses = {row.action_key: row for row in record.eco_responses.select_related('owner_user').all()}
         return {"updated_at": record.updated_at.isoformat(), "actions": [
             {**definition, "question_answer": answers.get(definition["number"], ""),
-             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "result": "", "status": "", "date": None})}
+             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "extra_required": False, "result": "", "status": "", "date": None})}
             for definition in ECO_ACTIONS
         ]}
 
@@ -288,6 +294,10 @@ class EcoActionDetail(APIView):
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
             if record.stage == 'ecr':
                 return Response({'detail': 'ECO阶段尚未启动。'}, status=409)
+            if record.stage == 'eco' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'extra_required'}):
+                return Response({'detail': '草稿／退回时仅可分配ECO负责人及补充任务，结果由提交后的负责人填写。'}, status=400)
+            if isinstance(request.data, dict) and 'extra_required' in request.data and (record.stage == 'legacy' or type(request.data['extra_required']) is not bool):
+                return Response({'detail': '补充任务标记必须为布尔值。'}, status=400)
             if action_key not in ECO_ACTION_IDS:
                 return Response({"detail": "行动不存在。"}, status=404)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
@@ -300,7 +310,7 @@ class EcoActionDetail(APIView):
             if any(getattr(instance, key) != value for key, value in fields.items()):
                 for key, value in fields.items():
                     setattr(instance, key, value)
-                if not (instance.owner or instance.owner_user_id or instance.result or instance.status or instance.date):
+                if not (instance.owner or instance.owner_user_id or instance.extra_required or instance.result or instance.status or instance.date):
                     instance.delete()
                 else:
                     instance.save()

@@ -24,6 +24,7 @@ class ReviewInbox(APIView):
         items = self.context_items(request, 'filler')
         items += self.context_items(request, 'reviewer')
         items += self.stage_items(request)
+        items += self.publication_items(request)
         return Response({'actor_id': request.user.pk, 'role': role,
                          'count': sum(item['count'] for item in items),
                          'unread_count': sum(item['count'] for item in items if not item['is_read']), 'items': items})
@@ -65,13 +66,14 @@ class ReviewInbox(APIView):
                 signature = hashlib.sha256(json.dumps([role, row.pk, row.latest_incoming or 0]).encode()).hexdigest()
                 items.append({'change_id': row.change_id, 'round': row.number, 'title': row.title if role == 'reviewer' else row.change.title,
                               'context': 'reviewer' if role == 'reviewer' else 'applicant',
-                              'ecr_no': row.ecr_no if role == 'reviewer' else row.change.ecr_no, 'status': row.state, 'count': count,
+                              'stage': row.change.stage, 'eco_no': row.eco_no,
+                              'ecr_no': row.ecr_no if role == 'reviewer' else row.change.source_ecr.ecr_no if row.change.stage == 'eco' else row.change.ecr_no, 'status': row.state, 'count': count,
                               'summary': '；'.join(notes), 'open_issues': open_issues,
                               'message_key': signature, 'is_read': reads.get(row.pk) == signature})
         return items
 
     def stage_items(self, request):
-        rows = ReviewRound.objects.filter(change__stage='ecr', number=F('change__current_review_round'),
+        rows = ReviewRound.objects.filter(change__stage__in=['ecr', 'eco'], number=F('change__current_review_round'),
             state=F('change__status'), state__in=['pending', 'returned'], records__reviewer=request.user, records__assigned=True).select_related('change').distinct()
         reads = dict(ReviewInboxRead.objects.filter(user=request.user, round__in=rows).values_list('round_id', 'signature'))
         items = []
@@ -87,10 +89,22 @@ class ReviewInbox(APIView):
             latest = row.change.issue_events.filter(kind='respond', issue__author=request.user).exclude(author=request.user).aggregate(value=Max('id'))['value'] or 0
             signature = hashlib.sha256(json.dumps(['stage', row.pk, latest]).encode()).hexdigest()
             items.append({'change_id': row.change_id, 'round': row.number, 'title': row.title, 'context': 'applicant' if row.change.applicant_id == request.user.pk else 'reviewer',
+                'stage': row.change.stage, 'eco_no': row.eco_no,
                 'ecr_no': row.ecr_no, 'status': row.state, 'count': tasks + replies,
-                'summary': f'ECR行动待处理{tasks}项；意见回应待复核{replies}项', 'open_issues': bool(replies),
+                'summary': f'{row.change.stage.upper()}行动待处理{tasks}项；意见回应待复核{replies}项', 'open_issues': bool(replies),
                 'message_key': signature, 'is_read': reads.get(row.pk) == signature})
         return items
+
+    def publication_items(self, request):
+        rows = ReviewRound.objects.filter(change__stage__in=['ecr', 'eco'], number=F('change__current_review_round'),
+            state='approved', change__status='approved', change__publisher=request.user).select_related('change')
+        reads = dict(ReviewInboxRead.objects.filter(user=request.user, round__in=rows).values_list('round_id', 'signature'))
+        return [{'change_id': row.change_id, 'round': row.number, 'stage': row.change.stage, 'title': row.title,
+                 'context': 'applicant' if row.change.applicant_id == request.user.pk else 'reviewer',
+                 'ecr_no': row.ecr_no, 'eco_no': row.eco_no, 'status': 'approved', 'count': 1,
+                 'summary': f'{row.change.stage.upper()}已批准，待本人发布', 'open_issues': False,
+                 'message_key': signature, 'is_read': reads.get(row.pk) == signature}
+                for row in rows for signature in [hashlib.sha256(json.dumps(['publication', row.pk]).encode()).hexdigest()]]
 
 
 class ReadItem(StrictValues):

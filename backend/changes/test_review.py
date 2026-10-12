@@ -219,5 +219,6 @@ class ReviewTransactionTests(TransactionTestCase):
             with self.assertRaisesRegex(RuntimeError,'不能直接回退'):
                 MigrationExecutor(connection).migrate([('changes','0012_submission')])
             self.assertIn('review_round',connection.introspection.table_names())
-            round.state='pending';round.save()
+            # A guarded rollback may already have removed newer round columns.
+            round.state='pending';round.save(update_fields=['state'])
         finally:MigrationExecutor(connection).migrate(latest)

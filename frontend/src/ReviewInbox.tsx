@@ -64,7 +64,7 @@ export default function ReviewInbox({ user, leaving, onSystem, systemCount = 0 }
       {query.error && <Alert type="error" title="审核消息读取失败" description={query.error.message} className="form-alert" />}
       <Table<InboxItem> rowKey="change_id" loading={query.isPending} dataSource={query.data?.items ?? []} pagination={{ pageSize: 10 }}
         locale={{ emptyText: '暂无需要你处理的审核事项' }} columns={[
-          { title: '申请', render: (_, item) => <div>{item.title || '未命名申请'}<p className="muted">{item.ecr_no || '未填写编号'} · 第{item.round}轮</p></div> },
+          { title: '申请', render: (_, item) => <div>{item.title || '未命名申请'}<p className="muted">{item.stage === 'eco' ? `ECO：${item.eco_no}` : item.ecr_no || '未填写编号'} · 第{item.round}轮</p></div> },
           { title: '消息', dataIndex: 'summary' },
           { title: '阅读状态', render: (_, item) => <Tag color={item.is_read ? undefined : 'red'}>{item.is_read ? '已读' : '未读'}</Tag> },
           { title: '操作', render: (_, item) => <div className="form-actions"><Button disabled={leaving} onClick={() => navigate(item)}>查看并处理</Button>

@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from .models import ChangeRequest, ReviewRound, ReviewRecord, ReviewFeedback, ActionTask
 from .permissions import ExpectedAccountPermission
-from .review_access import is_owner, eligible, can_read_round, reviewer_rounds
+from .review_access import is_owner, eligible, can_read_round, reviewer_rounds, is_publication_reader
 from .serializers import ChangeRequestSerializer
 from .review_issues import (ReturnValues, IssueActionValues, ApproveValues, blockers, issue_data,
                             replay, event, checked_issue, return_issues)
@@ -22,7 +22,7 @@ def person(user):
 
 def round_data(round):
     records = list(round.records.select_related('reviewer').order_by('reviewer_id'))
-    tasks = list(round.tasks.select_related('owner').order_by('action_key')) if round.change.stage == 'ecr' else []
+    tasks = list(round.tasks.select_related('owner').order_by('action_key')) if round.change.stage in ['ecr', 'eco'] else []
     return {'number': round.number, 'stage': round.change.stage, 'tasks': [
                 {'action_key': task.action_key, 'owner': person(task.owner), 'result': task.result, 'status': task.status,
                  'date': task.date.isoformat() if task.date else None, 'confirmed_at': task.confirmed_at.isoformat() if task.confirmed_at else None} for task in tasks],
@@ -40,9 +40,9 @@ def review_data(record, round, user):
     owner = is_owner(user, record)
     allowed = eligible(user, round)
     may_review = current and record.status == 'pending' and round.state == 'pending' and allowed
-    task_owner = record.stage == 'ecr' and round.tasks.filter(owner=user).exists()
+    task_owner = record.stage in ['ecr', 'eco'] and round.tasks.filter(owner=user).exists()
     opinion_owner = record.review_issues.filter(author=user).exclude(state='resolved').exists()
-    may_view = current and (owner or record.status in ['pending', 'approved'] and allowed)
+    may_view = current and (owner or is_publication_reader(user, record) or record.status in ['pending', 'approved', 'published'] and allowed)
     rounds = [row for row in record.review_rounds.order_by('number') if can_read_round(user, row)]
     notes = ReviewFeedback.objects.filter(round__in=rounds).select_related('author', 'round').order_by('created_at', 'id')
     return {'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'current_round': record.current_review_round,
@@ -132,9 +132,9 @@ class ReviewDetail(APIView):
             if record.current_review_round != number:
                 return Response({'detail': '该页面属于旧审核轮次，请刷新当前状态。'}, status=409)
             owner, reviewer = is_owner(request.user, record), eligible(request.user, round)
-            if action == 'approve' and record.stage == 'ecr':
-                return Response({'detail': '新ECR由行动任务确认自动批准，不接受整单批准。'}, status=409)
-            if action == 'return' and record.stage == 'ecr' and not round.tasks.filter(owner=request.user).exists() and any('issue_id' not in item for item in values['issues']):
+            if action == 'approve' and record.stage in ['ecr', 'eco']:
+                return Response({'detail': '新ECR／ECO由行动任务确认自动批准，不接受整单批准。'}, status=409)
+            if action == 'return' and record.stage in ['ecr', 'eco'] and not round.tasks.filter(owner=request.user).exists() and any('issue_id' not in item for item in values['issues']):
                 return Response({'detail': '未承担本轮任务的原提出者仅可复核或继续自己的原意见。'}, status=403)
             if action == 'respond' and not owner:
                 return Response({'detail': '只有申请本人可以回应意见。'}, status=403)
@@ -176,7 +176,7 @@ class ReviewDetail(APIView):
                 issue.save(update_fields=['state', 'version'])
                 event(record, round, request.user, action, values, issue, values['text'])
             record.updated_at = timezone.now(); record.save(update_fields=['status', 'updated_at'])
-            if record.stage == 'ecr':
+            if record.stage in ['ecr', 'eco']:
                 from .stage_workflow import approve_if_complete
                 approve_if_complete(record)
             return Response(review_data(record, round, request.user))

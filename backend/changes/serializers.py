@@ -11,6 +11,9 @@ NUMBER_ERRORS = {"ecr_no": "ECR 编号已存在，请使用其他编号。", "ec
 
 
 class ChangeRequestSerializer(serializers.ModelSerializer):
+    source_ecr_id = serializers.IntegerField(read_only=True, allow_null=True)
+    published_by_id = serializers.IntegerField(read_only=True, allow_null=True)
+    source_ecr_no = serializers.CharField(source='source_ecr.ecr_no', read_only=True, default=None)
     planned_eco_date = BusinessDateField(required=False, allow_null=True)
     publisher_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
 
@@ -18,15 +21,16 @@ class ChangeRequestSerializer(serializers.ModelSerializer):
         model = ChangeRequest
         fields = [
             "id", "applicant", "stage", "publisher_id", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round",
+            "source_ecr_id", "source_ecr_no", "eco_creation_request_id", "published_by_id", "published_at", "publication_request_id",
             "title", "ecr_no", "eco_no", "affected_products", "affected_region",
             "initiating_factory", "affected_factories", "ccb_owner", "change_owner",
             "planned_eco_date", "change_reason",
         ]
-        read_only_fields = ["id", "applicant", "stage", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round"]
+        read_only_fields = ["id", "applicant", "stage", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round", "source_ecr_id", "source_ecr_no", "eco_creation_request_id", "published_by_id", "published_at", "publication_request_id"]
 
     def validate_publisher_id(self, value):
-        if self.instance is None or self.instance.stage != 'ecr':
-            raise serializers.ValidationError('仅新ECR可指定发布人。')
+        if self.instance is None or self.instance.stage not in ['ecr', 'eco']:
+            raise serializers.ValidationError('仅新ECR／ECO可指定发布人。')
         if value is not None and not get_user_model().objects.filter(pk=value, is_active=True).exists():
             raise serializers.ValidationError('请选择有效发布人。')
         return value
@@ -35,6 +39,8 @@ class ChangeRequestSerializer(serializers.ModelSerializer):
         errors = {}
         if self.instance and self.instance.stage == 'ecr' and attrs.get('eco_no'):
             errors['eco_no'] = ['ECO阶段尚未启动，不能填写ECO编号。']
+        if self.instance and self.instance.stage == 'eco' and attrs.get('ecr_no'):
+            errors['ecr_no'] = ['来源ECR编号只读，ECO不能填写独立ECR编号。']
         for field, message in NUMBER_ERRORS.items():
             if not attrs.get(field):
                 continue
@@ -209,4 +215,4 @@ class MaterialChangeSerializer(serializers.ModelSerializer):
 class EcoActionSerializer(EcrActionSerializer):
     class Meta(EcrActionSerializer.Meta):
         model = EcoActionResponse
-        fields = [field for field in EcrActionSerializer.Meta.fields if field != 'extra_required']
+        fields = EcrActionSerializer.Meta.fields

@@ -99,5 +99,5 @@ function LegacyEcrEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, 
 }
 
 export default function EcrEditor(props: Parameters<typeof LegacyEcrEditor>[0]) {
-  return props.record.stage === 'ecr' ? <StageActions {...props} /> : <LegacyEcrEditor {...props} />
+  return props.record.stage === 'ecr' ? <StageActions {...props} /> : <LegacyEcrEditor {...props} record={props.record.stage === 'eco' ? { ...props.record, status: 'published' } : props.record} />
 }

@@ -1,356 +1,61 @@
-# 数据库完整字段 ER 图（0017快照）
+# 当前完整字段与关系（0021）
 
-2026-10-12现状说明：当前工作区模型为0019、25张业务表，增加阶段／发布人指定、action_task与task_operation；ECR第一批及五项修复已交付，尚未提交／推送。下方图和SVG仍为0017／23表结构快照，尚未补入0018、0019，不代表当前完整结构。最新模型关系见[项目梳理](../PROJECT_GUIDE.md#先理解二十五个业务表)，交付与边界见[第一批记录](../testing/ECR-STAGE-2026-10-12.md)。本轮只同步说明，不重绘历史图像。
+更新日期：2026-10-13。读取当前Django模型并只读核对本机MySQL列：25张业务表、213个字段、30条业务表间外键。不是其他设备已升级的证明。
 
-2026-10-12：本机已升级0018，两张行动表新增可空owner_user_id用户外键并采用删除保护。本文内嵌Mermaid及SVG／PNG仍为0017的186字段快照，不含这两列；新增结构见[第三步记录](../testing/ACTION-OWNERS-2026-10-12.md)。本批未重绘图。
+完整字段只在[Mermaid源文件](DATABASE-ER-FULL.mmd)维护，含PK／FK／单列UK、实际SQL类型、可空性和生成列；用户外键注明auth_user，不展开账号／权限系统表。结构总览见[代码与数据组](../PROJECT_GUIDE.md#先理解二十五个业务表)。
 
-生成日期：2026-10-09。23张业务表、186个实际字段、27条业务表间外键；迁移基线0017。直接读取本机 MySQL 的23张业务表字段，并与当前 Django 模型逐表核对；仅执行只读结构查询。
+0020增加受保护的唯一来源关系及发布证据；0021扩大任务键／状态并增加ECO补充标记，不新增业务表。任务属于轮次，原请求属于任务；业务确认和发布是独立记录。
 
-包含全部实际列（含隐式主键、外键列、UUID、时间、JSON及存储生成列）。不包含 Django 用户、会话、权限及迁移等系统表。用户外键在字段注释中注明目标表。
-
-PK为主键，FK为外键，UK仅表示单列唯一；联合唯一单独列在图后。SQL类型采用本机数据库实际类型，NOT NULL和NULL允许指数据库可空性，NOT NULL文字字段仍可能允许空字符串。创建和更新时间由Django处理，不表示数据库触发器或自动更新时间约束。
-
-关系线标签是实际外键列名；可空外键用零或一个，必填外键用恰好一个。实体之间均使用实线，未进一步区分识别与非识别关系。
-
-[Mermaid源文件](DATABASE-ER-FULL.mmd) · [完整SVG（可放大）](images/DATABASE-ER-FULL.svg) · [PNG](images/DATABASE-ER-FULL.png)
+## 关键关系
 
 ```mermaid
 erDiagram
-    direction TB
-
-    %% 变更申请
-    change_request {
-        bigint id PK "NOT NULL；自增"
-        varchar(16) status "NOT NULL"
-        varchar(255) title "NOT NULL"
-        varchar(64) ecr_no "NOT NULL"
-        varchar(64) eco_no "NOT NULL"
-        longtext affected_products "NOT NULL"
-        varchar(255) affected_region "NOT NULL"
-        varchar(255) initiating_factory "NOT NULL"
-        longtext affected_factories "NOT NULL"
-        varchar(255) ccb_owner "NOT NULL"
-        varchar(255) change_owner "NOT NULL"
-        date planned_eco_date "NULL允许"
-        longtext change_reason "NOT NULL"
-        datetime(6) created_at "NOT NULL；创建时自动填写"
-        datetime(6) updated_at "NOT NULL；保存时自动更新"
-        int applicant_id FK "关联 auth_user；NOT NULL"
-        varchar(64) eco_no_unique UK "存储生成列：空编号转NULL；NULL允许"
-        varchar(64) ecr_no_unique UK "存储生成列：空编号转NULL；NULL允许"
-        varchar(16) review_mode "NOT NULL"
-        datetime(6) submitted_at "NULL允许"
-        int_unsigned current_review_round "NOT NULL"
-    }
-
-    %% 物料变更
-    material_change {
-        bigint id PK "NOT NULL；自增"
-        varchar(20) category "NOT NULL"
-        varchar(255) material_no "NOT NULL"
-        longtext description "NOT NULL"
-        varchar(255) material_class "NOT NULL"
-        varchar(1) spare_part "NOT NULL"
-        varchar(1) optional_part "NOT NULL"
-        varchar(255) old_revision "NOT NULL"
-        varchar(255) new_revision "NOT NULL"
-        varchar(255) revision "NOT NULL"
-        varchar(255) detailed_class "NOT NULL"
-        varchar(255) discontinued_project "NOT NULL"
-        longtext change_description "NOT NULL"
-        bigint change_id FK "关联 change_request；NOT NULL"
-        char(32) request_id "UUID；NULL允许"
-    }
-
-    %% 物料位置处置
-    material_disposition {
-        bigint id PK "NOT NULL；自增"
-        varchar(16) location_group "NOT NULL"
-        varchar(32) location_item "NOT NULL"
-        varchar(20) disposition "NOT NULL"
-        longtext remark "NOT NULL"
-        bigint material_id FK "关联 material_change；NOT NULL"
-    }
-
-    %% 问题回答
-    question_response {
-        bigint id PK "NOT NULL；自增"
-        smallint_unsigned number "NOT NULL"
-        varchar(1) answer "NOT NULL"
-        longtext remark "NOT NULL"
-        bigint change_id FK "关联 change_request；NOT NULL"
-    }
-
-    %% ECR评估行动
-    ecr_action_response {
-        bigint id PK "NOT NULL；自增"
-        varchar(7) action_key "NOT NULL"
-        varchar(255) owner "NOT NULL"
-        longtext result "NOT NULL"
-        varchar(16) status "NOT NULL"
-        date date "NULL允许"
-        bigint change_id FK "关联 change_request；NOT NULL"
-    }
-
-    %% ECO执行行动
-    eco_action_response {
-        bigint id PK "NOT NULL；自增"
-        varchar(7) action_key "NOT NULL"
-        varchar(255) owner "NOT NULL"
-        longtext result "NOT NULL"
-        varchar(24) status "NOT NULL"
-        date date "NULL允许"
-        bigint change_id FK "关联 change_request；NOT NULL"
-    }
-
-    %% 执行计划
-    execution_plan_response {
-        bigint id PK "NOT NULL；自增"
-        varchar(8) activity_key "NOT NULL"
-        varchar(255) owner "NOT NULL"
-        date start_date "NULL允许"
-        date end_date "NULL允许"
-        longtext remark "NOT NULL"
-        bigint change_id FK "关联 change_request；NOT NULL"
-    }
-
-    %% 实质性最终评估
-    significant_assessment {
-        bigint id PK "NOT NULL；自增"
-        varchar(24) f_assessment "NOT NULL"
-        varchar(16) final_conclusion "NOT NULL"
-        bigint change_id FK, UK "关联 change_request；NOT NULL"
-    }
-
-    %% 实质性分组评估
-    significant_chart_response {
-        bigint id PK "NOT NULL；自增"
-        varchar(1) chart_key "NOT NULL"
-        varchar(1) applicability "NOT NULL"
-        longtext reason "NOT NULL"
-        varchar(16) result "NOT NULL"
-        bigint change_id FK "关联 change_request；NOT NULL"
-    }
-
-    %% 实质性逐题回答
-    significant_question_response {
-        bigint id PK "NOT NULL；自增"
-        varchar(16) question_key "NOT NULL"
-        varchar(1) answer "NOT NULL"
-        longtext reason "NOT NULL"
-        bigint change_id FK "关联 change_request；NOT NULL"
-    }
-
-    %% EMC参考副本
-    emc_reference {
-        bigint id PK "NOT NULL；自增"
-        varchar(255) title "NOT NULL"
-        longtext introduction "NOT NULL"
-        longtext legend "NOT NULL"
-        longtext definitions "NOT NULL"
-        datetime(6) created_at "NOT NULL；创建时自动填写"
-        datetime(6) updated_at "NOT NULL；保存时自动更新"
-        bigint change_id FK, UK "关联 change_request；NOT NULL"
-    }
-
-    %% EMC典型变更行
-    emc_reference_row {
-        bigint id PK "NOT NULL；自增"
-        varchar(64) key "NOT NULL"
-        longtext label "NOT NULL"
-        int_unsigned sort_order "NOT NULL"
-        bigint reference_id FK "关联 emc_reference；NOT NULL"
-    }
-
-    %% EMC测试列
-    emc_reference_test {
-        bigint id PK "NOT NULL；自增"
-        varchar(64) key "NOT NULL"
-        longtext label "NOT NULL"
-        varchar(255) group_label "NOT NULL"
-        varchar(255) standard_reference "NOT NULL"
-        int_unsigned sort_order "NOT NULL"
-        bigint reference_id FK "关联 emc_reference；NOT NULL"
-    }
-
-    %% EMC填写格
-    emc_reference_cell {
-        bigint id PK "NOT NULL；自增"
-        varchar(3) mark "NOT NULL"
-        longtext remark "NOT NULL"
-        bigint reference_id FK "关联 emc_reference；NOT NULL"
-        bigint row_id FK "关联 emc_reference_row；NOT NULL"
-        bigint test_id FK "关联 emc_reference_test；NOT NULL"
-    }
-
-    %% 审核轮次
-    review_round {
-        bigint id PK "NOT NULL；自增"
-        int_unsigned number "NOT NULL"
-        varchar(16) review_mode "NOT NULL"
-        char(32) request_id "UUID；NULL允许"
-        varchar(255) title "NOT NULL"
-        varchar(64) ecr_no "NOT NULL"
-        varchar(64) eco_no "NOT NULL"
-        datetime(6) submitted_at "NOT NULL"
-        varchar(16) state "NOT NULL"
-        datetime(6) approved_at "NULL允许"
-        datetime(6) returned_at "NULL允许"
-        longtext return_reason "NOT NULL"
-        bigint change_id FK "关联 change_request；NOT NULL"
-        int returned_by_id FK "关联 auth_user；NULL允许"
-    }
-
-    %% 个人审核记录
-    review_record {
-        bigint id PK "NOT NULL；自增"
-        datetime(6) approved_at "NULL允许"
-        bigint change_id FK "关联 change_request；NOT NULL"
-        int reviewer_id FK "关联 auth_user；NOT NULL"
-        tinyint(1) assigned "NOT NULL"
-        bigint round_id FK "关联 review_round；NULL允许"
-    }
-
-    %% 旧普通留言
-    review_feedback {
-        bigint id PK "NOT NULL；自增"
-        char(32) request_id "UUID；NOT NULL"
-        longtext text "NOT NULL"
-        datetime(6) created_at "NOT NULL；创建时自动填写"
-        int author_id FK "关联 auth_user；NOT NULL"
-        bigint round_id FK "关联 review_round；NOT NULL"
-    }
-
-    %% 审核修改意见
-    review_issue {
-        bigint id PK "NOT NULL；自增"
-        varchar(32) tab "NOT NULL"
-        varchar(255) location "NOT NULL"
-        longtext text "NOT NULL"
-        varchar(16) state "NOT NULL"
-        int_unsigned version "NOT NULL"
-        datetime(6) created_at "NOT NULL；创建时自动填写"
-        int author_id FK "关联 auth_user；NOT NULL"
-        bigint change_id FK "关联 change_request；NOT NULL"
-        bigint source_round_id FK "关联 review_round；NOT NULL"
-    }
-
-    %% 意见处理事件
-    review_issue_event {
-        bigint id PK "NOT NULL；自增"
-        varchar(16) kind "NOT NULL"
-        longtext text "NOT NULL"
-        varchar(16) state "NOT NULL"
-        int_unsigned version "NOT NULL"
-        char(32) request_id "UUID；NOT NULL"
-        int_unsigned position "NOT NULL"
-        json payload "NOT NULL"
-        datetime(6) created_at "NOT NULL；创建时自动填写"
-        int author_id FK "关联 auth_user；NOT NULL"
-        bigint change_id FK "关联 change_request；NOT NULL"
-        bigint issue_id FK "关联 review_issue；NULL允许"
-        bigint round_id FK "关联 review_round；NOT NULL"
-    }
-
-    %% 独立系统反馈
-    system_feedback {
-        bigint id PK "NOT NULL；自增"
-        varchar(16) category "NOT NULL"
-        longtext content "NOT NULL"
-        varchar(16) status "NOT NULL"
-        char(32) request_id "UUID；NOT NULL"
-        int_unsigned version "NOT NULL"
-        datetime(6) created_at "NOT NULL；创建时自动填写"
-        datetime(6) updated_at "NOT NULL；保存时自动更新"
-        int submitter_id FK "关联 auth_user；NOT NULL"
-    }
-
-    %% 系统反馈处理记录
-    system_feedback_event {
-        bigint id PK "NOT NULL；自增"
-        longtext text "NOT NULL"
-        varchar(16) from_status "NOT NULL"
-        varchar(16) to_status "NOT NULL"
-        char(32) request_id "UUID；NOT NULL"
-        int_unsigned base_version "NOT NULL"
-        datetime(6) created_at "NOT NULL；创建时自动填写"
-        int actor_id FK "关联 auth_user；NOT NULL"
-        bigint feedback_id FK "关联 system_feedback；NOT NULL"
-        varchar(16) kind "NOT NULL"
-    }
-
-    %% 审核消息已读
-    review_inbox_read {
-        bigint id PK "NOT NULL；自增"
-        varchar(64) signature "NOT NULL"
-        datetime(6) read_at "NOT NULL；保存时自动更新"
-        bigint round_id FK "关联 review_round；NOT NULL"
-        int user_id FK "关联 auth_user；NOT NULL"
-    }
-
-    %% 系统反馈已读
-    system_feedback_read {
-        bigint id PK "NOT NULL；自增"
-        int_unsigned version "NOT NULL"
-        bigint feedback_id FK "关联 system_feedback；NOT NULL"
-        int user_id FK "关联 auth_user；NOT NULL"
-    }
-
-    %% 全部业务表间外键；用户外键已在字段中注明，系统用户表不计入23张业务表
-    change_request ||--o{ material_change : "change_id"
-    material_change ||--o{ material_disposition : "material_id"
-    change_request ||--o{ question_response : "change_id"
-    change_request ||--o{ ecr_action_response : "change_id"
-    change_request ||--o{ eco_action_response : "change_id"
-    change_request ||--o{ execution_plan_response : "change_id"
-    change_request ||--o| significant_assessment : "change_id"
-    change_request ||--o{ significant_chart_response : "change_id"
-    change_request ||--o{ significant_question_response : "change_id"
-    change_request ||--o| emc_reference : "change_id"
-    emc_reference ||--o{ emc_reference_row : "reference_id"
-    emc_reference ||--o{ emc_reference_test : "reference_id"
-    emc_reference ||--o{ emc_reference_cell : "reference_id"
-    emc_reference_row ||--o{ emc_reference_cell : "row_id"
-    emc_reference_test ||--o{ emc_reference_cell : "test_id"
-    change_request ||--o{ review_round : "change_id"
-    change_request ||--o{ review_record : "change_id"
-    review_round |o--o{ review_record : "round_id"
-    review_round ||--o{ review_feedback : "round_id"
-    change_request ||--o{ review_issue : "change_id"
-    review_round ||--o{ review_issue : "source_round_id"
-    change_request ||--o{ review_issue_event : "change_id"
-    review_issue |o--o{ review_issue_event : "issue_id"
-    review_round ||--o{ review_issue_event : "round_id"
-    system_feedback ||--o{ system_feedback_event : "feedback_id"
-    review_round ||--o{ review_inbox_read : "round_id"
-    system_feedback ||--o{ system_feedback_read : "feedback_id"
+    change_request ||--o| change_request : source_ecr_id
+    change_request ||--o{ review_round : change_id
+    review_round ||--o{ action_task : round_id
+    action_task ||--o{ task_operation : task_id
+    change_request ||--o{ review_issue : change_id
+    review_issue |o--o{ review_issue_event : issue_id
+    change_request ||--o{ material_change : change_id
+    material_change ||--o{ material_disposition : material_id
+    change_request ||--o| emc_reference : change_id
+    emc_reference ||--o{ emc_reference_cell : reference_id
+    system_feedback ||--o{ system_feedback_event : feedback_id
 ```
 
 ## 联合唯一约束
 
-- `material_change`：`(change_id, request_id)` 联合唯一。
-- `material_disposition`：`(material_id, location_item)` 联合唯一。
-- `question_response`：`(change_id, number)` 联合唯一。
-- `ecr_action_response`：`(change_id, action_key)` 联合唯一。
-- `eco_action_response`：`(change_id, action_key)` 联合唯一。
-- `execution_plan_response`：`(change_id, activity_key)` 联合唯一。
-- `significant_chart_response`：`(change_id, chart_key)` 联合唯一。
-- `significant_question_response`：`(change_id, question_key)` 联合唯一。
-- `emc_reference_row`：`(reference_id, id)` 联合唯一。
-- `emc_reference_row`：`(reference_id, key)` 联合唯一。
-- `emc_reference_test`：`(reference_id, id)` 联合唯一。
-- `emc_reference_test`：`(reference_id, key)` 联合唯一。
-- `emc_reference_cell`：`(row_id, test_id)` 联合唯一。
-- `review_round`：`(change_id, number)` 联合唯一。
-- `review_round`：`(change_id, request_id)` 联合唯一。
-- `review_record`：`(round_id, reviewer_id)` 联合唯一。
-- `review_feedback`：`(round_id, author_id, request_id)` 联合唯一。
-- `review_issue_event`：`(change_id, author_id, request_id, position)` 联合唯一。
-- `system_feedback`：`(submitter_id, request_id)` 联合唯一。
-- `system_feedback_event`：`(feedback_id, request_id)` 联合唯一。
-- `review_inbox_read`：`(user_id, round_id)` 联合唯一。
-- `system_feedback_read`：`(user_id, feedback_id)` 联合唯一。
+- `change_request`：`(ecr_no_unique)`。
+- `change_request`：`(eco_no_unique)`。
+- `review_round`：`(change_id, number)`。
+- `review_round`：`(change_id, request_id)`。
+- `review_record`：`(round_id, reviewer_id)`。
+- `action_task`：`(round_id, action_key)`。
+- `task_operation`：`(task_id, author_id, request_id)`。
+- `review_feedback`：`(round_id, author_id, request_id)`。
+- `review_inbox_read`：`(user_id, round_id)`。
+- `review_issue_event`：`(change_id, author_id, request_id, position)`。
+- `system_feedback`：`(submitter_id, request_id)`。
+- `system_feedback_read`：`(user_id, feedback_id)`。
+- `system_feedback_event`：`(feedback_id, request_id)`。
+- `material_change`：`(change_id, request_id)`。
+- `material_disposition`：`(material_id, location_item)`。
+- `question_response`：`(change_id, number)`。
+- `ecr_action_response`：`(change_id, action_key)`。
+- `eco_action_response`：`(change_id, action_key)`。
+- `execution_plan_response`：`(change_id, activity_key)`。
+- `significant_chart_response`：`(change_id, chart_key)`。
+- `significant_question_response`：`(change_id, question_key)`。
+- `emc_reference_row`：`(reference_id, key)`。
+- `emc_reference_row`：`(reference_id, id)`。
+- `emc_reference_test`：`(reference_id, key)`。
+- `emc_reference_test`：`(reference_id, id)`。
+- `emc_reference_cell`：`(row_id, test_id)`。
 
 ## EMC复合外键
 
-`emc_reference_cell(reference_id, row_id)` 关联 `emc_reference_row(reference_id, id)`；`emc_reference_cell(reference_id, test_id)` 关联 `emc_reference_test(reference_id, id)`，约束填写格与行、列属于同一份参考。图中对应普通外键线已展示，不重复画线。
+cell(reference_id,row_id)和cell(reference_id,test_id)分别关联row／test的(reference_id,id)，防止跨参考填写。普通外键和每单行列结构见完整源文件；日期、状态、阶段及版本检查以models与迁移为准。
+
+## 历史图像
+
+[0017 Mermaid快照](DATABASE-ER-0017.mmd)、[旧SVG](images/DATABASE-ER-FULL.svg)、[旧PNG](images/DATABASE-ER-FULL.png)保留当时23表／186字段结构，未冒称当前0021图；当前完整结构以本页和新的Mermaid源文件为准。历史系统表／复合外键核对见[当批记录](../testing/SYSTEM-FEEDBACK-2026-10-08.md)。

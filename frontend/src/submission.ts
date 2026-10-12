@@ -14,7 +14,7 @@ const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Da
 export function checkedChange(value: unknown, owner: { id: number; applicant?: number }): ChangeRequest {
   if (!object(value) || value.id !== owner.id || !Number.isSafeInteger(value.applicant) || Number(value.applicant) <= 0
       || owner.applicant !== undefined && value.applicant !== owner.applicant
-      || typeof value.status !== 'string' || !['draft', 'pending', 'approved', 'returned'].includes(value.status) || typeof value.review_mode !== 'string' || !['', 'designated', 'public'].includes(value.review_mode)
+      || typeof value.status !== 'string' || !['draft', 'pending', 'approved', 'returned', 'published'].includes(value.status) || typeof value.review_mode !== 'string' || !['', 'designated', 'public'].includes(value.review_mode)
       || !Number.isSafeInteger(value.current_review_round) || Number(value.current_review_round) < 0
       || !date(value.updated_at) || !date(value.created_at) || !(value.submitted_at === null || date(value.submitted_at))
       || !['title', 'ecr_no', 'eco_no', 'affected_products', 'affected_region', 'initiating_factory', 'affected_factories', 'ccb_owner', 'change_owner', 'change_reason'].every((key) => typeof value[key] === 'string')

@@ -14,10 +14,16 @@ class ChangeRequest(models.Model):
         PENDING = "pending", "待审批"
         APPROVED = "approved", "已批准"
         RETURNED = "returned", "待修订"
+        PUBLISHED = "published", "已发布"
 
     applicant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
-    stage = models.CharField(max_length=8, default='legacy', choices=[('legacy', '旧流程'), ('ecr', 'ECR')])
+    stage = models.CharField(max_length=8, default='legacy', choices=[('legacy', '旧流程'), ('ecr', 'ECR'), ('eco', 'ECO')])
     publisher = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
+    published_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
+    published_at = models.DateTimeField(null=True, blank=True)
+    publication_request_id = models.UUIDField(null=True, blank=True)
+    source_ecr = models.OneToOneField('self', null=True, blank=True, on_delete=models.PROTECT, related_name='linked_eco')
+    eco_creation_request_id = models.UUIDField(null=True, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
     review_mode = models.CharField(max_length=16, blank=True, db_collation="utf8mb4_bin", choices=[("designated", "指定审核"), ("public", "公开审核")])
     submitted_at = models.DateTimeField(null=True, blank=True)
@@ -50,12 +56,14 @@ class ChangeRequest(models.Model):
         db_table = "change_request"
         ordering = ["-updated_at", "-id"]
         constraints = [
-            models.CheckConstraint(condition=models.Q(stage__in=['legacy', 'ecr']), name='change_valid_stage'),
+            models.CheckConstraint(condition=models.Q(stage__in=['legacy', 'ecr', 'eco']), name='change_valid_stage'),
+            models.CheckConstraint(condition=(models.Q(stage='eco', source_ecr__isnull=False, eco_creation_request_id__isnull=False, ecr_no='') | (~models.Q(stage='eco') & models.Q(source_ecr__isnull=True, eco_creation_request_id__isnull=True))), name='change_eco_source'),
+            models.CheckConstraint(condition=(models.Q(stage__in=['ecr', 'eco'], status='published', published_at__isnull=False, published_by__isnull=False, publication_request_id__isnull=False) | (~models.Q(status='published') & models.Q(published_at__isnull=True, published_by__isnull=True, publication_request_id__isnull=True))), name='change_publication_evidence'),
             models.CheckConstraint(condition=models.Q(review_mode__in=["", "designated", "public"]), name="change_valid_review_mode"),
             models.UniqueConstraint(fields=["ecr_no_unique"], name="change_request_ecr_no_unique"),
             models.UniqueConstraint(fields=["eco_no_unique"], name="change_request_eco_no_unique"),
             models.CheckConstraint(
-                condition=models.Q(status__in=["draft", "pending", "approved", "returned"]),
+                condition=models.Q(status__in=["draft", "pending", "approved", "returned", "published"]),
                 name="change_request_valid_status",
             )
         ]
@@ -105,7 +113,7 @@ class ActionTask(models.Model):
     action_key = models.CharField(max_length=7)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+')
     result = models.TextField(blank=True)
-    status = models.CharField(max_length=16, blank=True)
+    status = models.CharField(max_length=24, blank=True)
     date = models.DateField(null=True, blank=True)
     version = models.PositiveIntegerField(default=1)
     confirmed_at = models.DateTimeField(null=True, blank=True)
@@ -114,8 +122,8 @@ class ActionTask(models.Model):
         db_table = 'action_task'
         constraints = [
             models.UniqueConstraint(fields=['round', 'action_key'], name='task_round_action'),
-            models.CheckConstraint(condition=models.Q(action_key__in=ECR_ACTION_IDS), name='task_ecr_key'),
-            models.CheckConstraint(condition=models.Q(status__in=['', 'completed', 'not_applicable']), name='task_business_status'),
+            models.CheckConstraint(condition=models.Q(action_key__in=ECR_ACTION_IDS + ECO_ACTION_IDS), name='task_stage_key'),
+            models.CheckConstraint(condition=models.Q(status__in=['', 'completed', 'not_applicable', 'implementation_stage']), name='task_business_status'),
             models.CheckConstraint(condition=models.Q(version__gt=0), name='task_positive_version'),
         ]
 
@@ -335,6 +343,7 @@ class EcoActionResponse(models.Model):
     action_key = models.CharField(max_length=7)
     owner = models.CharField(max_length=255, blank=True)
     owner_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
+    extra_required = models.BooleanField(default=False)
     result = models.TextField(blank=True)
     status = models.CharField(max_length=24, blank=True, choices=[("completed", "完成"), ("not_applicable", "不适用"), ("implementation_stage", "在实施阶段完成")])
     date = models.DateField(null=True, blank=True)

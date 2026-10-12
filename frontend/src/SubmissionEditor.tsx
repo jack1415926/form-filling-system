@@ -130,5 +130,5 @@ function LegacySubmissionEditor({ record, leaving, onDirty, onBusy, onPrevious, 
 }
 
 export default function SubmissionEditor(props: Props) {
-  return props.record.stage === 'ecr' ? <StageSubmission {...props} /> : <LegacySubmissionEditor {...props} />
+  return ['ecr', 'eco'].includes(props.record.stage ?? '') ? <StageSubmission {...props} /> : <LegacySubmissionEditor {...props} />
 }

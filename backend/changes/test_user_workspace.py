@@ -28,7 +28,11 @@ class UserWorkspaceTests(TestCase):
         self.assertTrue(self.client.get('/api/auth/me/').json()['can_review'])
         created = self.client.post('/api/changes/', {'title': 'Own request', 'ecr_no': 'DUAL-001'}, format='json')
         self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.data['stage'], 'ecr')
         pk = created.json()['id']; base = f'/api/changes/{pk}/'
+        # Eight-form result filling below is the legacy compatibility contract.
+        # New ECR creation is still asserted above; task ownership is tested separately.
+        ChangeRequest.objects.filter(pk=pk).update(stage='legacy')
         material = self.client.post(base+'materials/', {'category': 'addition', 'description': 'Own material', 'request_id': str(uuid.uuid4())}, format='json')
         self.assertEqual(material.status_code, 201, material.data)
         writes = [('', {'change_reason': 'Own reason'}), ('questions/', {'responses': {'3': {'answer': 'Y'}}}),

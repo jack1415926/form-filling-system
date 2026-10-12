@@ -33,4 +33,4 @@ agent-browser --session form-bugs-check close
 
 须检查返回的`data.result.pass`为true，不能把CLI退出码为0当作全部断言通过。场景使用合成密码且只返回布尔结果；不输出实际密码或请求正文。
 
-用户已要求其余工作留给计划模式，待办统一见[需求纠正与分步重构待办](../REQUIREMENTS-REFACTOR-TODO.md#剩余事项交给计划模式)。本批技术验证不替代用户业务验收。
+用户已要求其余工作留给计划模式，待办统一见[需求纠正与分步重构待办](../REQUIREMENTS-REFACTOR-TODO.md#剩余事项)。本批技术验证不替代用户业务验收。

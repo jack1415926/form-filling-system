@@ -8,6 +8,7 @@ import { api, type ChangeRequest, type EcoAction, type EcoData, type EcoValues }
 import useAutosave, { discardSavedWarning } from './useAutosave'
 import { actionFields, actionPayload } from './autosaveFields'
 import ActionOwnerSelect from './ActionOwnerSelect'
+import { StageActions } from './StageWorkflow'
 import { actionOwnerLabel, checkedActionData } from './actionOwners'
 
 
@@ -45,7 +46,7 @@ function ActionForm({ action, record, leaving, paused, onDirty, onBusy, onSaved,
   </div>
 }
 
-export default function EcoEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen }: {
+function LegacyEcoEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen }: {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void
   onBack: () => void; onPrevious: () => void; onNext: () => void; leaving: boolean; onReauthenticate: () => void; onEditorOpen: (value: boolean) => void
 }) {
@@ -95,4 +96,8 @@ export default function EcoEditor({ record, onDirty, onBusy, onBack, onPrevious,
       }} />}
     </Drawer>
   </>
+}
+
+export default function EcoEditor(props: Parameters<typeof LegacyEcoEditor>[0]) {
+  return props.record.stage === 'eco' ? <StageActions {...props} /> : <LegacyEcoEditor {...props} />
 }

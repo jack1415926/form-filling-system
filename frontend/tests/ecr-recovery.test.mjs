@@ -37,7 +37,7 @@ test('lost save replays its original UUID then persists the newer queue patch in
 
 test('a delayed stage read cannot replace the newer cache written by a save', async () => {
   const client = new QueryClient(), key = ['stage-workflow', 2, 10]
-  const old = { actor_id: 2, change: null, change_id: 10, updated_at: '2026-10-12T00:00:01Z', status: 'returned', current_round: 1, actions: [], tasks: [{ ...task, can_edit: false }], unanswered: [], issue_blockers: [], submission_request_id: null, submission_requests: [] }
+  const old = { stage: 'ecr', actor_id: 2, change: null, change_id: 10, updated_at: '2026-10-12T00:00:01Z', status: 'returned', current_round: 1, actions: [], tasks: [{ ...task, can_edit: false }], unanswered: [], issue_blockers: [], submission_request_id: null, submission_requests: [] }
   const latest = { ...old, updated_at: '2026-10-12T00:00:02Z', tasks: [{ ...task, version: 2, result: 'newer', can_edit: false }] }
   let complete
   const flight = client.fetchQuery({ queryKey: key, queryFn: async () => checkedStage(await new Promise(resolve => { complete = resolve }), 10, 2, client.getQueryData(key)) })

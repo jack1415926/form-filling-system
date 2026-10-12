@@ -67,7 +67,7 @@ class EcrStageTests(TestCase):
         self.assertEqual(self.confirm_task(foreign).status_code, 200)
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'approved')
         self.client.force_authenticate(self.c)
-        self.assertEqual(self.client.get(self.path).status_code, 404)
+        self.assertEqual(self.client.get(self.path).status_code, 200)
 
     def test_return_reassign_old_round_history_and_original_author_resolution(self):
         self.assign('ecr_001', self.a); self.assign('ecr_002', self.b)
