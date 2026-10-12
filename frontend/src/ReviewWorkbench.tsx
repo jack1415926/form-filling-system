@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Alert, Button, Empty, Table, Tabs, Tag } from 'antd'
 import { api, type ChangeRequest, type User } from './api'
@@ -6,13 +6,17 @@ import { type RoundInfo, reviewStateLabels } from './review'
 import { modeLabel } from './submission'
 import ReviewPanel from './ReviewPanel'
 
-export default function ReviewWorkbench({ user, target: selected, onSelect: setSelected, leaving, onReauthenticate, renderForm, onBusy, onDirty }: { user: User; target: { id: number; number: number; showIssues?: boolean } | null; onSelect: (target: { id: number; number: number; showIssues?: boolean } | null) => void; leaving: boolean; onReauthenticate: () => void; renderForm: (record: ChangeRequest, onBack: () => void) => ReactNode; onBusy: (value: boolean) => void; onDirty: (value: boolean) => void }) {
+export default function ReviewWorkbench({ user, target: selected, onSelect: setSelected, leaving, onReauthenticate, renderForm, onBusy, onDirty }: { user: User; target: { id: number; number: number; showIssues?: boolean } | null; onSelect: (target: { id: number; number: number; showIssues?: boolean } | null) => void; leaving: boolean; onReauthenticate: () => void; renderForm: (record: ChangeRequest, onBack: () => void, state: { onBusy: (value: boolean) => void; onDirty: (value: boolean) => void; leaving: boolean }) => ReactNode; onBusy: (value: boolean) => void; onDirty: (value: boolean) => void }) {
   const [kind, setKind] = useState('designated')
-  const [busy, setBusy] = useState(false), [dirty, setDirty] = useState(false)
+  const [issueBusy, setIssueBusy] = useState(false), [issueDirty, setIssueDirty] = useState(false)
+  const [formBusy, setFormBusy] = useState(false), [formDirty, setFormDirty] = useState(false)
+  const busy = issueBusy || formBusy, dirty = issueDirty || formDirty
+  useEffect(() => { onBusy(busy); onDirty(dirty) }, [busy, dirty, onBusy, onDirty])
+  useEffect(() => () => { onBusy(false); onDirty(false) }, [onBusy, onDirty])
   const list = useQuery({ queryKey: ['review-list', user.id, kind], enabled: !selected, refetchOnWindowFocus: false, queryFn: () => api<(RoundInfo & { change_id: number })[]>(`/api/review/?kind=${kind}`, 'GET', undefined, user.id) })
-  const back = () => { if (busy || leaving) return; if (dirty && !window.confirm('尚未发送的审核意见或处理说明会丢失，确定返回列表？')) return; setSelected(null); setDirty(false); onDirty(false); onBusy(false) }
+  const back = () => { if (busy || leaving) return; if (dirty && !window.confirm('尚未保存的任务填写或审核意见会丢失，确定返回列表？')) return; setSelected(null); setIssueDirty(false); setFormDirty(false) }
   return <>
-    {selected ? <ReviewPanel key={`${selected.id}:${selected.number}`} initialOpen={selected.showIssues} changeId={selected.id} number={selected.number} leaving={leaving} onReauthenticate={onReauthenticate} onBack={back} onBusy={(value) => { setBusy(value); onBusy(value) }} onDirty={(value) => { setDirty(value); onDirty(value) }} renderForm={(record) => renderForm(record, back)} /> : <>
+    {selected ? <ReviewPanel key={`${selected.id}:${selected.number}`} initialOpen={selected.showIssues} changeId={selected.id} number={selected.number} leaving={leaving || formBusy} onReauthenticate={onReauthenticate} onBack={back} onBusy={setIssueBusy} onDirty={setIssueDirty} renderForm={(record) => renderForm(record, back, { onBusy: setFormBusy, onDirty: setFormDirty, leaving: leaving || issueBusy })} /> : <>
       <div className="page-heading"><h1>待我处理</h1><Button loading={list.isFetching} onClick={() => void list.refetch()}>刷新列表</Button></div>
       <Tabs activeKey={kind} onChange={setKind} items={[{ key: 'designated', label: '指定给我的任务' }, { key: 'returned', label: '退回沟通' }, { key: 'handled', label: '我的已处理记录' }]} />
       {list.error && <Alert type="error" title={list.error.message} className="form-alert" />}

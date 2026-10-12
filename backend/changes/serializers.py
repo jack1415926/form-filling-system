@@ -12,19 +12,29 @@ NUMBER_ERRORS = {"ecr_no": "ECR 编号已存在，请使用其他编号。", "ec
 
 class ChangeRequestSerializer(serializers.ModelSerializer):
     planned_eco_date = BusinessDateField(required=False, allow_null=True)
+    publisher_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
 
     class Meta:
         model = ChangeRequest
         fields = [
-            "id", "applicant", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round",
+            "id", "applicant", "stage", "publisher_id", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round",
             "title", "ecr_no", "eco_no", "affected_products", "affected_region",
             "initiating_factory", "affected_factories", "ccb_owner", "change_owner",
             "planned_eco_date", "change_reason",
         ]
-        read_only_fields = ["id", "applicant", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round"]
+        read_only_fields = ["id", "applicant", "stage", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round"]
+
+    def validate_publisher_id(self, value):
+        if self.instance is None or self.instance.stage != 'ecr':
+            raise serializers.ValidationError('仅新ECR可指定发布人。')
+        if value is not None and not get_user_model().objects.filter(pk=value, is_active=True).exists():
+            raise serializers.ValidationError('请选择有效发布人。')
+        return value
 
     def validate(self, attrs):
         errors = {}
+        if self.instance and self.instance.stage == 'ecr' and attrs.get('eco_no'):
+            errors['eco_no'] = ['ECO阶段尚未启动，不能填写ECO编号。']
         for field, message in NUMBER_ERRORS.items():
             if not attrs.get(field):
                 continue
@@ -92,7 +102,7 @@ class EcrActionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EcrActionResponse
-        fields = ["owner", "owner_user_id", "owner_user", "result", "status", "date"]
+        fields = ["owner", "owner_user_id", "owner_user", "extra_required", "result", "status", "date"]
         read_only_fields = ["owner", "owner_user"]
 
     def get_owner_user(self, instance):
@@ -199,3 +209,4 @@ class MaterialChangeSerializer(serializers.ModelSerializer):
 class EcoActionSerializer(EcrActionSerializer):
     class Meta(EcrActionSerializer.Meta):
         model = EcoActionResponse
+        fields = [field for field in EcrActionSerializer.Meta.fields if field != 'extra_required']

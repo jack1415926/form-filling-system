@@ -1,0 +1,173 @@
+"""ECR round tasks: callers hold the parent application lock for every write."""
+from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from rest_framework import serializers
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from .dates import BusinessDateField
+from .ecr import ECR_ACTIONS
+from .models import ActionTask, ChangeRequest, EcrActionResponse, ReviewRecord, ReviewRound, TaskOperation
+from .permissions import ExpectedAccountPermission
+from .review_access import can_read_round, eligible
+from .review_issues import StrictValues, blockers, canonical, conflict
+from .serializers import ChangeRequestSerializer
+
+
+def approve_if_complete(record):
+    if record.stage != 'ecr' or record.status != 'pending':
+        return
+    round = record.review_rounds.get(number=record.current_review_round)
+    if round.tasks.filter(confirmed_at__isnull=True).exists() or record.review_issues.exclude(state='resolved').exists():
+        return
+    round.state = 'approved'; round.approved_at = timezone.now()
+    round.save(update_fields=['state', 'approved_at'])
+    record.status = 'approved'; record.updated_at = round.approved_at
+    record.save(update_fields=['status', 'updated_at'])
+
+
+def task_data(task, actor, record):
+    current = task.round.number == record.current_review_round
+    editable = current and record.status == 'pending' and task.round.state == 'pending' and task.owner_id == actor.pk and actor.is_active and task.confirmed_at is None
+    return {'id': task.pk, 'round': task.round.number, 'action_key': task.action_key,
+            'owner_id': task.owner_id, 'owner_name': task.owner.get_full_name() or task.owner.username,
+            'result': task.result, 'status': task.status, 'date': task.date.isoformat() if task.date else None,
+            'version': task.version, 'confirmed_at': task.confirmed_at.isoformat() if task.confirmed_at else None,
+            'can_edit': editable,
+            'confirmed_requests': [str(value) for value in task.operations.filter(author=actor).values_list('request_id', flat=True)]}
+
+
+def stage_data(record, actor):
+    answers = dict(record.question_responses.values_list('number', 'answer'))
+    responses = {row.action_key: row for row in record.ecr_responses.select_related('owner_user')}
+    round = record.review_rounds.filter(number=record.current_review_round).first()
+    visible_rounds = [row.pk for row in record.review_rounds.all() if can_read_round(actor, row)]
+    tasks = [task_data(task, actor, record) for task in ActionTask.objects.filter(round_id__in=visible_rounds).select_related('round', 'owner').prefetch_related('operations').order_by('round__number', 'action_key')]
+    # Revision body is private. Old task snapshots remain available to participants.
+    body_visible = record.applicant_id == actor.pk or record.status in ['pending', 'approved'] and round is not None and eligible(actor, round)
+    actions = []
+    if body_visible:
+        for definition in ECR_ACTIONS:
+            row = responses.get(definition['id'])
+            actions.append({**definition, 'question_answer': answers.get(definition['number'], ''),
+                'extra_required': bool(row and row.extra_required), 'required': answers.get(definition['number']) == 'Y' or bool(row and row.extra_required),
+                'owner_user_id': row.owner_user_id if row else None,
+                'owner_name': (row.owner_user.get_full_name() or row.owner_user.username) if row and row.owner_user else '',
+                'owner_active': bool(row and row.owner_user and row.owner_user.is_active)})
+    return {'actor_id': actor.pk, 'change': ChangeRequestSerializer(record).data if body_visible else None,
+            'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'status': record.status,
+            'current_round': record.current_review_round, 'actions': actions, 'tasks': tasks,
+            'unanswered': [number for number in range(1, 28) if answers.get(number) not in ['Y', 'N']] if body_visible else [],
+            'issue_blockers': blockers(record) if record.applicant_id == actor.pk else [],
+            'submission_requests': [str(value) for value in record.review_rounds.exclude(request_id=None).values_list('request_id', flat=True)] if record.applicant_id == actor.pk else [],
+            'submission_request_id': str(round.request_id) if round and round.request_id else None}
+
+
+class StageDetail(APIView):
+    permission_classes = [IsAuthenticated, ExpectedAccountPermission]
+    def get(self, request, pk):
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, stage='ecr')
+            if record.applicant_id != request.user.pk:
+                round = record.review_rounds.filter(number=record.current_review_round).first()
+                if round is None or not can_read_round(request.user, round):
+                    return Response({'detail': '申请不存在或没有权限。'}, status=404)
+            return Response(stage_data(record, request.user))
+
+
+class StageSubmissionValues(StrictValues):
+    request_id = serializers.UUIDField()
+    expected_round = serializers.IntegerField(min_value=0)
+    acknowledge_no_tasks = serializers.BooleanField(default=False)
+
+
+class StageSubmission(APIView):
+    permission_classes = [IsAuthenticated, ExpectedAccountPermission]
+    def post(self, request, pk):
+        serializer = StageSubmissionValues(data=request.data); serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, stage='ecr', applicant=request.user)
+            repeated = record.review_rounds.filter(request_id=values['request_id']).first()
+            if repeated:
+                if repeated.submission_payload != canonical(values):
+                    conflict('相同请求标识的提交内容不同。')
+                return Response(stage_data(record, request.user))
+            if record.status not in ['draft', 'returned'] or record.current_review_round != values['expected_round']:
+                conflict('阶段状态或轮次已变化，请刷新后核对。')
+            data = stage_data(record, request.user)
+            errors = {field: '提交前必须填写。' for field in ['title', 'ecr_no'] if not getattr(record, field).strip()}
+            if data['unanswered']: errors['questions'] = '请回答全部27题。'
+            if data['issue_blockers']: errors['issues'] = data['issue_blockers']
+            rows = {row.action_key: row for row in record.ecr_responses.all()}
+            required = [row for row in data['actions'] if row['required']]
+            if any(not row['owner_active'] for row in required): errors['owners'] = '所有本轮行动都须指定有效负责人。'
+            if not required and not values['acknowledge_no_tasks']: errors['tasks'] = '请明确确认本阶段无行动需处理。'
+            # Keep account checks under row locks until the round has been created.
+            ids = {row['owner_user_id'] for row in required} | {record.publisher_id}
+            active = set(get_user_model().objects.select_for_update().filter(pk__in=[pk for pk in ids if pk], is_active=True).values_list('pk', flat=True))
+            if record.publisher_id not in active: errors['publisher_id'] = '请选择有效发布人。'
+            if any(row['owner_user_id'] not in active for row in required): errors['owners'] = '负责人账号已失效，请重新选择。'
+            if errors: raise serializers.ValidationError(errors)
+            now = timezone.now()
+            round = ReviewRound.objects.create(change=record, number=record.current_review_round + 1, review_mode='designated',
+                request_id=values['request_id'], submission_payload=canonical(values), title=record.title, ecr_no=record.ecr_no, eco_no='', submitted_at=now)
+            participants = {row['owner_user_id'] for row in required}
+            # Unresolved original authors retain opinion-only responsibility after reassignment.
+            participants.update(record.review_issues.exclude(state='resolved').values_list('author_id', flat=True))
+            ReviewRecord.objects.bulk_create([ReviewRecord(change=record, round=round, reviewer_id=pk) for pk in participants])
+            ActionTask.objects.bulk_create([ActionTask(round=round, action_key=row['id'], owner_id=row['owner_user_id'],
+                result=rows[row['id']].result, status=rows[row['id']].status, date=rows[row['id']].date) for row in required])
+            record.status = 'pending'; record.current_review_round = round.number; record.review_mode = 'designated'
+            record.submitted_at = record.updated_at = now
+            record.save(update_fields=['status', 'current_review_round', 'review_mode', 'submitted_at', 'updated_at'])
+            approve_if_complete(record)
+            return Response(stage_data(record, request.user))
+
+
+class TaskValues(StrictValues):
+    request_id = serializers.UUIDField()
+    version = serializers.IntegerField(min_value=1)
+    result = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.ChoiceField(choices=['', 'completed', 'not_applicable'], required=False)
+    date = BusinessDateField(required=False, allow_null=True)
+
+
+class TaskDetail(APIView):
+    permission_classes = [IsAuthenticated, ExpectedAccountPermission]
+    def patch(self, request, pk, task_id):
+        return self.write(request, pk, task_id, 'save')
+
+    def post(self, request, pk, task_id):
+        return self.write(request, pk, task_id, 'confirm')
+
+    def write(self, request, pk, task_id, kind):
+        serializer = TaskValues(data=request.data); serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        if kind == 'confirm' and set(values) - {'request_id', 'version'}:
+            raise serializers.ValidationError('确认只接受版本及请求标识，请先保存结果。')
+        with transaction.atomic():
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, stage='ecr')
+            task = get_object_or_404(ActionTask.objects.select_related('round', 'owner'), pk=task_id, round__change=record, owner=request.user)
+            receipt = task.operations.filter(author=request.user, request_id=values['request_id']).first()
+            if receipt:
+                if receipt.kind != kind or receipt.payload != canonical(values): conflict('同一请求标识的任务操作内容不同。')
+                return Response(stage_data(record, request.user))
+            if not task_data(task, request.user, record)['can_edit'] or task.version != values['version']:
+                conflict('任务已确认、轮次已结束或版本已变化；请保留输入并核对。')
+            if kind == 'confirm':
+                if not task.result.strip() or not task.status or not task.date:
+                    raise serializers.ValidationError('结果说明、业务状态及日期完整后才能确认，不适用也需说明原因。')
+                task.confirmed_at = timezone.now()
+            else:
+                for field in ['result', 'status', 'date']:
+                    if field in values: setattr(task, field, values[field])
+                EcrActionResponse.objects.filter(change=record, action_key=task.action_key).update(result=task.result, status=task.status, date=task.date)
+            task.version += 1; task.save()
+            TaskOperation.objects.create(task=task, author=request.user, request_id=values['request_id'], kind=kind, payload=canonical(values))
+            record.updated_at = timezone.now(); record.save(update_fields=['updated_at'])
+            approve_if_complete(record)
+            return Response(stage_data(record, request.user))

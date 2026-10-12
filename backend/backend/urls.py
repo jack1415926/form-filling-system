@@ -22,11 +22,15 @@ from changes.execution_plan_views import ExecutionPlanDetail
 from changes.significant_change_views import SignificantChangeDetail
 from changes.submission_views import ReviewerList, SubmissionDetail, ActionOwnerList
 from changes.review_views import ReviewList, ReviewDetail
+from changes.stage_workflow import StageDetail, StageSubmission, TaskDetail
 from changes.review_inbox import ReviewInbox, MarkInboxRead
 from changes.system_feedback_views import FeedbackList, FeedbackDetail, FeedbackRequest, ManagedList, ManagedDetail, ManagedAction, ManagedRequest
 from changes.system_feedback_views import FeedbackFollowup, FollowupRequest, FeedbackInbox, FeedbackMarkRead
 
 urlpatterns = [
+    path('api/changes/<int:pk>/stage-workflow/', StageDetail.as_view()),
+    path('api/changes/<int:pk>/stage-submission/', StageSubmission.as_view()),
+    path('api/changes/<int:pk>/action-tasks/<int:task_id>/', TaskDetail.as_view()),
     path('api/system-feedback/', FeedbackList.as_view()),
     path('api/system-feedback/inbox/', FeedbackInbox.as_view()),
     path('api/system-feedback/inbox/read/', FeedbackMarkRead.as_view()),

@@ -16,6 +16,8 @@ class ChangeRequest(models.Model):
         RETURNED = "returned", "待修订"
 
     applicant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    stage = models.CharField(max_length=8, default='legacy', choices=[('legacy', '旧流程'), ('ecr', 'ECR')])
+    publisher = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
     review_mode = models.CharField(max_length=16, blank=True, db_collation="utf8mb4_bin", choices=[("designated", "指定审核"), ("public", "公开审核")])
     submitted_at = models.DateTimeField(null=True, blank=True)
@@ -48,6 +50,7 @@ class ChangeRequest(models.Model):
         db_table = "change_request"
         ordering = ["-updated_at", "-id"]
         constraints = [
+            models.CheckConstraint(condition=models.Q(stage__in=['legacy', 'ecr']), name='change_valid_stage'),
             models.CheckConstraint(condition=models.Q(review_mode__in=["", "designated", "public"]), name="change_valid_review_mode"),
             models.UniqueConstraint(fields=["ecr_no_unique"], name="change_request_ecr_no_unique"),
             models.UniqueConstraint(fields=["eco_no_unique"], name="change_request_eco_no_unique"),
@@ -72,6 +75,7 @@ class ReviewRound(models.Model):
     returned_at = models.DateTimeField(null=True, blank=True)
     returned_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT)
     return_reason = models.TextField(blank=True)
+    submission_payload = models.JSONField(default=dict)
 
     class Meta:
         db_table = "review_round"
@@ -94,6 +98,38 @@ class ReviewRecord(models.Model):
     class Meta:
         db_table = "review_record"
         constraints = [models.UniqueConstraint(fields=["round", "reviewer"], name="review_unique_person")]
+
+
+class ActionTask(models.Model):
+    round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE, related_name='tasks')
+    action_key = models.CharField(max_length=7)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+')
+    result = models.TextField(blank=True)
+    status = models.CharField(max_length=16, blank=True)
+    date = models.DateField(null=True, blank=True)
+    version = models.PositiveIntegerField(default=1)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'action_task'
+        constraints = [
+            models.UniqueConstraint(fields=['round', 'action_key'], name='task_round_action'),
+            models.CheckConstraint(condition=models.Q(action_key__in=ECR_ACTION_IDS), name='task_ecr_key'),
+            models.CheckConstraint(condition=models.Q(status__in=['', 'completed', 'not_applicable']), name='task_business_status'),
+            models.CheckConstraint(condition=models.Q(version__gt=0), name='task_positive_version'),
+        ]
+
+
+class TaskOperation(models.Model):
+    task = models.ForeignKey(ActionTask, on_delete=models.CASCADE, related_name='operations')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    request_id = models.UUIDField()
+    kind = models.CharField(max_length=8)
+    payload = models.JSONField()
+
+    class Meta:
+        db_table = 'task_operation'
+        constraints = [models.UniqueConstraint(fields=['task', 'author', 'request_id'], name='task_request_receipt')]
 
 
 class ReviewFeedback(models.Model):
@@ -280,6 +316,7 @@ class EcrActionResponse(models.Model):
     action_key = models.CharField(max_length=7)
     owner = models.CharField(max_length=255, blank=True)
     owner_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
+    extra_required = models.BooleanField(default=False)
     result = models.TextField(blank=True)
     status = models.CharField(max_length=16, blank=True, choices=[("completed", "完成"), ("not_applicable", "不适用")])
     date = models.DateField(null=True, blank=True)

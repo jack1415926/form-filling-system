@@ -5,6 +5,7 @@ export type Overview = {
   ccb_owner: string; change_owner: string; planned_eco_date: string | null; change_reason: string
 }
 export type ChangeRequest = Overview & {
+  stage?: 'legacy' | 'ecr'; publisher_id?: number | null
   id: number; applicant: number; status: 'draft' | 'pending' | 'approved' | 'returned'; created_at: string; updated_at: string
   current_review_round: number
   review_mode: '' | 'designated' | 'public'; submitted_at: string | null

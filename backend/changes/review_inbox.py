@@ -23,6 +23,7 @@ class ReviewInbox(APIView):
         role = business_role(request.user)
         items = self.context_items(request, 'filler')
         items += self.context_items(request, 'reviewer')
+        items += self.stage_items(request)
         return Response({'actor_id': request.user.pk, 'role': role,
                          'count': sum(item['count'] for item in items),
                          'unread_count': sum(item['count'] for item in items if not item['is_read']), 'items': items})
@@ -31,6 +32,7 @@ class ReviewInbox(APIView):
         rows = ReviewRound.objects.filter(number=F('change__current_review_round'),
                                          state=F('change__status'), state__in=['pending', 'returned'])
         if role == 'reviewer':
+            rows = rows.filter(change__stage='legacy')
             vote = ReviewRecord.objects.filter(round_id=OuterRef('pk'), reviewer=request.user, approved_at__isnull=False)
             rows = rows.exclude(change__applicant=request.user).filter(reviewer_rounds(request.user)).annotate(
                 my_approved=Exists(vote),
@@ -66,6 +68,28 @@ class ReviewInbox(APIView):
                               'ecr_no': row.ecr_no if role == 'reviewer' else row.change.ecr_no, 'status': row.state, 'count': count,
                               'summary': '；'.join(notes), 'open_issues': open_issues,
                               'message_key': signature, 'is_read': reads.get(row.pk) == signature})
+        return items
+
+    def stage_items(self, request):
+        rows = ReviewRound.objects.filter(change__stage='ecr', number=F('change__current_review_round'),
+            state=F('change__status'), state__in=['pending', 'returned'], records__reviewer=request.user, records__assigned=True).select_related('change').distinct()
+        reads = dict(ReviewInboxRead.objects.filter(user=request.user, round__in=rows).values_list('round_id', 'signature'))
+        items = []
+        for row in rows:
+            # During revision the applicant's single item already covers this round.
+            # Self-assigned authors cannot review their reply until resubmission.
+            if row.state == 'returned' and row.change.applicant_id == request.user.pk:
+                continue
+            tasks = row.tasks.filter(owner=request.user, confirmed_at__isnull=True).count() if row.state == 'pending' else 0
+            replies = row.change.review_issues.filter(author=request.user, state='awaiting_review').count()
+            if not tasks and not replies:
+                continue
+            latest = row.change.issue_events.filter(kind='respond', issue__author=request.user).exclude(author=request.user).aggregate(value=Max('id'))['value'] or 0
+            signature = hashlib.sha256(json.dumps(['stage', row.pk, latest]).encode()).hexdigest()
+            items.append({'change_id': row.change_id, 'round': row.number, 'title': row.title, 'context': 'applicant' if row.change.applicant_id == request.user.pk else 'reviewer',
+                'ecr_no': row.ecr_no, 'status': row.state, 'count': tasks + replies,
+                'summary': f'ECR行动待处理{tasks}项；意见回应待复核{replies}项', 'open_issues': bool(replies),
+                'message_key': signature, 'is_read': reads.get(row.pk) == signature})
         return items
 
 

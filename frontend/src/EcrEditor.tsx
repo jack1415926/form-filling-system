@@ -9,6 +9,7 @@ import useAutosave, { discardSavedWarning } from './useAutosave'
 import { actionFields, actionPayload } from './autosaveFields'
 import ActionOwnerSelect from './ActionOwnerSelect'
 import { actionOwnerLabel, checkedActionData } from './actionOwners'
+import { StageActions } from './StageWorkflow'
 
 
 const statusLabels = { '': '未填写', completed: '完成', not_applicable: '不适用' }
@@ -45,7 +46,7 @@ function ActionForm({ action, record, leaving, paused, onDirty, onBusy, onSaved,
   </div>
 }
 
-export default function EcrEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen }: {
+function LegacyEcrEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen }: {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void
   onBack: () => void; onPrevious: () => void; onNext: () => void; leaving: boolean; onReauthenticate: () => void; onEditorOpen: (value: boolean) => void
 }) {
@@ -95,4 +96,8 @@ export default function EcrEditor({ record, onDirty, onBusy, onBack, onPrevious,
       }} />}
     </Drawer>
   </>
+}
+
+export default function EcrEditor(props: Parameters<typeof LegacyEcrEditor>[0]) {
+  return props.record.stage === 'ecr' ? <StageActions {...props} /> : <LegacyEcrEditor {...props} />
 }
