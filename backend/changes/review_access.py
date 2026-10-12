@@ -10,7 +10,11 @@ def is_owner(user, change):
 
 
 def eligible(user, round):
-    if not user.is_active or user.pk == round.change.applicant_id:
+    if not user.is_active:
+        return False
+    if round.change.stage == 'ecr':
+        return round.records.filter(reviewer=user, assigned=True).exists()
+    if user.pk == round.change.applicant_id:
         return False
     if round.review_mode == 'public':
         return business_role(user) == 'reviewer'

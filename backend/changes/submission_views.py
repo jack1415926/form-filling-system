@@ -84,6 +84,8 @@ class SubmissionDetail(APIView):
         values = serializer.validated_data
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            if record.stage == 'ecr':
+                return Response({'detail': '新ECR须通过行动任务提交入口，不接受整单审核名单。'}, status=409)
             # Recheck after any wait for the application lock.
             current = record.review_rounds.filter(number=record.current_review_round).first()
             request_id = values.get('request_id')

@@ -73,7 +73,7 @@ class ChangeList(generics.ListCreateAPIView):
         return ChangeRequest.objects.filter(applicant=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(applicant=self.request.user, status=ChangeRequest.Status.DRAFT)
+        serializer.save(applicant=self.request.user, stage='ecr', status=ChangeRequest.Status.DRAFT)
 
 
 class ChangeDetail(generics.RetrieveUpdateAPIView):
@@ -219,7 +219,7 @@ class EcrActionList(APIView):
         responses = {row.action_key: row for row in record.ecr_responses.select_related('owner_user').all()}
         return {"updated_at": record.updated_at.isoformat(), "actions": [
             {**definition, "question_answer": answers.get(definition["number"], ""),
-             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "result": "", "status": "", "date": None})}
+             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "extra_required": False, "result": "", "status": "", "date": None})}
             for definition in ECR_ACTIONS
         ]}
 
@@ -239,6 +239,10 @@ class EcrActionDetail(APIView):
                 return Response({"detail": "行动不存在。"}, status=404)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改 ECR 评估。"}, status=409)
+            if record.stage == 'ecr' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'extra_required'}):
+                return Response({'detail': '发起人仅可分配负责人和补充任务；结果由负责人在处理中填写。'}, status=400)
+            if 'extra_required' in request.data and type(request.data['extra_required']) is not bool:
+                return Response({'detail': '补充任务标记必须为布尔值。'}, status=400)
             existing = record.ecr_responses.filter(action_key=action_key).first()
             instance = existing or EcrActionResponse(change=record, action_key=action_key)
             serializer = EcrActionSerializer(instance, data=request.data, partial=True)
@@ -247,7 +251,7 @@ class EcrActionDetail(APIView):
             if any(getattr(instance, key) != value for key, value in fields.items()):
                 for key, value in fields.items():
                     setattr(instance, key, value)
-                if not (instance.owner or instance.owner_user_id or instance.result or instance.status or instance.date):
+                if not (instance.owner or instance.owner_user_id or instance.extra_required or instance.result or instance.status or instance.date):
                     instance.delete()
                 else:
                     instance.save()
@@ -282,6 +286,8 @@ class EcoActionDetail(APIView):
     def patch(self, request, pk, action_key):
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            if record.stage == 'ecr':
+                return Response({'detail': 'ECO阶段尚未启动。'}, status=409)
             if action_key not in ECO_ACTION_IDS:
                 return Response({"detail": "行动不存在。"}, status=404)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:

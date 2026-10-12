@@ -2,6 +2,8 @@ import { ApiError, type ChangeRequest } from './api.ts'
 import { checkedChange, type Reviewer } from './submission.ts'
 
 export type RoundInfo = {
+  stage?: 'legacy' | 'ecr'
+  tasks?: { action_key: string; owner: Reviewer; result: string; status: string; date: string | null; confirmed_at: string | null }[]
   number: number; title: string; ecr_no: string; eco_no: string; review_mode: 'designated' | 'public'; state: 'pending' | 'approved' | 'returned'
   submitted_at: string; approved_at: string | null; returned_at: string | null; returned_by: Reviewer | null; return_reason: string
   reviewers: Reviewer[]; approvals: (Reviewer & { approved_at: string })[]
@@ -13,12 +15,13 @@ export type ReplyDraft = { text: string; version: number }
 export function editReply(current: ReplyDraft | undefined, text: string, version: number): ReplyDraft {
   return { text, version: current?.text ? current.version : version }
 }
-export type ReviewData = { change_id: number; updated_at: string; current_round: number; round: RoundInfo; is_current: boolean; can_view_form: boolean; can_approve: boolean; can_return: boolean; can_feedback: boolean; form: ChangeRequest | null; history: RoundInfo[]; feedback: Feedback[]; issues: ReviewIssue[]; unresolved_count: number; issue_blockers: string[]; confirmed_requests: string[] }
+export type ReviewData = { can_add_issue?: boolean; change_id: number; updated_at: string; current_round: number; round: RoundInfo; is_current: boolean; can_view_form: boolean; can_approve: boolean; can_return: boolean; can_feedback: boolean; form: ChangeRequest | null; history: RoundInfo[]; feedback: Feedback[]; issues: ReviewIssue[]; unresolved_count: number; issue_blockers: string[]; confirmed_requests: string[] }
 export type ReviewAction = { kind: 'approve' | 'return' | 'respond' | 'resolve'; request_id: string; issues?: IssueInput[]; issue_id?: number; version?: number; text?: string }
 export const issueTabs = { overview: '概述', materials: '物料明细', questions: '问题评估', ecr: 'ECR 评估', eco: 'ECO 执行', emc: 'EMC 参考', 'execution-plan': '执行计划', 'significant-change': '实质性变更评估' }
 export const issueStateLabels = { awaiting_reply: '待回应', awaiting_review: '待复核', resolved: '已解决' }
 export const reviewStateLabels = { pending: '待审核', returned: '已退回', approved: '已批准' }
 export function approvalProgress(round: RoundInfo): string {
+  if (round.stage === 'ecr') return `ECR行动已确认 ${round.tasks?.filter(task => task.confirmed_at).length ?? 0}/${round.tasks?.length ?? 0} 项 · ${reviewStateLabels[round.state]}`
   const required = round.review_mode === 'public' ? 2 : round.reviewers.length
   const count = round.approvals.length
   if (round.state === 'approved') return `已批准 ${count}/${required} 人，整份申请审核已通过。`
@@ -39,7 +42,9 @@ const object = (value: unknown): value is Record<string, unknown> => !!value && 
 const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value))
 const person = (value: unknown) => object(value) && Number.isSafeInteger(value.id) && Number(value.id) > 0 && typeof value.username === 'string' && typeof value.display_name === 'string'
 function validRound(value: unknown): boolean {
-  return object(value) && Number.isSafeInteger(value.number) && Number(value.number) > 0
+  return object(value) && (value.stage === undefined || ['legacy', 'ecr'].includes(String(value.stage)))
+    && (value.stage !== 'ecr' || Array.isArray(value.tasks) && value.tasks.every(task => object(task) && typeof task.action_key === 'string' && /^ecr_\d{3}$/.test(task.action_key) && person(task.owner) && typeof task.result === 'string' && ['', 'completed', 'not_applicable'].includes(String(task.status)) && (task.date === null || date(task.date)) && (task.confirmed_at === null || date(task.confirmed_at))))
+    && Number.isSafeInteger(value.number) && Number(value.number) > 0
     && ['title', 'ecr_no', 'eco_no', 'return_reason'].every((key) => typeof value[key] === 'string')
     && typeof value.review_mode === 'string' && ['public', 'designated'].includes(value.review_mode) && typeof value.state === 'string' && ['pending', 'approved', 'returned'].includes(value.state)
     && date(value.submitted_at) && (value.approved_at === null || date(value.approved_at)) && (value.returned_at === null || date(value.returned_at))
@@ -53,6 +58,7 @@ export function checkedReview(value: unknown, id: number, number: number): Revie
   }
   const valid = object(value) && value.change_id === id && date(value.updated_at) && Number.isSafeInteger(value.current_round)
     && validRound(value.round) && (value.round as RoundInfo).number === number
+    && (value.can_add_issue === undefined || typeof value.can_add_issue === 'boolean')
     && ['is_current', 'can_view_form', 'can_approve', 'can_return', 'can_feedback'].every((key) => typeof value[key] === 'boolean')
     && Array.isArray(value.history) && value.history.every(validRound)
     && Array.isArray(value.feedback) && value.feedback.every((row) => object(row) && Number.isSafeInteger(row.id) && person(row.author) && typeof row.request_id === 'string' && typeof row.text === 'string' && date(row.created_at))

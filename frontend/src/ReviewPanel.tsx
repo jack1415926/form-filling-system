@@ -97,14 +97,18 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
   return <>
     {query.error && <Alert type="error" title="审核记录读取失败" description={query.error.message} action={<Button disabled={busy} onClick={() => void query.refetch()}>重试</Button>} className="form-alert" />}
     {!data ? query.isPending && <Spin tip="正在读取审核轮次…"><div className="loading-space" /></Spin> : <>
+      {compact && <section className="panel material-section">
+        <div className="section-heading"><span>第{data.round.number}轮审核 · {labels[data.round.state]}</span><Button disabled={busy || !!confirm || leaving} onClick={openReview}>查看审核历史与意见</Button></div>
+        <p className="muted">各轮审核、修改回应和历史留言保留；已批准申请的记录只读。</p>
+      </section>}
       {!compact && <section className="panel list-panel material-section">
         <div className="section-heading"><h2>第{data.round.number}轮审核 <Tag>{labels[data.round.state]}</Tag>{!data.is_current && <Tag>历史轮次</Tag>}</h2><div className="form-actions"><Button disabled={blocked} onClick={() => void query.refetch()}>刷新记录</Button>{onBack && <Button disabled={busy || unresolved || leaving} onClick={onBack}>返回待我处理</Button>}</div></div>
         <Descriptions column={1} items={[{ key: 'title', label: '提交时标题', children: data.round.title }, { key: 'numbers', label: '提交时编号', children: `ECR：${data.round.ecr_no} · ECO：${data.round.eco_no || '未填写'}` }, { key: 'mode', label: '方式', children: modeLabel(data.round.review_mode) }, { key: 'people', label: '指定人员', children: data.round.reviewers.map((row) => row.display_name).join('、') || '不指定人员' }, { key: 'approved', label: '个人通过', children: data.round.approvals.map((row) => `${row.display_name}（${new Date(row.approved_at).toLocaleString('zh-CN')}）`).join('、') || '尚无人通过' }]} />
         {data.round.returned_by && <Alert type="warning" title={`退回人：${data.round.returned_by.display_name}`} description={<div className="question-text">{data.round.return_reason}</div>} className="form-alert" />}
         {!data.can_view_form && <Alert type="info" title="当前仅开放基本信息与意见记录；修订中的表单和历史完整表单不开放。" className="form-alert" />}
-        <Alert type={data.round.state === 'approved' ? 'success' : 'info'} showIcon title={approvalProgress(data.round)} description={data.round.review_mode === 'public' ? '公开审核需要两名不同审核人员同意批准，无须先退回修改；达到人数条件后自动批准整份申请。' : '指定审核需要全部指定人员同意批准；达到人数条件后自动批准整份申请。'} className="form-alert" />
-        <div className="review-actions"><div className="form-actions">{!compact && data.is_current && data.round.state === 'pending' && data.can_return && <Button type="primary" disabled={!!approvalReason} onClick={() => setConfirm('approve')}>本人同意批准</Button>}{data.can_return && <Button danger disabled={blocked} onClick={() => { openReview(); if (!drafts.length) setDrafts([{ tab: 'overview', location: '', text: '' }]) }}>列出修改意见并退回</Button>}<Button disabled={busy} onClick={openReview}>查看审核意见（{data.unresolved_count}）</Button></div><Button disabled={busy || !!confirm} onClick={onReauthenticate}>重新登录</Button></div>
-        {!compact && data.is_current && data.round.state === 'pending' && data.can_return && approvalReason && <p role="status">暂不能批准：{approvalReason}</p>}
+        <Alert type={data.round.state === 'approved' ? 'success' : 'info'} showIcon title={approvalProgress(data.round)} description={data.round.stage === 'ecr' ? '全部行动任务确认且阻断意见解决后自动批准阶段；请进入ECR行动页处理自己的任务。' : data.round.review_mode === 'public' ? '公开审核需要两名不同审核人员同意批准，无须先退回修改；达到人数条件后自动批准整份申请。' : '指定审核需要全部指定人员同意批准；达到人数条件后自动批准整份申请。'} className="form-alert" />
+        <div className="review-actions"><div className="form-actions">{!compact && data.round.stage !== 'ecr' && data.is_current && data.round.state === 'pending' && data.can_return && <Button type="primary" disabled={!!approvalReason} onClick={() => setConfirm('approve')}>本人同意批准</Button>}{data.can_return && data.can_add_issue !== false && <Button danger disabled={blocked} onClick={() => { openReview(); if (!drafts.length) setDrafts([{ tab: 'overview', location: '', text: '' }]) }}>列出修改意见并退回</Button>}<Button disabled={busy} onClick={openReview}>查看审核意见（{data.unresolved_count}）</Button></div><Button disabled={busy || !!confirm} onClick={onReauthenticate}>重新登录</Button></div>
+        {!compact && data.round.stage !== 'ecr' && data.is_current && data.round.state === 'pending' && data.can_return && approvalReason && <p role="status">暂不能批准：{approvalReason}</p>}
         {data.unresolved_count > 0 && <Alert type="warning" title={`尚有 ${data.unresolved_count} 条未解决意见，全部解决后才能批准。`} className="form-alert" />}
       </section>}
       {renderForm && data.can_view_form && data.form && renderForm(data.form)}
@@ -130,7 +134,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
           {!!replies[issue.id]?.text && !issue.can_respond && !issue.can_resolve && !issue.can_reject && <Alert type="warning" title="以下文字尚未发送，可复制后保留" description={<p className="question-text">{replies[issue.id].text}</p>} />}
         </section>)}
         {data.can_return && <>
-          <h3>本次退回清单</h3><Button disabled={blocked} onClick={add}>新增修改意见</Button>
+          <h3>本次退回清单</h3><Button disabled={blocked || data.can_add_issue === false} onClick={add}>新增修改意见</Button>
           {drafts.map((row, index) => <section className="review-note" key={index}>
             {row.issue_id ? <p>继续修改意见 #{row.issue_id}</p> : <><Select aria-label={`意见${index + 1}所属页签`} disabled={blocked} value={row.tab} options={Object.entries(issueTabs).map(([value, label]) => ({ value, label }))} style={{ width: '100%' }} onChange={(tab) => setDrafts((current) => current.map((item, i) => i === index ? { ...item, tab } : item))} /><Input aria-label={`意见${index + 1}定位说明`} disabled={blocked} maxLength={255} value={row.location} placeholder="可选：题号、行动号或物料信息" onChange={(event) => setDrafts((current) => current.map((item, i) => i === index ? { ...item, location: event.target.value } : item))} /></>}
             <Input.TextArea aria-label={`意见${index + 1}具体问题`} disabled={blocked} maxLength={10000} value={row.text} placeholder="具体问题／继续修改理由" autoSize={{ minRows: 2, maxRows: 8 }} onChange={(event) => setDrafts((current) => current.map((item, i) => i === index ? { ...item, text: event.target.value } : item))} />
@@ -139,7 +143,15 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
           <Button danger disabled={blocked || !validDrafts} onClick={() => setConfirm('return')}>确认清单并退回整单</Button>
         </>}
         {!data.can_return && drafts.length > 0 && <Alert type="warning" title="本轮不能再退回，以下意见尚未提交" description={drafts.map((row, i) => <p className="question-text" key={i}>{row.text}</p>)} />}
-        <h3>审核过程</h3>{data.history.map((round) => <p key={round.number}>第{round.number}轮 · {labels[round.state]}{round.return_reason && ` · ${round.return_reason}`}</p>)}
+        <h3>审核过程</h3>{data.history.map((round) => <section className="review-note" key={round.number}>
+          <strong>第{round.number}轮 · {labels[round.state]}</strong>
+          <p>提交：{new Date(round.submitted_at).toLocaleString('zh-CN')} · {modeLabel(round.review_mode)}</p>
+          <p>指定人员：{round.reviewers.map((person) => `${person.display_name}（${person.username}）`).join('、') || '不指定人员'}</p>
+          <p>个人通过：{round.approvals.map((person) => `${person.display_name}（${person.username}） · ${new Date(person.approved_at).toLocaleString('zh-CN')}`).join('；') || '尚无人通过'}</p>
+          {round.returned_by && <p className="question-text">退回：{round.returned_by.display_name}{round.returned_at && ` · ${new Date(round.returned_at).toLocaleString('zh-CN')}`} · {round.return_reason}</p>}
+          {round.tasks?.map(task => <div key={task.action_key}><p>{task.action_key} · {task.owner.display_name} · {task.confirmed_at ? '已确认' : '未确认'} · {task.date || '未填日期'}</p><p className="question-text">{task.result || '未填结果'} · {task.status || '未填业务状态'}</p>{task.confirmed_at && <p>确认时间：{new Date(task.confirmed_at).toLocaleString('zh-CN')}</p>}</div>)}
+          {round.approved_at && <p>整单批准：{new Date(round.approved_at).toLocaleString('zh-CN')}</p>}
+        </section>)}
         <h3>历史留言，只读</h3>{data.feedback.map((note) => <div className="review-note" key={note.id}><strong>第{note.round_number}轮 · {note.author.display_name}</strong><span className="muted"> · {new Date(note.created_at).toLocaleString('zh-CN')}</span><p className="question-text">{note.text}</p></div>)}
       </Drawer>
     </>}

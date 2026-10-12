@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ChangeRequest, ReviewRound, ReviewRecord, ReviewFeedback
+from .models import ChangeRequest, ReviewRound, ReviewRecord, ReviewFeedback, ActionTask
 from .permissions import ExpectedAccountPermission
 from .review_access import is_owner, eligible, can_read_round, reviewer_rounds
 from .serializers import ChangeRequestSerializer
@@ -22,7 +22,11 @@ def person(user):
 
 def round_data(round):
     records = list(round.records.select_related('reviewer').order_by('reviewer_id'))
-    return {'number': round.number, 'title': round.title, 'ecr_no': round.ecr_no, 'eco_no': round.eco_no,
+    tasks = list(round.tasks.select_related('owner').order_by('action_key')) if round.change.stage == 'ecr' else []
+    return {'number': round.number, 'stage': round.change.stage, 'tasks': [
+                {'action_key': task.action_key, 'owner': person(task.owner), 'result': task.result, 'status': task.status,
+                 'date': task.date.isoformat() if task.date else None, 'confirmed_at': task.confirmed_at.isoformat() if task.confirmed_at else None} for task in tasks],
+            'title': round.title, 'ecr_no': round.ecr_no, 'eco_no': round.eco_no,
             'review_mode': round.review_mode, 'submitted_at': round.submitted_at.isoformat(), 'state': round.state,
             'approved_at': round.approved_at.isoformat() if round.approved_at else None,
             'returned_at': round.returned_at.isoformat() if round.returned_at else None,
@@ -36,13 +40,16 @@ def review_data(record, round, user):
     owner = is_owner(user, record)
     allowed = eligible(user, round)
     may_review = current and record.status == 'pending' and round.state == 'pending' and allowed
+    task_owner = record.stage == 'ecr' and round.tasks.filter(owner=user).exists()
+    opinion_owner = record.review_issues.filter(author=user).exclude(state='resolved').exists()
     may_view = current and (owner or record.status in ['pending', 'approved'] and allowed)
     rounds = [row for row in record.review_rounds.order_by('number') if can_read_round(user, row)]
     notes = ReviewFeedback.objects.filter(round__in=rounds).select_related('author', 'round').order_by('created_at', 'id')
     return {'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'current_round': record.current_review_round,
             'round': round_data(round), 'is_current': current, 'can_view_form': may_view,
-            'can_approve': may_review and not record.review_issues.exclude(state='resolved').exists() and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
-            'can_return': may_review, 'can_feedback': False,
+            'can_approve': record.stage == 'legacy' and may_review and not record.review_issues.exclude(state='resolved').exists() and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
+            'can_return': may_review and (record.stage == 'legacy' or task_owner or opinion_owner),
+            'can_add_issue': record.stage == 'legacy' or task_owner, 'can_feedback': False,
             'issues': issue_data(record, round, user, owner, allowed, current),
             'unresolved_count': record.review_issues.exclude(state='resolved').count() if current else 0,
             'issue_blockers': blockers(record) if current else [],
@@ -62,14 +69,17 @@ class ReviewList(APIView):
         if kind not in ['designated', 'public', 'handled', 'returned']:
             raise serializers.ValidationError({'kind': '列表类型不合法。'})
         own_approved = ReviewRecord.objects.filter(round_id=OuterRef('pk'), reviewer=request.user, approved_at__isnull=False)
-        rows = ReviewRound.objects.exclude(change__applicant=request.user).filter(reviewer_rounds(request.user)).annotate(my_approved=Exists(own_approved))
+        pending_task = ActionTask.objects.filter(round_id=OuterRef('pk'), owner=request.user, confirmed_at__isnull=True)
+        done_task = ActionTask.objects.filter(round_id=OuterRef('pk'), owner=request.user, confirmed_at__isnull=False)
+        rows = ReviewRound.objects.exclude(change__applicant=request.user, change__stage='legacy').filter(reviewer_rounds(request.user)).annotate(my_approved=Exists(own_approved), my_pending=Exists(pending_task), my_done=Exists(done_task))
         if kind == 'handled':
-            rows = rows.filter(Q(my_approved=True) | Q(returned_by=request.user))
+            rows = rows.filter(Q(my_approved=True) | Q(returned_by=request.user) | Q(my_done=True))
         elif kind == 'returned':
             rows = rows.filter(number=F('change__current_review_round'), state='returned', change__status='returned').filter(reviewer_rounds(request.user))
         else:
             rows = rows.filter(number=F('change__current_review_round'), state='pending', change__status='pending', my_approved=False,
                                review_mode=kind).filter(reviewer_rounds(request.user))
+            rows = rows.filter(Q(change__stage='legacy') | Q(my_pending=True) | Q(change__review_issues__author=request.user, change__review_issues__state='awaiting_review'))
         return Response([{'change_id': row.change_id, **round_data(row)} for row in rows.select_related('change', 'returned_by').distinct().order_by('-submitted_at', '-pk')])
 
 
@@ -122,6 +132,10 @@ class ReviewDetail(APIView):
             if record.current_review_round != number:
                 return Response({'detail': '该页面属于旧审核轮次，请刷新当前状态。'}, status=409)
             owner, reviewer = is_owner(request.user, record), eligible(request.user, round)
+            if action == 'approve' and record.stage == 'ecr':
+                return Response({'detail': '新ECR由行动任务确认自动批准，不接受整单批准。'}, status=409)
+            if action == 'return' and record.stage == 'ecr' and not round.tasks.filter(owner=request.user).exists() and any('issue_id' not in item for item in values['issues']):
+                return Response({'detail': '未承担本轮任务的原提出者仅可复核或继续自己的原意见。'}, status=403)
             if action == 'respond' and not owner:
                 return Response({'detail': '只有申请本人可以回应意见。'}, status=403)
             if action != 'respond' and not reviewer:
@@ -162,4 +176,7 @@ class ReviewDetail(APIView):
                 issue.save(update_fields=['state', 'version'])
                 event(record, round, request.user, action, values, issue, values['text'])
             record.updated_at = timezone.now(); record.save(update_fields=['status', 'updated_at'])
+            if record.stage == 'ecr':
+                from .stage_workflow import approve_if_complete
+                approve_if_complete(record)
             return Response(review_data(record, round, request.user))

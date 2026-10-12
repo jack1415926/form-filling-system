@@ -5,6 +5,7 @@ import { api, type ChangeRequest, type User } from './api'
 import { newestResponse } from './latestResponse'
 import { canEdit } from './workflow'
 import { checkedReviewers, checkedSubmission, newestSubmission, recoverSubmissionFailure, submissionConfirmed, submissionError, modeLabel, type SubmissionData, type SubmissionPayload } from './submission'
+import { StageSubmission } from './StageWorkflow'
 
 type Props = {
   reviewDraftDirty?: boolean
@@ -12,7 +13,7 @@ type Props = {
   onPrevious: () => void; onBack: () => void; onReauthenticate: () => void
 }
 
-export default function SubmissionEditor({ record, leaving, onDirty, onBusy, onPrevious, onBack, onReauthenticate, reviewDraftDirty = false }: Props) {
+function LegacySubmissionEditor({ record, leaving, onDirty, onBusy, onPrevious, onBack, onReauthenticate, reviewDraftDirty = false }: Props) {
   const queryClient = useQueryClient()
   const key = ['submission', record.applicant, record.id]
   const path = `/api/changes/${record.id}/submission/`
@@ -126,4 +127,8 @@ export default function SubmissionEditor({ record, leaving, onDirty, onBusy, onP
       <p>提交后全部表单、审核方式和指定名单不能修改。</p>
     </Modal>
   </>
+}
+
+export default function SubmissionEditor(props: Props) {
+  return props.record.stage === 'ecr' ? <StageSubmission {...props} /> : <LegacySubmissionEditor {...props} />
 }
