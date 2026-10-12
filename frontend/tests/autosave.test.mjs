@@ -35,15 +35,16 @@ test('typing debounces for two seconds and reverting before dispatch sends nothi
 test('one in-flight request preserves later edits, including changes then reverts and null clears', async () => {
   let resolve
   const calls = []
-  const { queue, tick } = setup((patch) => { calls.push(patch); return new Promise((done) => { resolve = done }) }, { title: 'old', date: '2026-10-03', region: 'old' })
-  queue.update({ title: 'submitted' }); await tick(2000)
-  queue.update({ title: 'temporary', region: 'new', date: null }); queue.update({ title: 'old' })
+  const { queue, tick } = setup((patch) => { calls.push(patch); return new Promise((done) => { resolve = done }) }, { title: 'old', date: '2026-10-03', region: 'old', owner_user_id: '1' })
+  queue.update({ title: 'submitted', owner_user_id: '7' }); await tick(2000)
+  queue.update({ title: 'temporary', region: 'new', date: null, owner_user_id: '8' }); queue.update({ title: 'old' })
   await tick(3000); assert.equal(calls.length, 1)
-  resolve({ title: 'submitted', date: '2026-10-03', region: 'external' }); await settle()
+  resolve({ title: 'submitted', date: '2026-10-03', region: 'external', owner_user_id: '7' }); await settle()
   assert.equal(queue.values.title, 'old'); assert.equal(queue.values.region, 'new'); assert.equal(queue.values.date, null)
+  assert.equal(queue.values.owner_user_id, '8'); assert.equal(queue.baseline.owner_user_id, '7')
   await tick(0)
-  assert.deepEqual(calls[1], { title: 'old', date: null, region: 'new' })
-  resolve({ title: 'old', date: null, region: 'new' }); await settle(); assert.equal(queue.dirty, false)
+  assert.deepEqual(calls[1], { title: 'old', date: null, region: 'new', owner_user_id: '8' })
+  resolve({ title: 'old', date: null, region: 'new', owner_user_id: '8' }); await settle(); assert.equal(queue.dirty, false)
 })
 
 test('ambiguous failures retry latest input at 5 and 15 seconds, then stop even after editing', async () => {

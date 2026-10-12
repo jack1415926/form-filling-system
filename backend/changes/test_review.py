@@ -61,7 +61,7 @@ class ReviewFlowTests(TestCase):
             with self.subTest(suffix=suffix):
                 self.assertEqual(self.clients[0].get(self.base+suffix).status_code,200)
                 self.assertEqual(self.clients[2].get(self.base+suffix).status_code,404)
-        self.assertEqual(self.clients[0].patch(self.base,{'title':'no'},format='json').status_code,403)
+        self.assertEqual(self.clients[0].patch(self.base,{'title':'no'},format='json').status_code,404)
         self.assertEqual(self.metadata(self.client_for(self.other)).status_code,404)
         draft=ChangeRequest.objects.create(applicant=self.owner)
         self.assertEqual(self.clients[0].get(f'/api/changes/{draft.pk}/').status_code,404)
@@ -80,14 +80,6 @@ class ReviewFlowTests(TestCase):
         self.assertEqual(self.action(0,'feedback').status_code,409)
         self.assertEqual(self.submit()[0].status_code,409)
 
-    def test_public_two_people_approve_and_third_cannot_add_a_vote_after_completion(self):
-        self.assertEqual(self.submit('public',[])[0].status_code,200)
-        self.assertEqual(len(self.clients[2].get('/api/review/?kind=public').json()),1)
-        self.assertEqual(self.action(0,'approve').status_code,200);self.change.refresh_from_db();self.assertEqual(self.change.status,'pending')
-        self.assertEqual(self.action(1,'approve').status_code,200);self.change.refresh_from_db();self.assertEqual(self.change.status,'approved')
-        self.assertEqual(self.action(2,'approve').status_code,409);self.assertEqual(ReviewRecord.objects.count(),2)
-        self.assertEqual(self.action(1,'approve').status_code,200)
-
     def test_return_after_personal_approval_hides_editing_form_and_reopens_all_owner_writes(self):
         material=MaterialChange.objects.create(change=self.change,category='revision')
         self.submit();self.action(0,'approve')
@@ -97,8 +89,8 @@ class ReviewFlowTests(TestCase):
         for suffix in ['', 'materials/', 'questions/', 'ecr-actions/', 'eco-actions/', 'emc/', 'execution-plan/', 'significant-change/']:
             self.assertEqual(self.clients[0].get(self.base+suffix).status_code,404)
         writes=[(self.base,{'title':'Revised private title'}),(self.base+f'materials/{material.pk}/',{'description':'updated'}),
-                (self.base+'questions/',{'responses':{'1':{'answer':'Y'}}}),(self.base+'ecr-actions/ecr_001/',{'owner':'owner'}),
-                (self.base+'eco-actions/eco_001/',{'owner':'owner'}),(self.base+'emc/',{'cells':{'emc_change_001/emc_test_001':{'mark':'X'}}}),
+                (self.base+'questions/',{'responses':{'1':{'answer':'Y'}}}),(self.base+'ecr-actions/ecr_001/',{'owner_user_id':self.owner.pk}),
+                (self.base+'eco-actions/eco_001/',{'owner_user_id':self.owner.pk}),(self.base+'emc/',{'cells':{'emc_change_001/emc_test_001':{'mark':'X'}}}),
                 (self.base+'execution-plan/',{'responses':{'plan_001':{'remark':'updated'}}}),
                 (self.base+'significant-change/',{'charts':{'A':{'reason':'updated'}}})]
         for path,payload in writes:self.assertEqual(self.owner_client.patch(path,payload,format='json').status_code,200)
@@ -129,7 +121,7 @@ class ReviewFlowTests(TestCase):
         _,original=self.submit();self.legacy_return()
         self.assertEqual(self.owner_client.post(self.base+'submission/',original,format='json').status_code,200)
         self.assertEqual(ReviewRound.objects.count(),1)
-        response,new=self.submit('public',[]);self.assertEqual(response.status_code,200)
+        response,new=self.submit(people=[self.reviewers[2].pk]);self.assertEqual(response.status_code,200)
         self.assertEqual(self.owner_client.post(self.base+'submission/',original,format='json').status_code,409)
         self.assertEqual(self.owner_client.post(self.base+'submission/',new,format='json').status_code,200)
         self.assertEqual(ReviewRound.objects.count(),2)
@@ -146,15 +138,6 @@ class ReviewFlowTests(TestCase):
         self.submit(people=[self.reviewers[2].pk])
         self.assertEqual(self.clients[1].get('/api/review/?kind=returned').json(),[])
         self.assertEqual(self.metadata(self.clients[1],2).status_code,404)
-
-    def test_returned_public_discussion_is_discoverable_without_a_personal_vote(self):
-        self.submit('public',[]);self.legacy_return()
-        rows=self.clients[2].get('/api/review/?kind=returned').json()
-        self.assertEqual(len(rows),1);self.assertEqual(rows[0]['state'],'returned')
-        self.assertFalse(self.metadata(self.clients[2]).json()['can_feedback'])
-        self.assertEqual(self.clients[2].get(self.base).status_code,404)
-        self.submit('public',[])
-        self.assertEqual(self.clients[2].get('/api/review/?kind=returned').json(),[])
 
     def test_legacy_feedback_is_readonly_and_survives_resubmission(self):
         self.submit();self.legacy_return()
@@ -189,7 +172,7 @@ class ReviewTransactionTests(TransactionTestCase):
         for user in self.people:user.groups.add(group)
         self.change=ChangeRequest.objects.create(applicant=self.owner,title='Original',ecr_no='REVIEW-TX')
         client=APIClient();client.force_authenticate(self.owner)
-        self.assertEqual(client.post(f'/api/changes/{self.change.pk}/submission/',{'review_mode':'public','reviewer_ids':[]},format='json').status_code,200)
+        self.assertEqual(client.post(f'/api/changes/{self.change.pk}/submission/',{'review_mode':'designated','reviewer_ids':[user.pk for user in self.people]},format='json').status_code,200)
 
     def request(self,user,action,barrier):
         try:
@@ -199,7 +182,7 @@ class ReviewTransactionTests(TransactionTestCase):
             return client.post(f'/api/changes/{self.change.pk}/review-rounds/1/{action}/',payload,format='json').status_code
         finally:connections['default'].close()
 
-    def test_parallel_public_approvals_finish_once(self):
+    def test_parallel_designated_approvals_finish_once(self):
         barrier=Barrier(2)
         with ThreadPoolExecutor(max_workers=2) as pool:
             tasks=[pool.submit(self.request,user,'approve',barrier) for user in self.people]
@@ -223,12 +206,15 @@ class ReviewTransactionTests(TransactionTestCase):
             OldChange=old.get_model('changes','ChangeRequest');OldRecord=old.get_model('changes','ReviewRecord')
             original=OldChange.objects.get(pk=self.change.pk);before={key:getattr(original,key) for key in ['status','title','ecr_no','review_mode','submitted_at','updated_at']}
             legacy=OldChange.objects.create(applicant_id=self.owner.pk,status='pending')
-            OldRecord.objects.create(change_id=self.change.pk,reviewer_id=self.people[0].pk)
+            before_people=set(OldRecord.objects.filter(change_id=self.change.pk).values_list('reviewer_id',flat=True))
+            self.assertEqual(before_people,{user.pk for user in self.people})
             MigrationExecutor(connection).migrate(latest)
             restored=ChangeRequest.objects.get(pk=self.change.pk)
             self.assertEqual({key:getattr(restored,key) for key in before},before)
             self.assertEqual(restored.current_review_round,1);self.assertEqual(ChangeRequest.objects.get(pk=legacy.pk).current_review_round,0)
-            self.assertTrue(ReviewRecord.objects.get(change=restored).round_id)
+            records=ReviewRecord.objects.filter(change=restored)
+            self.assertEqual(set(records.values_list('reviewer_id',flat=True)),before_people)
+            self.assertFalse(records.filter(round__isnull=True).exists())
             round=restored.review_rounds.get(number=1);round.state='returned';round.return_reason='History';round.save()
             with self.assertRaisesRegex(RuntimeError,'不能直接回退'):
                 MigrationExecutor(connection).migrate([('changes','0012_submission')])

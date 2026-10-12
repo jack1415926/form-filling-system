@@ -42,9 +42,9 @@ test('submission eligibility requires title/ECR and follows each mode minimum',(
  assert.match(submissionError(change,'designated',[],reviewers),/至少/)
  assert.match(submissionError(change,'designated',[2,2],reviewers),/失效/)
  assert.match(submissionError(change,'designated',[5],reviewers),/失效/)
- assert.equal(submissionError(change,'public',[],reviewers.slice(0,1)),'系统中的有效审核员不足两人，请联系账号维护人员设置审核员身份。')
+ assert.match(submissionError(change,'public',[],reviewers.slice(0,1)),/停止新增/)
  assert.equal(submissionError(change,'designated',[2],reviewers),null)
- assert.equal(submissionError(change,'public',[],reviewers),null)
+ assert.match(submissionError(change,'public',[],reviewers),/停止新增/)
 })
 test('cold GET accepts valid blank/legacy records and rejects missing metadata or mismatched owners',()=>{
  assert.equal(checkedSubmission(draft,change),draft)

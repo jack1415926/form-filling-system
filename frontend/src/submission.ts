@@ -85,8 +85,8 @@ export function submissionError(record: ChangeRequest, mode: '' | SubmissionPayl
   if (reviewDraftDirty) return '仍有未发送的审核回应，请从悬浮审核意见入口提交或清除后再重提。'
   if (!record.title.trim() || !record.ecr_no.trim()) return '提交前必须填写标题和 ECR 编号，请返回概述补齐。'
   if (!mode) return '请选择审核方式。'
-  if (mode === 'public') return reviewers.length < 2 ? '系统中的有效审核员不足两人，请联系账号维护人员设置审核员身份。' : null
-  if (!ids.length) return '指定审核至少选择一名审核员。'
+  if (mode === 'public') return '公开审核已停止新增，请选择具体审核人员。'
+  if (!ids.length) return '至少选择一名审核人员。'
   if (new Set(ids).size !== ids.length || ids.some((id) => !reviewers.some((person) => person.id === id))) return '所选审核员已失效，请重新选择。'
   return null
 }

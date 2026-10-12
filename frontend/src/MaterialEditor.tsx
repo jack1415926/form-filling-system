@@ -83,7 +83,7 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
   const [confirming, setConfirming] = useState(false)
   const [filter, setFilter] = useState<MaterialCategory | ''>('')
   useEffect(() => { onEditorOpen(!!editor); return () => onEditorOpen(false) }, [editor, onEditorOpen])
-  const locked = !canEdit(record, actorUser(queryClient).role)
+  const locked = !canEdit(record, actorUser(queryClient))
   const materials = useQuery({ queryKey: ['materials', actorId, record.id], queryFn: () => api<Material[]>(path, 'GET', undefined, actorId), refetchOnWindowFocus: false })
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['materials', actorId, record.id] })

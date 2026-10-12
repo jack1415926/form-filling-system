@@ -46,21 +46,21 @@ class EcrFlowTests(TestCase):
         self.assertEqual(self.client.head(self.path).status_code, 200)
 
     def test_save_reopen_relogin_partial_clear_and_answer_changes_preserve_results(self):
-        values = {'owner': '负责人', 'result': '解释🧪\n第二行', 'status': 'completed', 'date': '2026-10-02'}
+        values = {'owner_user_id': self.user.pk, 'result': '解释🧪\n第二行', 'status': 'completed', 'date': '2026-10-02'}
         self.assertEqual(self.write(values).status_code, 200)
         for _ in range(2):
             self.assertEqual(self.write({'result': '新解释'}).status_code, 200)
         self.login()
         row = self.client.get(self.path).json()['actions'][8]
-        self.assertEqual((row['owner'], row['result'], row['status'], row['date']), ('负责人', '新解释', 'completed', '2026-10-02'))
+        self.assertEqual((row['owner_user_id'], row['result'], row['status'], row['date']), (self.user.pk, '新解释', 'completed', '2026-10-02'))
         for answer in ['Y', 'N', '']:
             response = self.client.patch(f'/api/changes/{self.change.pk}/questions/', {'responses': {'6': {'answer': answer}}}, format='json')
             self.assertEqual(response.status_code, 200)
             row = self.client.get(self.path).json()['actions'][8]
             self.assertEqual((row['question_answer'], row['result'], row['status']), (answer, '新解释', 'completed'))
         self.assertEqual(self.write({'date': None}).status_code, 200)
-        self.assertEqual(EcrActionResponse.objects.get().owner, '负责人')
-        self.assertEqual(self.write({'owner': '', 'result': '', 'status': '', 'date': None}).status_code, 200)
+        self.assertEqual(EcrActionResponse.objects.get().owner_user_id, self.user.pk)
+        self.assertEqual(self.write({'owner_user_id': None, 'result': '', 'status': '', 'date': None}).status_code, 200)
         self.assertEqual(EcrActionResponse.objects.count(), 0)
 
     def test_empty_retries_validation_and_transaction_rollback(self):

@@ -41,7 +41,7 @@ class SubmissionFlowTests(TestCase):
         self.assertEqual(data['change']['review_mode'], ''); self.assertIsNone(data['change']['submitted_at']); self.assertEqual(data['reviewers'], [])
         self.assertFalse(ReviewRecord.objects.exists())
         data = self.client.get('/api/reviewers/').json()
-        self.assertEqual([person['id'] for person in data], [p.pk for p in self.reviewers])
+        self.assertEqual([person['id'] for person in data], [self.other.pk] + [p.pk for p in self.reviewers])
         self.assertTrue(all(set(person) == {'id', 'username', 'display_name'} for person in data))
 
     def test_designated_single_and_multiple_submit_restore_and_idempotence(self):
@@ -64,22 +64,10 @@ class SubmissionFlowTests(TestCase):
         self.assertEqual(self.submit(ids=list(reversed(ids)), path=path).status_code, 200)
         self.assertEqual(ReviewRecord.objects.filter(change=second).count(), 2)
 
-    def test_public_capacity_and_no_preassigned_records(self):
-        self.reviewers[0].is_active = False; self.reviewers[0].save(update_fields=['is_active'])
-        self.assertEqual(self.submit('public', []).status_code, 400)
-        self.change.refresh_from_db(); self.assertEqual(self.change.status, 'draft')
-        self.reviewers[1].groups.remove(self.group)
-        self.assertEqual(self.submit('public', []).status_code, 400)
-        self.reviewers[0].is_active = True; self.reviewers[0].save(update_fields=['is_active']); self.reviewers[1].groups.add(self.group)
-        result = self.submit('public', [])
-        self.assertEqual(result.status_code, 200); self.assertEqual(result.json()['reviewers'], [])
-        self.assertFalse(ReviewRecord.objects.exists()); self.assertEqual(self.submit('public', []).json(), result.json())
-
-    def test_strict_inputs_inactive_accounts_and_nonreviewers(self):
+    def test_strict_inputs_and_inactive_candidates(self):
         for payload in [[], {}, {'review_mode': 'other', 'reviewer_ids': []}, {'review_mode': 'designated', 'reviewer_ids': []},
                         {'review_mode': 'public', 'reviewer_ids': [self.reviewers[0].pk]},
                         {'review_mode': 'designated', 'reviewer_ids': [self.reviewers[0].pk] * 2},
-                        {'review_mode': 'designated', 'reviewer_ids': [self.other.pk]},
                         {'review_mode': 'designated', 'reviewer_ids': [999999]},
                         {'review_mode': 'designated', 'reviewer_ids': ['1']}, {'review_mode': 'designated', 'reviewer_ids': [True]},
                         {'review_mode': 'public', 'reviewer_ids': [], 'status': 'approved'}]:
@@ -99,7 +87,7 @@ class SubmissionFlowTests(TestCase):
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'draft'); self.assertIsNone(self.change.submitted_at); self.assertFalse(ReviewRecord.objects.exists())
         self.assertEqual(self.submit().status_code, 200)  # All other form fields remain blank.
 
-    def test_permissions_csrf_expected_account_and_role_boundaries(self):
+    def test_permissions_csrf_expected_account_and_ownership(self):
         self.assertEqual(APIClient().get(self.path).status_code, 403)
         self.client.credentials(HTTP_X_EXPECTED_USER=str(self.owner.pk)); self.assertEqual(self.submit().status_code, 403)
         csrf = self.client.get('/api/auth/csrf/').json()['csrfToken']
@@ -112,9 +100,9 @@ class SubmissionFlowTests(TestCase):
             self.assertEqual(self.client.patch(f'/api/changes/{self.change.pk}/', {field:value}, format='json').status_code, 400)
         self.owner.groups.add(self.group)
         for path in ['/api/changes/', self.path, '/api/reviewers/', f'/api/changes/{self.change.pk}/questions/']:
-            self.assertEqual(self.client.get(path).status_code, 404 if path.endswith('/questions/') else 403)
-        self.assertEqual(self.submit().json()['code'], 'role_forbidden')
-        self.assertEqual(self.client.post('/api/changes/', {}, format='json').status_code, 403)
+            self.assertEqual(self.client.get(path).status_code, 200)
+        self.assertEqual(self.submit().status_code, 200)
+        self.assertEqual(self.client.post('/api/changes/', {}, format='json').status_code, 201)
         self.assertEqual(self.client.get('/api/auth/me/').json()['role'], 'reviewer')
 
     def test_submission_locks_all_write_paths_and_preserves_read_access(self):
@@ -202,7 +190,7 @@ class SubmissionTransactionTests(TransactionTestCase):
                     with self.assertRaises(TimeoutError):
                         task.result(timeout=0.15)
                 client=APIClient();client.force_authenticate(self.owner)
-                result=client.post(self.path,{'review_mode':'public','reviewer_ids':[]},format='json')
+                result=client.post(self.path,{'review_mode':'designated','reviewer_ids':[self.reviewers[0].pk]},format='json')
                 self.assertEqual(result.status_code,200)
             self.assertEqual([task.result(timeout=10)[0] for task in tasks],[409,409])
         self.assertEqual(ChangeRequest.objects.get(pk=self.change.pk).title,'Submit')

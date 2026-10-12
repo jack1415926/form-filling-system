@@ -4,7 +4,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import APIException
 
 from .models import ReviewIssue, ReviewIssueEvent
-from .roles import business_role
+from .review_access import can_read_round
 
 
 TABS = ['overview', 'materials', 'questions', 'ecr', 'eco', 'emc', 'execution-plan', 'significant-change']
@@ -74,16 +74,16 @@ def blockers(record):
     reasons = []
     if pending.filter(state='awaiting_reply').exists():
         reasons.append('请逐条提交全部未解决意见的回应，再重新提交申请。')
-    if any(not row.author.is_active or business_role(row.author) != 'reviewer' for row in pending):
-        reasons.append('有未解决意见的原提出者已停用或失去审核员身份，请联系账号管理员恢复身份。')
+    if any(not row.author.is_active for row in pending):
+        reasons.append('有未解决意见的原提出者已停用，请联系账号管理员恢复账号。')
     return reasons
 
 
 def issue_data(record, viewed_round, user, owner, reviewer, current):
     rows = []
-    round_numbers = dict(record.review_rounds.filter(number__lte=viewed_round.number).values_list('id', 'number'))
+    round_numbers = {round.pk: round.number for round in record.review_rounds.filter(number__lte=viewed_round.number) if can_read_round(user, round)}
     # Old-round viewers must not receive responses or decisions from later rounds.
-    for issue in record.review_issues.filter(source_round__number__lte=viewed_round.number).select_related('author', 'source_round').prefetch_related('events__author').order_by('id'):
+    for issue in record.review_issues.filter(source_round_id__in=round_numbers).select_related('author', 'source_round').prefetch_related('events__author').order_by('id'):
         events = sorted((event for event in issue.events.all() if event.round_id in round_numbers), key=lambda event: event.pk)
         if not events:
             continue

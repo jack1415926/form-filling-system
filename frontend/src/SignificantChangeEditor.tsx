@@ -22,7 +22,7 @@ function AssessmentForm({ data, record, leaving, paused, saveRef, onDirty, onBus
   const actorId = actorUser(queryClient).id
   const [chartId, setChartId] = useState<string | null>(null)
   const [review, setReview] = useState(false)
-  const locked = !canEdit(record, actorUser(queryClient).role)
+  const locked = !canEdit(record, actorUser(queryClient))
   const save = useAutosave({
     fields: significantFields(data), enabled: !locked && !leaving, paused, onDirty, onBusy,
     send: async (patch) => {

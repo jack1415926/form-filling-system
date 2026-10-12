@@ -12,7 +12,7 @@
     "test:autosave": "node --test tests/autosave.test.mjs",
     "test:api": "node --test tests/api.test.mjs",
     "test:questions": "node --test tests/question-draft.test.mjs",
-    "test:ecr-preview": "node --test tests/ecr-preview.test.mjs",
+    "test:action-definitions": "node --test tests/action-definitions.test.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

@@ -6,17 +6,22 @@ from .roles import business_role
 
 
 def is_owner(user, change):
-    return business_role(user) == 'filler' and change.applicant_id == user.pk
+    return change.applicant_id == user.pk
 
 
 def eligible(user, round):
-    return (business_role(user) == 'reviewer' and user.pk != round.change.applicant_id
-            and (round.review_mode == 'public' or round.records.filter(reviewer=user, assigned=True).exists()))
+    if not user.is_active or user.pk == round.change.applicant_id:
+        return False
+    if round.review_mode == 'public':
+        return business_role(user) == 'reviewer'
+    return round.records.filter(reviewer=user, assigned=True).exists()
 
 
 def can_read_round(user, round):
     if is_owner(user, round.change) or eligible(user, round):
         return True
+    if round.review_mode == 'public':
+        return False
     current = round.change.review_rounds.filter(number=round.change.current_review_round).first()
     return current is not None and eligible(user, current)
 
@@ -32,4 +37,7 @@ def readable_change(request, pk):
 
 
 def reviewer_rounds(user):
-    return Q(review_mode='public') | Q(records__reviewer=user, records__assigned=True)
+    if not user.is_active:
+        return Q(pk__in=[])
+    assigned = Q(review_mode='designated', records__reviewer=user, records__assigned=True)
+    return assigned | Q(review_mode='public') if business_role(user) == 'reviewer' else assigned

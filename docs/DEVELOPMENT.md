@@ -1,5 +1,7 @@
 # 开发与演示
 
+2026-10-12：第三步负责人账号关联已完成（工作区未提交／推送）。普通业务账号统一为用户，职责按具体申请区分。ECR／ECO每项可选真实负责人，含本人；旧姓名只读保留，迁移至0018，仍23张业务表。负责人关联不授予权限，不自动加入整单审核名单，不派发任务或通知。最新字段、接口及最小验证见[第三步记录](testing/ACTION-OWNERS-2026-10-12.md)。ECR／ECO独立流转及发布尚未实现。
+
 本文件维护当前操作方法。功能进度见 [README](../README.md)，业务规则见 [MVP](MVP.md)，代码地图见 [项目开发梳理](PROJECT_GUIDE.md)。历史设备的运行快照见 [2026-10-05复验](testing/REVERIFICATION-2026-10-05.md)，不作为其他设备的当前配置。
 
 ## 环境与配置
@@ -164,3 +166,31 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-review-recovery.ps
 八表修改停顿2秒自动保存，新物料首次创建仍需手动确认。切页的放弃只丢弃未保存修改，不撤销已自动保存内容。刷新/关闭保护用于未保存文字、请求在途或未知结果，不提供异常退出后的本地恢复。
 
 ECR内存演示仍可通过 `?preview=ecr` 访问，不需要后端；正式填报使用无查询参数入口并登录。功能检查与人工业务验收分开记录，不根据历史日志推断当前设备已验收。
+
+## 统一账号工作台回归（2026-10-12）
+
+前后端同步载入第一步代码；使用--noreload的后端需要重启。无需数据库迁移。独立回归入口：
+
+```powershell
+pwsh -NoProfile -File scripts/check-dual-workspace.ps1
+```
+
+可用-PlaywrightModule指定当前设备已有Playwright模块；脚本准备独立账号、执行真实与拦截页面场景、在finally清理，并核对原23张业务表及账号／组数据。最新全量为158项MySQL、81项前端，历史数量仍保留为批次证据。
+
+## 按指定关系授权回归（第二步，2026-10-12）
+
+本批无迁移，前后端同步更新，--noreload后端需要重启。最小回归命令：
+
+```powershell
+pwsh -NoProfile -File scripts/check-dual-workspace.ps1 -Scenario assignment
+```
+
+按当前设备需要指定-PlaywrightModule。只验证两个临时普通账号之间的指定提交、处理和查看结果，结束后清理并核对原业务及账号／组摘要。第二步仅运行4项MySQL专项、16项相关前端和该实际链路；历史全量数字不能当作本批全量结果。
+
+## 全面审查后的验证基线（2026-10-12）
+
+最新全量为166项真实MySQL、84项前端，lint/build通过；迁移仍至0018。全面页面回归及两项P2修复见[审查记录](testing/COMPREHENSIVE-REVIEW-2026-10-12.md)，旧全量／专项数字是当时批次证据。异常行动响应的完全模拟回归入口为scripts/action-owner-response-recovery-browser.cjs，使用现有Playwright模块，不写真实库。
+
+## 现行测试整理（2026-10-12）
+
+最新完整测试为161项真实MySQL、80项前端，均通过；旧数量按批次保留。八表能力回归在test_user_workspace，授权在test_assignment_access，混合提醒在test_review_inbox。共享行动定义专项为npm.cmd run test:action-definitions，旧test:ecr-preview入口已移除。删除和合并依据见[测试整理记录](testing/TEST-CLEANUP-2026-10-12.md)。

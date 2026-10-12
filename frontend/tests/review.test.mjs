@@ -9,7 +9,7 @@ const round={number:1,title:'Submitted title',ecr_no:'ECR-1',eco_no:'ECO-1',revi
 const data={change_id:1,updated_at:'2026-10-05T01:00:00Z',current_round:1,round,is_current:true,can_view_form:false,can_approve:true,can_return:true,can_feedback:true,form:null,history:[round],feedback:[],issues:[],unresolved_count:0,issue_blockers:[],confirmed_requests:[]}
 const change={id:1,applicant:2,current_review_round:1,title:'Revised',ecr_no:'ECR-1',eco_no:'ECO-1',affected_products:'',affected_region:'',initiating_factory:'',affected_factories:'',ccb_owner:'',change_owner:'',change_reason:'',planned_eco_date:null,status:'returned',review_mode:'public',submitted_at:'2026-10-05T01:00:00Z',created_at:'2026-10-05T00:00:00Z',updated_at:'2026-10-05T01:01:00Z'}
 
-test('first public submission permits approval without return; individual approval and issue resolution do not imply whole approval',()=>{
+test('approval permissions and legacy public progress remain readable without treating individual decisions as whole approval',()=>{
  assert.equal(approvalBlockReason(data,actor.id,0),null)
  assert.match(approvalProgress(round),/0\/2/)
  const one={...data,round:{...round,approvals:[{...actor,approved_at:round.submitted_at}]}}
@@ -31,8 +31,8 @@ test('disabled approval always explains draft, permission, old round or terminal
  assert.match(approvalBlockReason({...data,round:{...round,state:'approved'}},actor.id,0),/已批准/)
 })
 
-test('only the filler can edit draft or returned states; reviewer identity is not replaced with applicant',()=>{
- for(const state of ['draft','returned']){assert.equal(canEdit({status:state}),true);assert.equal(canEdit({status:state},'reviewer'),false)}
+test('owners with either capability edit draft or returned states; other actors cannot edit',()=>{
+ for(const state of ['draft','returned']){assert.equal(canEdit({status:state}),true);assert.equal(canEdit({status:state,applicant:3},actor),true);assert.equal(canEdit({status:state,applicant:1},actor),false)}
  for(const state of ['pending','approved'])assert.equal(canEdit({status:state}),false)
  const client=new QueryClient();client.setQueryData(['me'],actor);assert.equal(actorUser(client).id,3);assert.notEqual(actorUser(client).id,change.applicant);client.clear()
 })

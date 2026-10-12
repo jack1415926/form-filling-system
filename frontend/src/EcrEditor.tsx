@@ -6,7 +6,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Drawer, Empty, Input, Select, Table, Tag } from 'antd'
 import { api, type ChangeRequest, type EcrAction, type EcrData, type EcrValues } from './api'
 import useAutosave, { discardSavedWarning } from './useAutosave'
-import { actionFields } from './autosaveFields'
+import { actionFields, actionPayload } from './autosaveFields'
+import ActionOwnerSelect from './ActionOwnerSelect'
+import { actionOwnerLabel, checkedActionData } from './actionOwners'
 
 
 const statusLabels = { '': '未填写', completed: '完成', not_applicable: '不适用' }
@@ -20,22 +22,22 @@ function ActionForm({ action, record, leaving, paused, onDirty, onBusy, onSaved,
   const actorId = actorUser(queryClient).id
   const [dateInvalid, setDateInvalid] = useState(false)
   const save = useAutosave({
-    fields: actionFields(action), enabled: canEdit(record, actorUser(queryClient).role) && !leaving, valid: !dateInvalid, paused, onDirty, onBusy,
+    fields: actionFields(action), enabled: canEdit(record, actorUser(queryClient)) && !leaving, valid: !dateInvalid, paused, onDirty, onBusy,
     send: async (patch) => {
-      const data = await api<EcrData>(`/api/changes/${record.id}/ecr-actions/${action.id}/`, 'PATCH', patch, actorId)
+      const data = checkedActionData(await api<unknown>(`/api/changes/${record.id}/ecr-actions/${action.id}/`, 'PATCH', actionPayload(patch), actorId), 'ecr')
       const latest = save.queue.active ? onSaved(data) : data
       return actionFields(latest.actions.find((row) => row.id === action.id)!)
     },
   })
-  const values = save.values as EcrValues
+  const values = save.values as { owner_user_id: string | null; result: string; status: EcrValues['status']; date: string | null }
   const dirty = save.dirty
-  const update = (next: Partial<EcrValues>) => save.update(next)
-  const disabled = !canEdit(record, actorUser(queryClient).role) || leaving || save.manual
+  const update = (next: Partial<typeof values>) => save.update(next)
+  const disabled = !canEdit(record, actorUser(queryClient)) || leaving || save.manual
   const manualSave = () => { void save.manualSave().then(onComplete).catch(() => {}) }
   return <div className="preview-drawer" {...save.composition}>
     <Tag>{action.function}</Tag><p className="question-text">{action.text}</p>
-    {!canEdit(record, actorUser(queryClient).role) && <Alert type="info" title="申请已锁定，仅供查看。" />}
-    <label htmlFor="ecr-owner">负责人</label><Input id="ecr-owner" maxLength={255} disabled={disabled} value={values.owner} onChange={(event) => update({ owner: event.target.value })} />
+    {!canEdit(record, actorUser(queryClient)) && <Alert type="info" title="申请已锁定，仅供查看。" />}
+    <ActionOwnerSelect id="ecr-owner" value={values.owner_user_id} linked={action.owner_user} legacy={action.owner} disabled={disabled} onChange={owner_user_id => update({ owner_user_id })} />
     <label htmlFor="ecr-result">评估结果</label><Input.TextArea id="ecr-result" disabled={disabled} value={values.result} autoSize={{ minRows: 5, maxRows: 12 }} onChange={(event) => update({ result: event.target.value })} />
     <div className="form-grid"><div><label htmlFor="ecr-status">评估状态</label><Select id="ecr-status" style={{ width: '100%' }} disabled={disabled} options={statusOptions} value={values.status} onChange={(status: EcrValues['status']) => update({ status })} /></div><div><label htmlFor="ecr-date">日期</label><DateInput id="ecr-date" disabled={disabled} value={values.date ?? ''} onChange={(event) => { const invalid = !event.target.validity.valid; setDateInvalid(invalid); if (!invalid) update({ date: event.target.value || null }) }} /></div></div>
     {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
@@ -57,7 +59,7 @@ export default function EcrEditor({ record, onDirty, onBusy, onBack, onPrevious,
   const [all, setAll] = useState(false)
   const queryKey = ['ecr-actions', actorId, record.id]
   const actions = useQuery({ queryKey, refetchOnWindowFocus: false, queryFn: async () => {
-    const result = await api<EcrData>(`/api/changes/${record.id}/ecr-actions/`, 'GET', undefined, actorId)
+    const result = checkedActionData(await api<unknown>(`/api/changes/${record.id}/ecr-actions/`, 'GET', undefined, actorId), 'ecr')
     const current = queryClient.getQueryData<EcrData>(queryKey)
     return newestResponse(current, result)
   } })
@@ -79,8 +81,8 @@ export default function EcrEditor({ record, onDirty, onBusy, onBack, onPrevious,
         { title: '来源问题', width: 160, render: (_, row) => <><strong>问题 {row.number}</strong><div className="preview-source"><Tag color={row.question_answer === 'Y' ? 'green' : 'default'}>{row.question_answer === 'Y' ? '当前触发' : row.question_answer === 'N' ? '当前未触发' : '来源问题未回答'}</Tag></div></> },
         { title: '职能', dataIndex: 'function', width: 125 },
         { title: 'ECR 评估行动', dataIndex: 'text', width: 380, render: (text: string) => <div className="question-text">{text}</div> },
-        { title: '填写摘要', width: 280, render: (_, row) => <div className="preview-summary"><div>{row.owner || '未填负责人'} · {statusLabels[row.status]} · {row.date || '未填日期'}</div><p title={row.result}>{row.result ? row.result.slice(0, 100) : '未填写评估结果'}</p></div> },
-        { title: '操作', width: 90, render: (_, row) => <Button type="link" disabled={busy || !!editor} onClick={() => setEditor(row)}>{canEdit(record, actorUser(queryClient).role) ? '编辑' : '查看'}</Button> },
+        { title: '填写摘要', width: 280, render: (_, row) => <div className="preview-summary"><div>{actionOwnerLabel(row.owner_user)} · {statusLabels[row.status]} · {row.date || '未填日期'}</div>{row.owner && <p>原负责人文字：{row.owner}</p>}<p title={row.result}>{row.result ? row.result.slice(0, 100) : '未填写评估结果'}</p></div> },
+        { title: '操作', width: 90, render: (_, row) => <Button type="link" disabled={busy || !!editor} onClick={() => setEditor(row)}>{canEdit(record, actorUser(queryClient)) ? '编辑' : '查看'}</Button> },
       ]} />
     </section><div className="form-footer"><span className="muted">未触发时隐藏，不删除已有填写；触发后重新出现。</span><div className="form-actions"><Button disabled={busy || !!editor} onClick={onPrevious}>上一页</Button><Button disabled={busy || !!editor} onClick={onNext}>下一页</Button></div></div>
     <Drawer open={!!editor} size={720} title={editor && `问题 ${editor.number} · ECR 评估`} onClose={close} maskClosable={!busy} keyboard={!busy} closable={!busy} extra={<Button disabled={busy} onClick={onReauthenticate}>重新登录</Button>}>

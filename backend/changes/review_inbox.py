@@ -21,6 +21,13 @@ class ReviewInbox(APIView):
 
     def get(self, request):
         role = business_role(request.user)
+        items = self.context_items(request, 'filler')
+        items += self.context_items(request, 'reviewer')
+        return Response({'actor_id': request.user.pk, 'role': role,
+                         'count': sum(item['count'] for item in items),
+                         'unread_count': sum(item['count'] for item in items if not item['is_read']), 'items': items})
+
+    def context_items(self, request, role):
         rows = ReviewRound.objects.filter(number=F('change__current_review_round'),
                                          state=F('change__status'), state__in=['pending', 'returned'])
         if role == 'reviewer':
@@ -45,7 +52,7 @@ class ReviewInbox(APIView):
                 count = review + row.replies
                 notes = (['申请待审核'] if review else [])
                 if row.replies:
-                    notes.append(f'{row.replies}条填写员回应' + ('待复核' if row.state == 'pending' else '（待填写员重提）'))
+                    notes.append(f'{row.replies}条申请者回应' + ('待复核' if row.state == 'pending' else '（待申请者重提）'))
                 open_issues = bool(row.replies)
             else:
                 count = max(1, row.unanswered)
@@ -55,12 +62,11 @@ class ReviewInbox(APIView):
                 # Only incoming messages/new rounds notify again; own replies/resolutions do not.
                 signature = hashlib.sha256(json.dumps([role, row.pk, row.latest_incoming or 0]).encode()).hexdigest()
                 items.append({'change_id': row.change_id, 'round': row.number, 'title': row.title if role == 'reviewer' else row.change.title,
+                              'context': 'reviewer' if role == 'reviewer' else 'applicant',
                               'ecr_no': row.ecr_no if role == 'reviewer' else row.change.ecr_no, 'status': row.state, 'count': count,
                               'summary': '；'.join(notes), 'open_issues': open_issues,
                               'message_key': signature, 'is_read': reads.get(row.pk) == signature})
-        return Response({'actor_id': request.user.pk, 'role': role,
-                         'count': sum(item['count'] for item in items),
-                         'unread_count': sum(item['count'] for item in items if not item['is_read']), 'items': items})
+        return items
 
 
 class ReadItem(StrictValues):

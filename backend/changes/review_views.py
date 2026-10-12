@@ -11,7 +11,6 @@ from rest_framework.views import APIView
 from .models import ChangeRequest, ReviewRound, ReviewRecord, ReviewFeedback
 from .permissions import ExpectedAccountPermission
 from .review_access import is_owner, eligible, can_read_round, reviewer_rounds
-from .roles import business_role
 from .serializers import ChangeRequestSerializer
 from .review_issues import (ReturnValues, IssueActionValues, ApproveValues, blockers, issue_data,
                             replay, event, checked_issue, return_issues)
@@ -59,13 +58,11 @@ class ReviewList(APIView):
     http_method_names = ['get', 'head', 'options']
 
     def get(self, request):
-        if business_role(request.user) != 'reviewer':
-            return Response({'detail': '此入口仅对审核员开放。', 'code': 'role_forbidden'}, status=403)
         kind = request.query_params.get('kind', 'designated')
         if kind not in ['designated', 'public', 'handled', 'returned']:
             raise serializers.ValidationError({'kind': '列表类型不合法。'})
         own_approved = ReviewRecord.objects.filter(round_id=OuterRef('pk'), reviewer=request.user, approved_at__isnull=False)
-        rows = ReviewRound.objects.exclude(change__applicant=request.user).annotate(my_approved=Exists(own_approved))
+        rows = ReviewRound.objects.exclude(change__applicant=request.user).filter(reviewer_rounds(request.user)).annotate(my_approved=Exists(own_approved))
         if kind == 'handled':
             rows = rows.filter(Q(my_approved=True) | Q(returned_by=request.user))
         elif kind == 'returned':
@@ -160,7 +157,7 @@ class ReviewDetail(APIView):
                     return Response({'detail': '当前状态不允许此意见操作。'}, status=409)
                 issue = checked_issue(record, request.user, values, owner=action == 'respond')
                 if action == 'resolve' and issue.state != 'awaiting_review':
-                    return Response({'detail': '填写员尚未回应，不能确认解决。'}, status=409)
+                    return Response({'detail': '申请者尚未回应，不能确认解决。'}, status=409)
                 issue.state = 'awaiting_review' if action == 'respond' else 'resolved'; issue.version += 1
                 issue.save(update_fields=['state', 'version'])
                 event(record, round, request.user, action, values, issue, values['text'])

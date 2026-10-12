@@ -24,7 +24,7 @@ function EmcForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNext, le
   const { message } = App.useApp()
   const [rowId, setRowId] = useState<string | null>(null)
   const row = data.rows.find((item) => item.id === rowId)
-  const locked = !canEdit(record, actorUser(queryClient).role) || !data.can_fill
+  const locked = !canEdit(record, actorUser(queryClient)) || !data.can_fill
   const save = useAutosave({
     fields: emcFields(data), enabled: !locked && !leaving, paused, onDirty, onBusy,
     send: async (patch) => {

@@ -18,7 +18,7 @@ type Props = {
 function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNext, saveRef, leaving, paused = false }: Props & { data: QuestionData }) {
   const queryClient = useQueryClient()
   const actorId = actorUser(queryClient).id
-  const locked = !canEdit(record, actorUser(queryClient).role)
+  const locked = !canEdit(record, actorUser(queryClient))
   const save = useAutosave({
     fields: questionFields(data), enabled: !locked && !leaving, paused, onDirty, onBusy,
     send: async (patch) => {

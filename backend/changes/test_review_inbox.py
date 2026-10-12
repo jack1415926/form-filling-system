@@ -1,3 +1,5 @@
+import hashlib
+import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from threading import Event
@@ -42,6 +44,29 @@ class ReviewInboxTests(TestCase):
         client = APIClient(); client.force_authenticate(user)
         return client.post('/api/review/inbox/read/', {'items': [{key: item[key] for key in
                            ['change_id', 'round', 'message_key']} for item in items]}, format='json')
+
+    def test_mixed_inbox_preserves_context_signatures_and_existing_read_receipts(self):
+        client = APIClient(); client.force_authenticate(self.reviewer)
+        own = ChangeRequest.objects.create(applicant=self.reviewer, status='returned', current_review_round=1, title='Own')
+        own_round = ReviewRound.objects.create(change=own, number=1, review_mode='designated', state='returned', submitted_at=timezone.now(), title='Own')
+        foreign = ChangeRequest.objects.create(applicant=self.owner, status='pending', current_review_round=1, title='Foreign')
+        round = ReviewRound.objects.create(change=foreign, number=1, review_mode='designated', submitted_at=timezone.now(), title='Foreign')
+        ReviewRecord.objects.create(change=foreign, round=round, reviewer=self.reviewer)
+        signature = hashlib.sha256(json.dumps(['reviewer', round.pk, 0]).encode()).hexdigest()
+        ReviewInboxRead.objects.create(user=self.reviewer, round=round, signature=signature)
+        data = client.get('/api/review/inbox/').json()
+        self.assertEqual(data['count'], 2); self.assertEqual(data['unread_count'], 1)
+        items = {item['context']: item for item in data['items']}
+        self.assertEqual(items['applicant']['change_id'], own.pk)
+        self.assertEqual(items['reviewer']['change_id'], foreign.pk)
+        self.assertTrue(items['reviewer']['is_read']); self.assertEqual(items['reviewer']['message_key'], signature)
+        payload = {'items': [{key: item[key] for key in ['change_id', 'round', 'message_key']} for item in data['items']]}
+        self.assertEqual(client.post('/api/review/inbox/read/', payload, format='json').json()['unread_count'], 0)
+        self.reviewer.groups.remove(Group.objects.get(name=REVIEWER_GROUP))
+        remaining = client.get('/api/review/inbox/').json()
+        self.assertEqual({item['context'] for item in remaining['items']}, {'applicant', 'reviewer'})
+        self.assertTrue(remaining['items'][0]['is_read'])
+        self.assertEqual(client.patch(f'/api/changes/{own.pk}/', {'title': 'Still mine'}, format='json').status_code, 200)
 
     def test_read_persists_per_account_without_completing_tasks(self):
         change, round = self.record('public')
@@ -130,7 +155,7 @@ class ReviewInboxTests(TestCase):
         self.assertEqual(self.inbox(self.owner).data['unread_count'], 0)
         result = self.inbox(self.reviewer).data
         self.assertEqual(result['count'], 1)
-        self.assertIn('待填写员重提', result['items'][0]['summary'])
+        self.assertIn('待申请者重提', result['items'][0]['summary'])
         self.assertEqual(result['items'][0]['title'], 'Submitted title')
         self.assertEqual(self.inbox(self.second).data['count'], 0)
         self.assertFalse(self.inbox(self.owner).data['items'][0]['open_issues'])

@@ -7,7 +7,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import ChangeRequest, ReviewRecord, ReviewRound
-from .roles import REVIEWER_GROUP, business_role
 from .serializers import ChangeRequestSerializer
 from .review_issues import blockers
 
@@ -17,10 +16,17 @@ def reviewer_data(user):
 
 
 def active_reviewers():
-    return get_user_model().objects.filter(is_active=True, groups__name=REVIEWER_GROUP).distinct().order_by('pk')
+    return get_user_model().objects.filter(is_active=True).order_by('pk')
 
 
 class ReviewerList(APIView):
+    http_method_names = ['get', 'head', 'options']
+
+    def get(self, request):
+        return Response([reviewer_data(user) for user in active_reviewers().exclude(pk=request.user.pk)])
+
+
+class ActionOwnerList(APIView):
     http_method_names = ['get', 'head', 'options']
 
     def get(self, request):
@@ -79,8 +85,6 @@ class SubmissionDetail(APIView):
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
             # Recheck after any wait for the application lock.
-            if business_role(request.user) != 'filler':
-                return Response({'detail': '账号角色已变化，请刷新身份。', 'code': 'role_forbidden'}, status=403)
             current = record.review_rounds.filter(number=record.current_review_round).first()
             request_id = values.get('request_id')
             if request_id:
@@ -95,6 +99,8 @@ class SubmissionDetail(APIView):
                 if not request_id and current and current.number == 1 and current.review_mode == values['review_mode'] and saved_ids == sorted(values['reviewer_ids']):
                     return Response(self.data(record))
                 return Response({'detail': '申请已锁定，不能重复开启审核轮次。'}, status=409)
+            if values['review_mode'] != 'designated':
+                raise serializers.ValidationError({'review_mode': '公开审核已停止新增，请选择具体审核人员。'})
             if values.get('expected_round', 0) != record.current_review_round:
                 return Response({'detail': '申请轮次已变化，请刷新后再次提交。'}, status=409)
             if record.status == 'returned' and not request_id:
@@ -109,13 +115,11 @@ class SubmissionDetail(APIView):
             errors = {field: '提交前必须填写。' for field in ['title', 'ecr_no'] if not getattr(record, field).strip()}
             if errors:
                 raise serializers.ValidationError(errors)
-            # Lock account rows while checking activity and membership for this submission.
+            # Lock account rows while checking activity for this submission.
             candidates = list(active_reviewers().exclude(pk=record.applicant_id).select_for_update())
             available = {user.pk for user in candidates}
-            if values['review_mode'] == 'public' and len(available) < 2:
-                raise serializers.ValidationError({'review_mode': '系统中的有效审核员不足两人，请联系账号维护人员设置审核员身份。'})
             if not set(values['reviewer_ids']).issubset(available):
-                raise serializers.ValidationError({'reviewer_ids': '所选账号不存在、已停用或不是审核员，请重新选择。'})
+                raise serializers.ValidationError({'reviewer_ids': '所选账号不存在、已停用或是申请者本人，请重新选择。'})
             if record.review_records.filter(round__isnull=True).exists():
                 return Response({'detail': '草稿已有异常审核关联，请先核对数据。'}, status=409)
             now = timezone.now()

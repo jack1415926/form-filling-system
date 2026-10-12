@@ -8,7 +8,7 @@ from .models import ChangeRequest
 
 def check_empty_retries_validation_and_transaction_rollback(self, prefix, model):
     previous = self.change.updated_at
-    for values in [{}, {'owner': '', 'date': None}]:
+    for values in [{}, {'owner_user_id': None, 'date': None}]:
         self.assertEqual(self.write(values).status_code, 200)
         self.change.refresh_from_db()
         self.assertEqual(self.change.updated_at, previous)
@@ -71,11 +71,11 @@ def check_parallel_partial_saves_and_retries_keep_both_fields(self, prefix, mode
             return client.patch(path, values, format='json').status_code
         finally:
             connections.close_all()
-    for values in [[{'owner': '并行负责人'}, {'result': '并行解释'}], [{'status': 'completed'}, {'status': 'completed'}]]:
+    for values in [[{'owner_user_id': user.pk}, {'result': '并行解释'}], [{'status': 'completed'}, {'status': 'completed'}]]:
         barrier = Barrier(2)
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(write, value) for value in values]
             self.assertEqual([future.result(timeout=15) for future in futures], [200, 200])
     self.assertEqual(model.objects.count(), 1)
     row = model.objects.get()
-    self.assertEqual((row.owner, row.result, row.status), ('并行负责人', '并行解释', 'completed'))
+    self.assertEqual((row.owner_user_id, row.result, row.status), (user.pk, '并行解释', 'completed'))

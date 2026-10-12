@@ -16,8 +16,12 @@ const folder = '.local/review-recovery-browser';
     await page.getByLabel('密码', { exact: true }).fill(account.password);
     const inbox = page.waitForResponse(response => new URL(response.url()).pathname === '/api/review/inbox/');
     await page.getByRole('button', { name: /登\s*录/ }).click();
-    await page.getByRole('heading', { name: account.role === 'filler' ? '我的申请' : '审核工作台', exact: true }).waitFor();
+    await page.getByRole('heading', { name: /欢迎回来/ }).waitFor();
     if ((await (await inbox).json()).unread_count > 0) await page.getByRole('button', { name: '稍后处理', exact: true }).click();
+    // A polling notification can appear underneath an operation modal. Dismiss
+    // only this unrelated notice without changing the recovery action under test.
+    await page.addLocatorHandler(page.getByRole('button', { name: '稍后处理', exact: true }), async button => { await button.evaluate(element => element.click()); });
+    await page.locator('.workspace-card').filter({ hasText: account.role === 'reviewer' ? '待我处理' : '我的申请' }).click();
     return { context, page };
   }
   try {
@@ -71,7 +75,9 @@ const folder = '.local/review-recovery-browser';
     const page = filler.page;
     await page.getByRole('button', { name: '全项目复查2（临时）', exact: true }).click();
     await page.getByRole('tab', { name: '提交审核', exact: true }).click();
-    await page.getByRole('radio', { name: '公开审核', exact: true }).check();
+    await page.getByLabel('指定审核员', { exact: true }).click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: fixture.accounts[1].username }).click();
+    await page.getByRole('heading', { name: /提交审核/ }).click();
     let submitted;
     await page.route(`**/api/changes/${fixture.records[1]}/submission/`, async route => {
       if (route.request().method() !== 'POST') return route.continue();

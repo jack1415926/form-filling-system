@@ -1,0 +1,167 @@
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const folder = '.local/dual-workspace-20261012';
+const fixture = JSON.parse(fs.readFileSync(folder+'/fixture.json','utf8'));
+(async () => {
+  const browser = await chromium.launch({ channel:'msedge',headless:true });
+  const contexts=[], checks=[], errors=[];
+  let currentPage;
+  async function login(account) {
+    const context=await browser.newContext({ baseURL:process.env.DUAL_BASE_URL||'http://localhost:5173',viewport:{width:1440,height:1000} });
+    contexts.push(context); const page=await context.newPage(); currentPage=page;
+    page.on('pageerror',error=>errors.push(error.message));
+    await page.goto('/');
+    await page.getByLabel('用户名',{exact:true}).fill(account.username);
+    await page.getByLabel('密码',{exact:true}).fill(account.password);
+    const inboxResponse=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/review/inbox/');
+    await page.getByRole('button',{name:/登\s*录/}).click();
+    await page.getByRole('heading',{name:/欢迎回来/}).waitFor();
+    if ((await (await inboxResponse).json()).unread_count>0) await page.getByRole('button',{name:'稍后处理',exact:true}).click();
+    await page.locator('.ant-modal:visible').waitFor({state:'hidden'});
+    return {context,page};
+  }
+  async function openInbox(page) {
+    if(!await page.getByRole('button',{name:'打开审核意见',exact:true}).isVisible()) await page.getByRole('button',{name:'打开意见与反馈',exact:true}).click();
+    await page.getByRole('button',{name:'打开审核意见',exact:true}).click();
+  }
+  async function reauthenticate(page,account) {
+    await page.locator('.topbar').getByRole('button',{name:'重新登录',exact:true}).click();
+    const modal=page.locator('.ant-modal:visible');
+    await modal.getByLabel('用户名',{exact:true}).fill(account.username);
+    await modal.getByLabel('密码',{exact:true}).fill(account.password);
+    await modal.getByRole('button',{name:/登\s*录/}).click();
+    await modal.waitFor({state:'hidden'});
+  }
+  function capability(action) {
+    execFileSync(process.env.DUAL_POWERSHELL,['-NoProfile','-File',process.env.DUAL_BACKEND_SCRIPT,'shell','-c',"exec(open('../scripts/dual_workspace_fixture.py', encoding='utf-8').read())"],{env:{...process.env,DUAL_FIXTURE_ACTION:action},stdio:'pipe'});
+  }
+  try {
+    const owner=await login(fixture.accounts[0]); const page=owner.page;
+    assert.equal(await page.locator('.workspace-card').count(),2);
+    await page.screenshot({path:folder+'/home-b.png',fullPage:true});
+    checks.push('B home has both entries for one reviewer account');
+    const inbox=await (await owner.context.request.get('/api/review/inbox/')).json();
+    assert.deepEqual(new Set(inbox.items.map(item=>item.context)),new Set(['applicant','reviewer']));
+    await openInbox(page);
+    await page.getByRole('row').filter({hasText:'本人退回申请（临时）'}).getByRole('button',{name:'查看并处理',exact:true}).click();
+    await page.getByRole('heading',{name:/变更概述/}).waitFor();
+    await page.getByLabel('ECR/ECO 标题',{exact:true}).waitFor();
+    assert.equal(await page.getByLabel('ECR/ECO 标题',{exact:true}).isEnabled(),true);
+    const issueDrawer=page.locator('.ant-drawer-open');
+    if(await issueDrawer.count()) await issueDrawer.locator('.ant-drawer-close').click();
+    await page.getByRole('button',{name:'工作台首页',exact:true}).click();
+    await page.getByRole('heading',{name:/欢迎回来/}).waitFor();
+    await openInbox(page);
+    await page.getByRole('row').filter({hasText:'他人待审核申请（临时）'}).getByRole('button',{name:'查看并处理',exact:true}).click();
+    await page.getByRole('heading',{name:/第1轮审核/}).waitFor();
+    await page.getByLabel('ECR/ECO 标题',{exact:true}).waitFor();
+    assert.equal(await page.getByLabel('ECR/ECO 标题',{exact:true}).isDisabled(),true);
+    checks.push('mixed inbox opens own editable form and other read-only review');
+    await page.getByRole('button',{name:'列出修改意见并退回',exact:true}).click();
+    await page.getByRole('textbox',{name:'意见1具体问题',exact:true}).fill('尚未发送的审核意见');
+    await page.locator('.ant-drawer-open .ant-drawer-close').click();
+    await openInbox(page);
+    await page.getByRole('row').filter({hasText:'他人待审核申请（临时）'}).getByRole('button',{name:'查看并处理',exact:true}).click();
+    await page.getByRole('button',{name:/查看审核意见/}).click();
+    assert.equal(await page.getByRole('textbox',{name:'意见1具体问题',exact:true}).inputValue(),'尚未发送的审核意见');
+    await page.locator('.ant-drawer-open .ant-drawer-close').click();
+    checks.push('same review reminder keeps unsent opinion and navigation protection');
+    await page.getByRole('button',{name:'工作台首页',exact:true}).click();
+    await page.getByRole('button',{name:'继续填写',exact:true}).click();
+    await page.getByRole('heading',{name:/第1轮审核/}).waitFor();
+    await page.getByRole('button',{name:'工作台首页',exact:true}).click();
+    await page.getByRole('button',{name:'放弃修改并离开',exact:true}).click();
+    await page.locator('.workspace-card').filter({hasText:'我的申请'}).click();
+    await page.getByRole('button',{name:'＋ 新建草稿',exact:true}).click();
+    await page.getByLabel('ECR/ECO 标题',{exact:true}).fill('双能力账号新申请（临时）');
+    await page.getByLabel('ECR 编号',{exact:true}).fill('DUAL-BROWSER-'+fixture.accounts[0].id);
+    await page.getByRole('button',{name:'保存草稿',exact:true}).click();
+    await page.getByRole('button',{name:'工作台首页',exact:true}).click();
+    await page.locator('.workspace-card').filter({hasText:'我的申请'}).click();
+    await page.getByRole('button',{name:'双能力账号新申请（临时）',exact:true}).click();
+    assert.equal(await page.getByLabel('ECR/ECO 标题',{exact:true}).inputValue(),'双能力账号新申请（临时）');
+    checks.push('review-capable account creates and restores its own real draft');
+    const records=await (await owner.context.request.get('/api/changes/')).json();
+    const created=records.find(row=>row.title==='双能力账号新申请（临时）');
+    await page.getByRole('tab',{name:'提交审核',exact:true}).click();
+    assert.equal(await page.getByRole('radio',{name:'公开审核',exact:true}).count(),0);
+    const people=await (await owner.context.request.get('/api/reviewers/')).json();
+    assert(!people.some(user=>user.id===fixture.accounts[0].id));
+    await page.getByLabel('指定审核员',{exact:true}).click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText:fixture.accounts[1].username}).click();
+    await page.getByRole('heading',{name:/提交审核/}).click();
+    let submitted;
+    await page.route(`**/api/changes/${created.id}/submission/`,async route=>{
+      if(route.request().method()!=='POST')return route.continue();
+      const response=await route.fetch();assert.equal(response.status(),200);submitted=await response.json();await route.abort('failed');
+    });
+    await page.getByRole('button',{name:'提交申请',exact:true}).click();
+    await page.getByRole('button',{name:'确认提交并锁定',exact:true}).click();
+    await page.getByText('提交结果未确认',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'工作台首页',exact:true}).isDisabled(),true);
+    await page.getByRole('button',{name:'查询提交结果',exact:true}).click();
+    await page.getByText('提交结果未确认',{exact:true}).waitFor({state:'hidden'});
+    assert.equal(submitted.change.status,'pending');
+    checks.push('owner submission lost response blocks home until original request is confirmed');
+    await page.getByRole('button',{name:'工作台首页',exact:true}).click();
+    await page.locator('.workspace-card').filter({hasText:'待我处理'}).click();
+    const ownInList=await (await owner.context.request.get('/api/review/?kind=designated')).json();
+    assert(!ownInList.some(row=>row.change_id===created.id));
+    await page.getByRole('button',{name:'查看申请',exact:true}).click();
+    const incomingId=fixture.records['他人待审核申请（临时）'];
+    await page.route(`**/api/changes/${incomingId}/review-rounds/1/approve/`,async route=>{
+      const response=await route.fetch();assert.equal(response.status(),200);await route.abort('failed');
+    });
+    await page.getByRole('button',{name:'本人同意批准',exact:true}).click();
+    await page.getByRole('button',{name:'确认批准',exact:true}).click();
+    await page.getByText('操作结果未确认，原请求及输入已保留',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'工作台首页',exact:true}).isDisabled(),true);
+    await page.getByRole('button',{name:'查询结果',exact:true}).click();
+    await page.getByText('操作结果未确认，原请求及输入已保留',{exact:true}).waitFor({state:'hidden'});
+    if(await page.locator('.ant-drawer-open').count()) await page.locator('.ant-drawer-open .ant-drawer-close').click();
+    checks.push('other review lost response blocks home until recovery, own request excluded');
+    await page.getByRole('button',{name:'工作台首页',exact:true}).click();
+    await page.locator('.workspace-card').filter({hasText:'我的申请'}).click();
+    await page.getByRole('button',{name:'本人退回申请（临时）',exact:true}).click();
+    const pattern=`**/api/changes/${fixture.records['本人退回申请（临时）']}/`;
+    const rejectSave=route=>route.request().method()==='PATCH'?route.fulfill({status:400,json:{detail:'保留未保存文字的模拟校验失败'}}):route.continue();
+    await page.route(pattern,rejectSave);
+    await page.getByLabel('ECR/ECO 标题',{exact:true}).fill('权限变化仍保留的本人草稿');
+    await page.getByRole('button',{name:'保存草稿',exact:true}).click();
+    await page.getByText('保留未保存文字的模拟校验失败',{exact:true}).waitFor();
+    await reauthenticate(page,fixture.accounts[0]);
+    assert.equal(await page.getByLabel('ECR/ECO 标题',{exact:true}).inputValue(),'权限变化仍保留的本人草稿');
+    capability('revoke');
+    await page.locator('.topbar').getByRole('button',{name:'刷新身份',exact:true}).click();
+    assert.equal(await page.getByLabel('ECR/ECO 标题',{exact:true}).inputValue(),'权限变化仍保留的本人草稿');
+    assert.equal((await owner.context.request.get('/api/review/')).status(),200);
+    checks.push('same-account login and legacy group change preserve owned dirty input');
+    await page.getByRole('button',{name:'工作台首页',exact:true}).click();
+    await page.getByRole('button',{name:'继续填写',exact:true}).click();
+    assert.equal(await page.getByLabel('ECR/ECO 标题',{exact:true}).inputValue(),'权限变化仍保留的本人草稿');
+    await page.getByRole('button',{name:'工作台首页',exact:true}).click();
+    await page.getByRole('button',{name:'放弃修改并离开',exact:true}).click();
+    assert.equal(await page.locator('.workspace-card').count(),2);
+    capability('restore');
+    await page.locator('.topbar').getByRole('button',{name:'刷新身份',exact:true}).click();
+    await page.locator('.workspace-card').filter({hasText:'待我处理'}).waitFor();
+    await reauthenticate(page,fixture.accounts[2]);
+    await page.getByRole('heading',{name:/欢迎回来/}).waitFor();
+    assert.equal(await page.locator('.workspace-card').count(),2);
+    checks.push('discard confirmation, restored capability and account switch navigate safely');
+    const examiner=await login(fixture.accounts[1]); currentPage=examiner.page;
+    const wrong=await examiner.context.request.get(`/api/changes/${fixture.records['本人退回申请（临时）']}/`);
+    assert.equal(wrong.status(),404);
+    checks.push('assigned reviewer cannot read returned body');
+    assert.deepEqual(errors,[]);
+    fs.writeFileSync(folder+'/browser-verification.json',JSON.stringify({checks,errors},null,2));
+    console.log(JSON.stringify({passed:checks.length,errors}));
+  } catch(error) {
+    if(currentPage)await currentPage.screenshot({path:folder+'/failure.png',fullPage:true});
+    throw error;
+  } finally {
+    for(const context of contexts)await context.close();await browser.close();
+  }
+})().catch(error=>{console.error(error);process.exitCode=1;});

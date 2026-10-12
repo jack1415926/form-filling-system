@@ -40,7 +40,9 @@ fs.mkdirSync(folder, { recursive: true });
       });
       try {
         await page.goto(process.env.FEEDBACK_BASE_URL || 'http://localhost:5173');
-        await page.getByRole('heading', { name: '我的申请', exact: true }).waitFor();
+        await page.getByRole('heading', { name: /欢迎回来/ }).waitFor();
+    await page.locator('.workspace-card').filter({ hasText: '我的申请' }).click();
+    await page.getByRole('heading', { name: '我的申请', exact: true }).waitFor();
         if (managed) await page.locator('.topbar').getByRole('button', { name: '反馈管理', exact: true }).click();
         else {
           await page.getByRole('button', { name: '打开意见与反馈', exact: true }).click();

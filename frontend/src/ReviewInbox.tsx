@@ -33,7 +33,7 @@ export default function ReviewInbox({ user, leaving, onSystem, systemCount = 0 }
     if (!prompted.current && query.data?.unread_count && client.getQueryData<User>(['me'])?.id === user.id) {
       prompted.current = true
       intro.current = modal.confirm({ title: `你有 ${query.data.unread_count} 项未读审核消息`,
-        content: `涉及 ${query.data.items.filter(item => !item.is_read).length} 份申请，包含审核意见、填写员回应及待审核申请。稍后处理不会清除提醒。`,
+        content: `涉及 ${query.data.items.filter(item => !item.is_read).length} 份申请，包含审核意见、申请者回应及待审核申请。稍后处理不会清除提醒。`,
         okText: '查看消息', cancelText: '稍后处理', onOk: () => requestFeedbackDrawer('inbox', () => setOpen(true)) })
     }
   }, [query.data, client, user.id, modal])

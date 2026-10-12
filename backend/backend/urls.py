@@ -20,7 +20,7 @@ from changes import views
 from changes.emc_views import EmcDetail
 from changes.execution_plan_views import ExecutionPlanDetail
 from changes.significant_change_views import SignificantChangeDetail
-from changes.submission_views import ReviewerList, SubmissionDetail
+from changes.submission_views import ReviewerList, SubmissionDetail, ActionOwnerList
 from changes.review_views import ReviewList, ReviewDetail
 from changes.review_inbox import ReviewInbox, MarkInboxRead
 from changes.system_feedback_views import FeedbackList, FeedbackDetail, FeedbackRequest, ManagedList, ManagedDetail, ManagedAction, ManagedRequest
@@ -44,6 +44,7 @@ urlpatterns = [
     path('api/auth/logout/', views.logout_view),
     path('api/auth/me/', views.me_view),
     path('api/reviewers/', ReviewerList.as_view()),
+    path('api/action-owners/', ActionOwnerList.as_view()),
     path('api/review/', ReviewList.as_view()),
     path('api/review/inbox/', ReviewInbox.as_view()),
     path('api/review/inbox/read/', MarkInboxRead.as_view()),

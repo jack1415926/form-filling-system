@@ -20,11 +20,11 @@ from .eco import ECO_ACTIONS, ECO_ACTION_IDS
 from .questions import QUESTIONS
 from .dispositions import LOCATIONS
 from .permissions import account_changed
-from .roles import business_role, can_manage_feedback
+from .roles import business_role, can_manage_feedback, can_review
 
 
 def user_data(user):
-    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "role": business_role(user), "can_manage_feedback": can_manage_feedback(user)}
+    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "role": business_role(user), "can_review": can_review(user), "can_manage_feedback": can_manage_feedback(user)}
 
 
 @require_GET
@@ -216,10 +216,10 @@ class EcrActionList(APIView):
     @staticmethod
     def data(record):
         answers = dict(record.question_responses.values_list("number", "answer"))
-        responses = {row.action_key: row for row in record.ecr_responses.all()}
+        responses = {row.action_key: row for row in record.ecr_responses.select_related('owner_user').all()}
         return {"updated_at": record.updated_at.isoformat(), "actions": [
             {**definition, "question_answer": answers.get(definition["number"], ""),
-             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "result": "", "status": "", "date": None})}
+             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "result": "", "status": "", "date": None})}
             for definition in ECR_ACTIONS
         ]}
 
@@ -247,7 +247,7 @@ class EcrActionDetail(APIView):
             if any(getattr(instance, key) != value for key, value in fields.items()):
                 for key, value in fields.items():
                     setattr(instance, key, value)
-                if not (instance.owner or instance.result or instance.status or instance.date):
+                if not (instance.owner or instance.owner_user_id or instance.result or instance.status or instance.date):
                     instance.delete()
                 else:
                     instance.save()
@@ -263,10 +263,10 @@ class EcoActionList(APIView):
     @staticmethod
     def data(record):
         answers = dict(record.question_responses.values_list("number", "answer"))
-        responses = {row.action_key: row for row in record.eco_responses.all()}
+        responses = {row.action_key: row for row in record.eco_responses.select_related('owner_user').all()}
         return {"updated_at": record.updated_at.isoformat(), "actions": [
             {**definition, "question_answer": answers.get(definition["number"], ""),
-             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "result": "", "status": "", "date": None})}
+             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "result": "", "status": "", "date": None})}
             for definition in ECO_ACTIONS
         ]}
 
@@ -294,7 +294,7 @@ class EcoActionDetail(APIView):
             if any(getattr(instance, key) != value for key, value in fields.items()):
                 for key, value in fields.items():
                     setattr(instance, key, value)
-                if not (instance.owner or instance.result or instance.status or instance.date):
+                if not (instance.owner or instance.owner_user_id or instance.result or instance.status or instance.date):
                     instance.delete()
                 else:
                     instance.save()

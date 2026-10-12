@@ -84,7 +84,7 @@ class ReviewIssueTests(TestCase):
         self.assertEqual(self.reply(issues[0]).status_code, 200)
         self.assertEqual(self.submit().status_code, 409)
         self.assertEqual(self.reply(issues[1]).status_code, 200)
-        self.assertEqual(self.submit('public', []).status_code, 409)
+        self.assertEqual(self.submit('public', []).status_code, 400)
         self.assertEqual(self.submit(people=[self.people[2].pk]).status_code, 409)
         self.assertEqual(self.submit().status_code, 200)
         self.change.refresh_from_db(); self.assertEqual(self.change.current_review_round, 2)
@@ -99,16 +99,16 @@ class ReviewIssueTests(TestCase):
         self.assertEqual(self.act(self.clients[1], 'approve').status_code, 200)
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'approved')
 
-    def test_public_original_author_closes_but_does_not_vote_automatically(self):
-        _, issues = self.return_two('public')
+    def test_assigned_original_author_closes_but_does_not_vote_automatically(self):
+        _, issues = self.return_two()
         for issue in issues: self.assertEqual(self.reply(issue).status_code, 200)
-        self.assertEqual(self.submit('public', []).status_code, 200)
-        self.assertEqual(self.resolve(issues[0], self.clients[2]).status_code, 409)
+        self.assertEqual(self.submit().status_code, 200)
+        self.assertEqual(self.resolve(issues[0], self.clients[1]).status_code, 409)
         for issue in issues: self.assertEqual(self.resolve(issue).status_code, 200)
         self.assertEqual(self.change.review_records.filter(approved_at__isnull=False).count(), 0)
         self.assertEqual(self.act(self.clients[1], 'approve').status_code, 200)
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'pending')
-        self.assertEqual(self.act(self.clients[2], 'approve').status_code, 200)
+        self.assertEqual(self.act(self.clients[0], 'approve').status_code, 200)
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'approved')
 
     def test_rejection_retains_history_and_requires_new_reply(self):
@@ -144,12 +144,12 @@ class ReviewIssueTests(TestCase):
         self.assertEqual(issue.events.filter(kind='resolve').count(), 1)
 
     def test_disabled_author_blocks_resubmission_and_never_allows_delegation(self):
-        _, issues = self.return_two('public')
+        _, issues = self.return_two()
         for issue in issues: self.reply(issue)
         person = self.people[0]; person.is_active = False; person.save()
-        self.assertEqual(self.submit('public', []).status_code, 409)
+        self.assertEqual(self.submit().status_code, 409)
         person.is_active = True; person.save(); person.groups.clear()
-        self.assertEqual(self.submit('public', []).status_code, 409)
+        self.assertEqual(self.submit().status_code, 200)
 
     def test_permissions_hidden_body_and_historical_round_event_boundary(self):
         _, issues = self.return_two()

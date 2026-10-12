@@ -22,8 +22,9 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
     await page.getByLabel('密码', { exact: true }).fill(account.password);
     const inbox = page.waitForResponse(response => new URL(response.url()).pathname === '/api/review/inbox/');
     await page.getByRole('button', { name: /登\s*录/ }).click();
-    await page.getByRole('heading', { name: account.kind === 'reviewer' ? '审核工作台' : '我的申请', exact: true }).waitFor();
+    await page.getByRole('heading', { name: /欢迎回来/ }).waitFor();
     if ((await (await inbox).json()).unread_count > 0) await page.getByRole('button', { name: '稍后处理', exact: true }).click();
+    await page.locator('.workspace-card').filter({ hasText: account.kind === 'reviewer' ? '待我处理' : '我的申请' }).click();
     return page;
   }
   async function select(page, label, text) {
@@ -189,7 +190,7 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
     await reviewer.locator('.ant-drawer-open .ant-drawer-close').click();
     await reviewer.locator('.topbar').getByRole('button', { name: '退出登录', exact: true }).click();
     await reviewer.getByRole('button', { name: '放弃并离开', exact: true }).click();
-    await reviewer.getByRole('dialog', { name: '离开未发送的审核意见？', exact: true }).getByRole('button', { name: /取\s*消/ }).click();
+    await reviewer.getByRole('dialog', { name: '离开前放弃未保存的修改？', exact: true }).getByRole('button', { name: '继续填写', exact: true }).click();
     await openSystemFeedback(reviewer);
     assert.equal(await reviewer.getByLabel('反馈内容', { exact: true }).inputValue(), '审核员取消退出后保留的系统反馈');
     await reviewer.locator('.ant-drawer-open').getByRole('button', { name: '审核修改意见', exact: true }).click();

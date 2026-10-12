@@ -18,7 +18,7 @@ function PlanForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onB
   const queryClient = useQueryClient()
   const actorId = actorUser(queryClient).id
   const [incomplete, setIncomplete] = useState<Set<string>>(new Set())
-  const locked = !canEdit(record, actorUser(queryClient).role)
+  const locked = !canEdit(record, actorUser(queryClient))
   const save = useAutosave({
     fields: executionPlanFields(data), enabled: !locked && !leaving, valid: (values) => !invalidPlanRows(values, data.rows, incomplete).length, paused, onDirty, onBusy,
     send: async (patch) => {

@@ -44,6 +44,8 @@ async function checkInputRecovery() {
       await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     });
     await page.goto(process.env.FEEDBACK_BASE_URL || 'http://localhost:5173/');
+    await page.getByRole('heading', { name: /欢迎回来/ }).waitFor();
+    await page.locator('.workspace-card').filter({ hasText: '我的申请' }).click();
     await page.getByRole('heading', { name: '我的申请', exact: true }).waitFor();
     return { page, context, calls };
   }
@@ -83,7 +85,7 @@ async function checkInputRecovery() {
     await modal.getByLabel('用户名', { exact: true }).fill('mock-review-only');
     await modal.getByLabel('密码', { exact: true }).fill('mock-only');
     await modal.getByRole('button', { name: /登\s*录/ }).click();
-    await q.getByRole('heading', { name: '审核工作台', exact: true }).waitFor();
+    await q.getByRole('heading', { name: '我的申请', exact: true }).waitFor();
     if (!await q.locator('.ant-drawer-open').count()) await openSystemFeedback(q);
     results.same_account_role_change = { id_unchanged: true, feedback_after_login: await q.getByLabel('反馈内容', { exact: true }).inputValue() };
     assert.equal(results.same_account_role_change.feedback_after_login, '同账号角色变化不应丢失的反馈');
@@ -148,6 +150,8 @@ async function checkLatePermission() {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     });
     await page.goto(process.env.FEEDBACK_BASE_URL || 'http://localhost:5173/');
+    await page.getByRole('heading', { name: /欢迎回来/ }).waitFor();
+    await page.locator('.workspace-card').filter({ hasText: '我的申请' }).click();
     await page.getByRole('heading', { name: '我的申请', exact: true }).waitFor();
     await page.locator('.topbar').getByRole('button', { name: '反馈管理', exact: true }).click();
     while (!lateA) await new Promise(resolve => setTimeout(resolve, 10));

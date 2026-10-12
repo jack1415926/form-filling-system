@@ -23,12 +23,12 @@ export function approvalProgress(round: RoundInfo): string {
   const count = round.approvals.length
   if (round.state === 'approved') return `已批准 ${count}/${required} 人，整份申请审核已通过。`
   if (round.state === 'returned') return '本轮已退回；重新提交后，个人批准重新计算。'
-  return `已批准 ${count}/${required} 人；还需 ${Math.max(0, required - count)} 名不同审核员同意，整份申请才会通过。`
+  return `已批准 ${count}/${required} 人；还需 ${Math.max(0, required - count)} 名不同审核人员同意，整份申请才会通过。`
 }
 export function approvalBlockReason(data: ReviewData, actorId: number, draftCount: number): string | null {
   if (!data.is_current) return '这是历史轮次，请打开当前审核轮次。'
-  if (data.round.state !== 'pending') return data.round.state === 'approved' ? '整份申请已批准。' : '申请已退回，须由填写员修订并重新提交。'
-  if (data.round.approvals.some((row) => row.id === actorId)) return '你已同意批准本轮申请，无需重复批准；请等待其他审核员。'
+  if (data.round.state !== 'pending') return data.round.state === 'approved' ? '整份申请已批准。' : '申请已退回，须由申请者修订并重新提交。'
+  if (data.round.approvals.some((row) => row.id === actorId)) return '你已同意批准本轮申请，无需重复批准；请等待其他审核人员。'
   if (data.unresolved_count) return `尚有 ${data.unresolved_count} 条未解决意见，须由原提出者确认解决后才能批准。`
   if (!data.can_approve) return '当前账号没有本轮批准权限，请刷新身份和审核记录核对。'
   if (draftCount) return '存在未提交的修改意见，请先处理或删除未提交意见，再同意批准。'

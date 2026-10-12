@@ -1,4 +1,4 @@
-export type User = { id: number; username: string; display_name: string; role: 'filler' | 'reviewer'; can_manage_feedback?: boolean }
+export type User = { id: number; username: string; display_name: string; role: 'filler' | 'reviewer'; can_review?: boolean; can_manage_feedback?: boolean }
 export type Overview = {
   title: string; ecr_no: string; eco_no: string; affected_products: string
   affected_region: string; initiating_factory: string; affected_factories: string
@@ -17,10 +17,11 @@ export type Question = {
 }
 export type QuestionData = { updated_at: string; questions: Question[] }
 export type EcrValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable'; date: string | null }
-export type EcrAction = EcrValues & { id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
+export type ActionOwner = { id: number; username: string; display_name: string; is_active: boolean }
+export type EcrAction = EcrValues & { owner_user_id: number | null; owner_user: ActionOwner | null; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
 export type EcrData = { updated_at: string; actions: EcrAction[] }
 export type EcoValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable' | 'implementation_stage'; date: string | null }
-export type EcoAction = EcoValues & { id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
+export type EcoAction = EcoValues & { owner_user_id: number | null; owner_user: ActionOwner | null; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
 export type EcoData = { updated_at: string; actions: EcoAction[] }
 export class ApiError extends Error {
   status: number
