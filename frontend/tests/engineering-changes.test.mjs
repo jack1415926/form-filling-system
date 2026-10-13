@@ -23,6 +23,10 @@ test('两份流程均保留八表导航且自己的进度不受另一流程影�
   for (const stage of ['ecr', 'eco']) {
     const flat = processMenu(stage).flatMap(item => item.children ?? [item])
     for (const key of ['overview', 'materials', 'questions', 'ecr', 'eco', 'emc', 'execution-plan', 'significant-change', 'summary', 'history', 'submission']) assert.ok(flat.some(item => item.key === key))
+    assert.ok(processMenu(stage).every(item => !('children' in item)))
+    assert.equal(flat.find(item => item.key === 'questions').label, '问题评估')
+    assert.equal(flat.at(-1).key, 'history')
+    assert.equal(processMenu(stage, true).at(-1).key, 'history')
     assert.ok(!processMenu(stage, true).some(item => item.key === 'submission'))
     for (const [status, index] of [['draft', 0], ['returned', 0], ['pending', 1], ['approved', 2], ['published', 3]]) assert.equal(currentProcessIndex({ stage, status }), index)
   }

@@ -24,7 +24,7 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
     await page.getByRole('button', { name: /登\s*录/ }).click();
     await page.getByRole('heading', { name: /欢迎回来/ }).waitFor();
     if ((await (await inbox).json()).unread_count > 0) await page.getByRole('button', { name: '稍后处理', exact: true }).click();
-    await page.locator('.workspace-card').filter({ hasText: account.kind === 'reviewer' ? '待我处理' : '我的申请' }).click();
+    await page.locator('.workspace-card').filter({ hasText: account.kind === 'reviewer' ? '待我处理' : '工程变更' }).click();
     return page;
   }
   async function select(page, label, text) {
@@ -34,7 +34,8 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
   const unknown = page => page.getByText('操作结果未确认，原请求和输入已保留', { exact: true });
   try {
     const owner = await login(fixture.accounts[0]);
-    await owner.getByRole('button', { name: '继续填写', exact: true }).click();
+    await owner.getByRole('row').filter({ hasText: '反馈回归临时申请1' }).getByRole('button', { name: '打开ECR', exact: true }).click();
+    await owner.getByRole('menuitem', { name: '概述', exact: true }).click();
     await owner.locator('#title').fill('反馈期间保留的申请标题');
     await openSystemFeedback(owner);
     await owner.getByLabel('反馈内容', { exact: true }).fill('回归问题：保存后页面体验需要改善');
@@ -83,7 +84,8 @@ const fixture = JSON.parse(fs.readFileSync(folder + '/fixture.json', 'utf8'));
     results.application_editor_preserved = true;
 
     const admin = await login(fixture.accounts[2]);
-    await admin.getByRole('button', { name: '继续填写', exact: true }).click();
+    await admin.getByRole('row').filter({ hasText: '管理员自己的填写草稿' }).getByRole('button', { name: '打开ECR', exact: true }).click();
+    await admin.getByRole('menuitem', { name: '概述', exact: true }).click();
     await admin.route('**/api/changes/'+fixture.records[2]+'/', route => route.request().method() === 'PATCH' ? route.abort('failed') : route.continue());
     await admin.locator('#title').fill('撤销反馈管理权限仍须保留的填写草稿');
     await admin.getByRole('button', { name: '反馈管理', exact: true }).click();

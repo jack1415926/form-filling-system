@@ -60,3 +60,14 @@ class ReviewFixTests(TransactionTestCase):
         ReviewRound.objects.create(change=self.record, number=1, review_mode='designated', title=self.record.title, ecr_no=self.record.ecr_no, submitted_at=timezone.now())
         approve_if_complete(self.record)
         self.record.refresh_from_db(); self.assertEqual(self.record.status, 'approved')
+
+    def test_ecr_creation_rejects_eco_number_without_reserving_it(self):
+        before = ChangeRequest.objects.count()
+        response = self.client.post('/api/changes/', {'title': 'Invalid ECR', 'eco_no': 'RESERVED-ECO'}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('eco_no', response.data)
+        self.assertEqual(ChangeRequest.objects.count(), before)
+        self.assertFalse(ChangeRequest.objects.filter(eco_no='RESERVED-ECO').exists())
+        response = self.client.post('/api/changes/', {'title': 'Valid ECR', 'eco_no': ''}, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['stage'], 'ecr')

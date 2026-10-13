@@ -1,4 +1,4 @@
-import { actorUser, canEdit, backLabel } from './workflow'
+import { actorUser, canEdit } from './workflow'
 import { useImperativeHandle, useState, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Input, Spin, Table } from 'antd'
@@ -14,7 +14,7 @@ type Props = {
   onDirty: (value: boolean) => void; onBusy: (value: boolean) => void; onBack: () => void; onPrevious: () => void; onNext: () => void
 }
 
-function PlanForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onBack, onPrevious, onNext }: Props & { data: PlanData }) {
+function PlanForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onPrevious, onNext }: Props & { data: PlanData }) {
   const queryClient = useQueryClient()
   const actorId = actorUser(queryClient).id
   const [incomplete, setIncomplete] = useState<Set<string>>(new Set())
@@ -52,7 +52,7 @@ function PlanForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onB
     }} />
   const saveButton = <Button type="primary" loading={save.manual} disabled={disabled || !save.dirty || !!invalid.length} onClick={save.clickSave}>保存执行计划</Button>
   return <div {...save.composition}>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id} · Part E</span><h1>设计变更执行计划</h1><p className="muted">活动固定，日期精确到日。两端都填写时，结束日期不得早于开始日期。</p></div><div className="form-actions">{saveButton}<Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id} · Part E</span><h1>设计变更执行计划</h1><p className="muted">活动固定，日期精确到日。两端都填写时，结束日期不得早于开始日期。</p></div><div className="form-actions">{saveButton}</div></div>
     {locked && <Alert type="info" title="申请已锁定，执行计划仅供查看。" className="form-alert" />}
     <section className="panel list-panel">
       <div className="section-heading"><h2>变更计划执行表</h2><span className="muted">ECR：{record.ecr_no || '未填写'} · QR-216-004 E</span></div>
@@ -81,6 +81,6 @@ export default function ExecutionPlanEditor(props: Props) {
   } })
   return <>
     {query.error && <Alert type="error" showIcon title={query.data ? '执行计划刷新失败，当前填写仍保留' : '无法读取执行计划'} description={query.error.message} className="form-alert" action={<Button disabled={leaving} loading={query.isFetching} onClick={() => void query.refetch()}>重试</Button>} />}
-    {query.data ? <PlanForm {...props} data={query.data} /> : query.isPending ? <Spin tip="正在读取执行计划…"><div className="loading-space" /></Spin> : <Button disabled={leaving} onClick={props.onBack}>{backLabel(queryClient)}</Button>}
+    {query.data ? <PlanForm {...props} data={query.data} /> : query.isPending ? <Spin tip="正在读取执行计划…"><div className="loading-space" /></Spin> : null}
   </>
 }

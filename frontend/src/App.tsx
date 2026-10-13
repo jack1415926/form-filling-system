@@ -72,7 +72,7 @@ function Login({ onLogin, compact = false, onBusy }: { onLogin: (user: User) => 
   </div>
 }
 
-export function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onNext, saveRef, paused = false }: {
+export function OverviewEditor({ record, onDirty, onSaved, onBusy, leaving, onNext, saveRef, paused = false }: {
   record: ChangeRequest; onDirty: (dirty: boolean) => void; onSaved: (record: ChangeRequest) => void; onBack: () => void; onBusy: (busy: boolean) => void; leaving: boolean; onReauthenticate: () => void; onNext?: () => void
   saveRef?: Ref<SaveHandle>; paused?: boolean
 }) {
@@ -109,14 +109,16 @@ export function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leavi
     { key: 'change_owner', label: '设计负责人／变更发起人' },
   ]
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{['ecr', 'eco'].includes(record.stage ?? '') && record.status === 'pending' ? '处理中' : stateLabels[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div><Button onClick={onBack} disabled={(save.pending || save.manual) || leaving}>{backLabel(queryClient)}</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{['ecr', 'eco'].includes(record.stage ?? '') && record.status === 'pending' ? '处理中' : stateLabels[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div></div>
     <section className="panel overview-panel">
       <div className="section-heading"><div><h2>概述基本信息</h2><p className="muted">{record.stage === 'eco' ? 'ECO填写人由创建或交接时指定，业务负责人单独填写。' : '申请者由登录账号确定，业务负责人单独填写。'}</p></div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.status}</span></div>
       {locked && <Alert type="info" title={['draft', 'returned'].includes(record.status) ? '当前由指定填写人编辑，概述仅供查看。' : '申请已锁定，概述仅供查看。'} className="form-alert" />}
       <Form form={form} initialValues={{ ...record, planned_eco_date: record.planned_eco_date ?? '' }} layout="vertical" onValuesChange={changed} onFinish={save.clickSave} disabled={locked || save.manual || leaving} {...save.composition} requiredMark={false}>
         <Form.Item name="title" label="ECR/ECO 标题" rules={[{ max: 255, message: '标题最多 255 个字符' }]}><Input placeholder="填写这项设计变更的标题" maxLength={255} /></Form.Item>
         <Form.Item name="affected_products" label="受影响产品和型号"><Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="填写涉及的产品及型号" /></Form.Item>
-        <div className="form-grid">{fields.map((field) => <Form.Item key={field.key} name={field.key} label={record.stage === 'eco' && field.key === 'ecr_no' ? '来源ECR编号（见上方关联）' : field.label} rules={[{ max: field.key.endsWith('_no') ? 64 : 255, message: '内容超过允许长度' }]}><Input placeholder={record.stage === 'ecr' && field.key === 'eco_no' ? 'ECO尚未启动' : field.placeholder} disabled={locked || save.manual || leaving || record.stage === 'ecr' && field.key === 'eco_no' || record.stage === 'eco' && field.key === 'ecr_no'} /></Form.Item>)}</div>
+        <div className="form-grid">{fields.map((field) => record.stage === 'eco' && field.key === 'ecr_no'
+          ? <Form.Item key={field.key} label="来源ECR编号"><Input aria-label="来源ECR编号" value={record.source_ecr_no ?? ''} readOnly disabled /></Form.Item>
+          : <Form.Item key={field.key} name={field.key} label={field.label} rules={[{ max: field.key.endsWith('_no') ? 64 : 255, message: '内容超过允许长度' }]}><Input placeholder={record.stage === 'ecr' && field.key === 'eco_no' ? 'ECO尚未启动' : field.placeholder} disabled={locked || save.manual || leaving || record.stage === 'ecr' && field.key === 'eco_no'} /></Form.Item>)}</div>
         <div className="form-grid"><Form.Item name="affected_factories" label="受影响工厂"><Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item><Form.Item name="planned_eco_date" label="ECO 计划完成时间" getValueFromEvent={(event) => { const invalid = !event.target.validity.valid; setDateInvalid(invalid); const value = invalid ? form.getFieldValue('planned_eco_date') : event.target.value; if (!invalid) save.update({ planned_eco_date: value || null }); return value }} rules={[{ validator: () => dateInvalid ? Promise.reject(new Error('请修正日期或清空日期后保存')) : Promise.resolve() }]}><DateInput /></Form.Item></div>
         <Form.Item name="change_reason" label="变更原因"><Input.TextArea autoSize={{ minRows: 4, maxRows: 12 }} placeholder="说明变更来源、原因分析和解决措施" /></Form.Item>
         {save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />}
@@ -149,7 +151,7 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
   }
   const switchTab = (key: string) => {
     if (blocked || key === tab) return
-    const change = () => { setDirty(false); props.onDirty(issueDirty); setTab(key); window.scrollTo({ top: 0 }) }
+    const change = () => { setDirty(false); props.onDirty(issueDirty); setTab(key) }
     if (!dirty) { change(); return }
     setConfirming(true)
     if (!saveRef.current) {
@@ -164,7 +166,7 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
   const next: Record<string, string> = { overview: 'materials', materials: 'questions', questions: 'summary', ecr: 'summary', eco: 'summary', emc: 'execution-plan', 'execution-plan': 'significant-change', 'significant-change': 'summary' }
   const previous: Record<string, string> = { materials: 'overview', questions: 'materials', ecr: 'summary', eco: 'summary', emc: 'summary', 'execution-plan': 'emc', 'significant-change': 'execution-plan' }
   const navigation = { onPrevious: () => switchTab(previous[tab] ?? 'summary'), onNext: () => switchTab(next[tab] ?? 'summary') }
-  const items = processMenu(stage, props.reviewOnly).map(item => 'children' in item ? { ...item, children: item.children?.map(child => ({ ...child, disabled: blocked })) } : { ...item, disabled: blocked })
+  const items = processMenu(stage, props.reviewOnly).map(item => ({ ...item, disabled: blocked }))
   const content = tab === 'summary' ? <>
       <StageNavigation record={record} leaving={blocked || dirty || issueDirty} onOpenChange={props.onOpenChange} />
       <section className="panel process-summary"><h2>{label}流程总览</h2><Descriptions column={2} items={[
@@ -177,14 +179,14 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
       : tab === 'materials' ? <MaterialEditor {...editorProps} {...navigation} onEditorOpen={setEditorOpen} />
       : tab === 'questions' ? <QuestionEditor {...editorProps} {...navigation} />
       : tab === 'ecr' ? <>{stage === 'eco' && <SourceOverview record={record} />}<EcrEditor {...editorProps} {...navigation} onEditorOpen={setEditorOpen} /></>
-      : tab === 'eco' ? stage === 'ecr' ? <InactiveEcoSheet onEditorOpen={setEditorOpen} /> : <EcoEditor {...editorProps} {...navigation} onEditorOpen={setEditorOpen} />
+      : tab === 'eco' ? stage === 'ecr' ? <InactiveEcoSheet record={record} leaving={props.leaving || issueBusy || publicationBusy || fillerBusy} onEditorOpen={setEditorOpen} /> : <EcoEditor {...editorProps} {...navigation} onEditorOpen={setEditorOpen} />
       : tab === 'emc' ? <EmcEditor {...editorProps} {...navigation} onEditorOpen={setEditorOpen} />
       : tab === 'execution-plan' ? <ExecutionPlanEditor {...editorProps} {...navigation} />
       : tab === 'significant-change' ? <SignificantChangeEditor {...editorProps} {...navigation} onEditorOpen={setEditorOpen} />
       : tab === 'submission' ? <SubmissionEditor {...editorProps} reviewDraftDirty={issueDirty} onPrevious={() => switchTab('summary')} />
       : <Alert type="info" title={record.current_review_round ? props.reviewOnly ? '本流程审核与意见请使用上方审核面板。' : '本流程的轮次、意见回应及原提出者复核见下方。' : '本流程尚未提交，没有审核轮次或正式意见。'} />
   return <>
-    <div className="process-heading"><div><span className="eyebrow">独立{label}流程</span><h1>{(stage === 'eco' ? record.eco_no : record.ecr_no) || '编号待填写'} · {record.title || '未命名工程变更'} <Tag color={stateColors[record.status]}>{processStates[record.status]}</Tag></h1>{stage === 'eco' && <p className="muted">来源ECR：{record.source_ecr_no} · 已发布结果只读，本ECO独立填写、审核及发布。</p>}</div><Button disabled={blocked} onClick={props.onBack}>{backLabel(client)}</Button></div>
+    <div className="process-heading"><div><span className="eyebrow">独立{label}流程</span><h1>{(stage === 'eco' ? record.eco_no : record.ecr_no) || '编号待填写'} · {record.title || '未命名工程变更'} <Tag color={stateColors[record.status]}>{processStates[record.status]}</Tag></h1>{stage === 'eco' && <p className="muted">来源ECR：{record.source_ecr_no} · 已发布结果只读，本ECO独立填写、审核及发布。</p>}</div>{!props.reviewOnly && <Button disabled={blocked} onClick={props.onBack}>{backLabel(client)}</Button>}</div>
     <div className="process-layout"><aside className="panel process-sidebar"><Menu selectedKeys={[tab]} mode="inline" items={items} onClick={({ key }) => switchTab(key)} /></aside><section className="process-body">{content}
       {!props.reviewOnly && !!record.current_review_round && <div style={{ display: ['summary', 'history'].includes(tab) ? undefined : 'none' }}><ReviewPanel compact={tab !== 'history'} initialOpen={props.initialReviewOpen} key={`${record.id}:${record.current_review_round}`} changeId={record.id} number={record.current_review_round} leaving={props.leaving || busy || confirming || publicationBusy || fillerBusy} onReauthenticate={props.onReauthenticate} onBusy={value => { setIssueBusy(value); props.onBusy(value || busy || publicationBusy || fillerBusy) }} onDirty={value => { setIssueDirty(value); props.onDirty(value || dirty) }} /></div>}
     </section></div>
@@ -265,7 +267,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
     window.addEventListener('beforeunload', protect)
     return () => window.removeEventListener('beforeunload', protect)
   }, [dirty, saving, confirming])
-  const [processFilter, setProcessFilter] = useState<ProcessFilter>('all'), [statusFilter, setStatusFilter] = useState('all')
+  const [processFilter, setProcessFilter] = useState<ProcessFilter>('ecr'), [statusFilter, setStatusFilter] = useState('all')
   const detail = useQuery({ queryKey: ['change', user.id, selectedId], queryFn: async () => {
     const result = await api<ChangeRequest>('/api/changes/' + selectedId + '/', 'GET', undefined, user.id)
     return newestResponse(queryClient.getQueryData<ChangeRequest>(['change', user.id, selectedId]), result)

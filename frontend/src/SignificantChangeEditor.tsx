@@ -1,4 +1,4 @@
-import { actorUser, canEdit, backLabel } from './workflow'
+import { actorUser, canEdit } from './workflow'
 import { useEffect, useImperativeHandle, useState, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Drawer, Input, Select, Spin, Table } from 'antd'
@@ -17,7 +17,7 @@ type Props = {
 const applicabilityOptions = [{ value: '', label: '未填写' }, { value: 'Y', label: '适用' }, { value: 'N', label: '不适用' }]
 const answerOptions = [{ value: '', label: '未回答' }, { value: 'Y', label: 'Y／是' }, { value: 'N', label: 'N／否' }]
 
-function AssessmentForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onEditorOpen, onBack, onPrevious, onNext, onReauthenticate }: Props & { data: SignificantData }) {
+function AssessmentForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onEditorOpen, onPrevious, onNext, onReauthenticate }: Props & { data: SignificantData }) {
   const queryClient = useQueryClient()
   const actorId = actorUser(queryClient).id
   const [chartId, setChartId] = useState<string | null>(null)
@@ -63,7 +63,7 @@ function AssessmentForm({ data, record, leaving, paused, saveRef, onDirty, onBus
   const reviewMessage = review && <Alert type="warning" title="回答已调整，请核对组结论及最终结论" className="form-alert" />
   const error = save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />
   return <div {...save.composition}>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id} · Part F</span><h1>实质性变更评估</h1><p className="muted">逐题结果是原模板的分支提示；组结论与最终结论由人填写。</p></div><div className="form-actions">{saveButton}<Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id} · Part F</span><h1>实质性变更评估</h1><p className="muted">逐题结果是原模板的分支提示；组结论与最终结论由人填写。</p></div><div className="form-actions">{saveButton}</div></div>
     {locked && <Alert type="info" title="申请已锁定，评估仅供查看。" className="form-alert" />}
     <section className="panel list-panel">
       <div className="section-heading"><h2>{data.title}</h2><span className={save.dirty ? 'save-status unsaved' : 'save-status'}>{save.status}</span></div>
@@ -114,6 +114,6 @@ export default function SignificantChangeEditor(props: Props) {
   } })
   return <>
     {query.error && <Alert type="error" showIcon title={query.data ? '评估刷新失败，当前填写仍保留' : '无法读取实质性变更评估'} description={query.error.message} className="form-alert" action={<Button disabled={props.leaving} loading={query.isFetching} onClick={() => void query.refetch()}>重试</Button>} />}
-    {query.data ? <AssessmentForm {...props} data={query.data} /> : query.isPending ? <Spin tip="正在读取评估…"><div className="loading-space" /></Spin> : <Button disabled={props.leaving} onClick={props.onBack}>{backLabel(queryClient)}</Button>}
+    {query.data ? <AssessmentForm {...props} data={query.data} /> : query.isPending ? <Spin tip="正在读取评估…"><div className="loading-space" /></Spin> : null}
   </>
 }

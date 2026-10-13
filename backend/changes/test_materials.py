@@ -236,7 +236,6 @@ class MaterialFlowTests(TestCase):
 
     def test_draft_delete_cascades_materials_and_releases_numbers(self):
         self.record.ecr_no = 'DELETE-ECR'
-        self.record.eco_no = 'DELETE-ECO'
         self.record.save()
         material = MaterialChange.objects.create(change=self.record, category='revision')
         path = f'/api/changes/{self.record.pk}/'
@@ -247,7 +246,7 @@ class MaterialFlowTests(TestCase):
         self.assertFalse(MaterialChange.objects.filter(pk=material.pk).exists())
         self.assertEqual(self.client.get(path).status_code, 404)
         self.assertEqual(self.client.delete(path).status_code, 404)
-        replacement = self.client.post('/api/changes/', {'ecr_no': 'DELETE-ECR', 'eco_no': 'DELETE-ECO'}, format='json')
+        replacement = self.client.post('/api/changes/', {'ecr_no': 'DELETE-ECR'}, format='json')
         self.assertEqual(replacement.status_code, 201)
 
     def test_application_delete_enforces_owner_auth_csrf_and_state(self):

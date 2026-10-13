@@ -58,9 +58,10 @@ class ChangeRequestSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         errors = {}
-        if self.instance and self.instance.stage == 'ecr' and attrs.get('eco_no'):
+        stage = self.instance.stage if self.instance else 'ecr'
+        if stage == 'ecr' and attrs.get('eco_no'):
             errors['eco_no'] = ['ECO阶段尚未启动，不能填写ECO编号。']
-        if self.instance and self.instance.stage == 'eco' and attrs.get('ecr_no'):
+        if stage == 'eco' and attrs.get('ecr_no'):
             errors['ecr_no'] = ['来源ECR编号只读，ECO不能填写独立ECR编号。']
         for field, message in NUMBER_ERRORS.items():
             if not attrs.get(field):

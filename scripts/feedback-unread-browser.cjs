@@ -30,6 +30,7 @@ fs.mkdirSync(folder, { recursive: true });
         if (path === '/api/auth/me/') body = { ...actor, username: 'mock-unread', can_manage_feedback: managed };
         else if (path === '/api/auth/csrf/') body = { csrfToken: 'mock-token' };
         else if (path === '/api/changes/') body = [];
+        else if (path === '/api/engineering-changes/') body = { actor_id: actor.id, items: [] };
         else if (path === '/api/review/inbox/') body = { actor_id: actor.id, count: 0, unread_count: 0, items: [] };
         else if (path === '/api/system-feedback/inbox/') body = inbox();
         else if (path === '/api/system-feedback/inbox/read/') { assert.deepEqual(request.postDataJSON(), { id: 901, message_version: 3 }); readVersion = 3; body = inbox(); }
@@ -41,8 +42,8 @@ fs.mkdirSync(folder, { recursive: true });
       try {
         await page.goto(process.env.FEEDBACK_BASE_URL || 'http://localhost:5173');
         await page.getByRole('heading', { name: /欢迎回来/ }).waitFor();
-    await page.locator('.workspace-card').filter({ hasText: '我的申请' }).click();
-    await page.getByRole('heading', { name: '我的申请', exact: true }).waitFor();
+        await page.locator('.workspace-card').filter({ hasText: '工程变更' }).click();
+        await page.getByRole('heading', { name: '工程变更', exact: true }).waitFor();
         if (managed) await page.locator('.topbar').getByRole('button', { name: '反馈管理', exact: true }).click();
         else {
           await page.getByRole('button', { name: '打开意见与反馈', exact: true }).click();

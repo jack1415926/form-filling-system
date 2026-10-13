@@ -1,4 +1,4 @@
-import { actorUser, canEdit, backLabel } from './workflow'
+import { actorUser, canEdit } from './workflow'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Drawer, Dropdown, Empty, Form, Input, Select, Table, Tabs, Tag } from 'antd'
@@ -69,7 +69,7 @@ function MaterialForm({ material, category, path, ownerId, locked, leaving, onDi
   </Form>
 }
 
-export default function MaterialEditor({ record, onDirty, onBusy, onBack, leaving, onReauthenticate, onNext, onEditorOpen }: {
+export default function MaterialEditor({ record, onDirty, onBusy, leaving, onReauthenticate, onNext, onEditorOpen }: {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void; onBack: () => void; leaving: boolean; onReauthenticate: () => void
   onNext: () => void; onEditorOpen: (value: boolean) => void
 }) {
@@ -104,7 +104,7 @@ export default function MaterialEditor({ record, onDirty, onBusy, onBack, leavin
     modal.confirm({ content: discardSavedWarning, onCancel: () => setConfirming(false), title: '放弃未保存的物料修改？', okText: '放弃修改', cancelText: '继续填写', onOk: () => { setConfirming(false); discard() } })
   }
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>物料明细</h1><p className="muted">分别记录升版、新增和停用的物料，物料信息和处置建议一起保存。</p></div><Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>物料明细</h1><p className="muted">分别记录升版、新增和停用的物料，物料信息和处置建议一起保存。</p></div></div>
     {locked && <Alert type="info" title="申请已锁定，物料仅供查看。" className="form-alert" />}
     {materials.error ? <Alert type="error" title={materials.error.message} action={<Button onClick={() => void materials.refetch()}>重试</Button>} /> : <section className="panel list-panel material-section">
       <div className="section-heading"><h2>物料明细</h2><div className="form-actions"><span className="muted">类别筛选</span><Select aria-label="类别筛选" value={filter} onChange={setFilter} disabled={busy || !!editor} options={[{ value: '', label: '不限' }, { value: 'revision', label: '升版' }, { value: 'addition', label: '新增' }, { value: 'discontinuation', label: '停用' }]} style={{ width: 110 }} />{!locked && <Dropdown trigger={['click']} disabled={busy || !!editor || materials.isPending} menu={{ items: categories.map((category) => ({ key: category.key, label: category.label })), onClick: ({ key }) => { deletion.reset(); if (filter) setFilter(key as MaterialCategory); setEditor({ category: key as MaterialCategory }) } }}><Button type="primary" disabled={busy || !!editor || materials.isPending}>新增物料</Button></Dropdown>}</div></div>

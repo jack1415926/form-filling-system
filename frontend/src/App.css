@@ -104,6 +104,9 @@
 .process-sidebar .ant-menu-item-selected { background: #e7f1eb; color: #176b5b; }
 .process-body { min-width: 0; }
 .process-body .page-heading h1 { font-size: 23px; }
+.process-body > .panel.form-alert { padding: 24px; margin-bottom: 24px; }
+.process-body > .panel.form-alert > h2 { margin-bottom: 16px; }
+.process-body > .panel.form-alert > p { line-height: 1.7; margin-bottom: 16px; }
 .process-summary { padding: 24px; margin-bottom: 24px; }
 .process-summary .ant-descriptions { margin-bottom: 18px; }
 .process-body .ant-steps { margin-bottom: 20px; }

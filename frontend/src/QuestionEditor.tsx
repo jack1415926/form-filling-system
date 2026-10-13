@@ -1,4 +1,4 @@
-import { actorUser, canEdit, backLabel } from './workflow'
+import { actorUser, canEdit } from './workflow'
 import { useImperativeHandle, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Input, Select, Spin, Table } from 'antd'
@@ -15,7 +15,7 @@ type Props = {
   saveRef?: Ref<SaveHandle>; paused?: boolean
 }
 
-function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNext, saveRef, leaving, paused = false }: Props & { data: QuestionData }) {
+function QuestionForm({ data, record, onDirty, onBusy, onPrevious, onNext, saveRef, leaving, paused = false }: Props & { data: QuestionData }) {
   const queryClient = useQueryClient()
   const actorId = actorUser(queryClient).id
   const locked = !canEdit(record, actorUser(queryClient))
@@ -40,7 +40,7 @@ function QuestionForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNex
   const update = (number: number, fields: Partial<Pick<Question, 'answer' | 'remark'>>) => save.update(Object.fromEntries(Object.entries(fields).map(([key, value]) => [`${number}.${key}`, value])))
   const groups = [...new Set(rows.map((row) => row.function))]
   return <div {...save.composition}>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>问题评估</h1><p className="muted">未回答与否分别保存；缺少条件性理由时会提示，仍可保存草稿。</p></div><div className="form-actions"><Button type="primary" loading={save.manual} disabled={locked || save.manual || leaving || !dirty} onClick={save.clickSave}>保存草稿</Button><Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>问题评估</h1><p className="muted">未回答与否分别保存；缺少条件性理由时会提示，仍可保存草稿。</p></div><div className="form-actions"><Button type="primary" loading={save.manual} disabled={locked || save.manual || leaving || !dirty} onClick={save.clickSave}>保存草稿</Button></div></div>
     {locked && <Alert type="info" title="申请已锁定，问题评估仅供查看。" className="form-alert" />}
     {groups.map((group) => <section className="panel list-panel question-section" key={group}>
       <div className="section-heading"><h2>{group}</h2></div>
@@ -72,6 +72,6 @@ export default function QuestionEditor(props: Props) {
   })
   return <>
     {questions.error && <Alert type="error" showIcon title={questions.data ? '问题评估刷新失败，当前填写内容仍保留' : '无法读取问题评估'} description={questions.error.message} className="form-alert" action={<Button loading={questions.isFetching} disabled={leaving} onClick={() => void questions.refetch()}>重试</Button>} />}
-    {questions.data ? <QuestionForm {...props} data={questions.data} /> : questions.isPending ? <Spin tip="正在读取问题评估…"><div className="loading-space" /></Spin> : <Button disabled={leaving} onClick={props.onBack}>{backLabel(queryClient)}</Button>}
+    {questions.data ? <QuestionForm {...props} data={questions.data} /> : questions.isPending ? <Spin tip="正在读取问题评估…"><div className="loading-space" /></Spin> : null}
   </>
 }

@@ -87,3 +87,47 @@ class MultiOwnerApprovalTests(TestCase):
         self.assertEqual(self.client.patch(path, {'owner_user_ids': [self.first.pk]}, format='json').status_code, 200)
         self.assertEqual(self.client.patch(path, {'owner_user_ids': []}, format='json').status_code, 200)
         self.assertFalse(self.change.ecr_responses.exists())
+
+    def test_resubmission_retains_each_owners_results_and_clears_reassigned_initial_values(self):
+        for stage in ['ecr', 'eco']:
+            with self.subTest(stage=stage):
+                if stage == 'eco':
+                    self.change.status = 'published'; self.change.published_at = timezone.now()
+                    self.change.published_by = self.applicant; self.change.publication_request_id = uuid.uuid4()
+                    self.change.save()
+                    self.change = ChangeRequest.objects.create(stage='eco', source_ecr=self.change,
+                        eco_creation_request_id=uuid.uuid4(), applicant=self.applicant, publisher=self.applicant,
+                        title='Resubmitted ECO', eco_no='RESUBMIT-ECO')
+                    QuestionResponse.objects.bulk_create([QuestionResponse(change=self.change, number=n, answer='N') for n in range(1, 28)])
+                    self.path = f'/api/changes/{self.change.pk}/'
+                self.change.stage_approvers.set([self.applicant])
+                self.client.force_authenticate(self.applicant)
+                assignment = self.path + f'{stage}-actions/{stage}_001/'
+                self.assertEqual(self.client.patch(assignment, {'owner_user_ids': [self.first.pk, self.second.pk], 'extra_required': True}, format='json').status_code, 200)
+                self.assertEqual(self.client.post(self.path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': 0}, format='json').status_code, 200)
+                expected = {}
+                for task in self.change.review_rounds.get(number=1).tasks.select_related('owner'):
+                    self.client.force_authenticate(task.owner)
+                    values = {'result': f'{stage}-{task.owner_id}-result', 'status': 'completed', 'date': '2026-10-13'}
+                    expected[task.owner_id] = (values['result'], values['status'], values['date'])
+                    task_path = self.path + f'action-tasks/{task.pk}/'
+                    self.assertEqual(self.client.patch(task_path, {'request_id': str(uuid.uuid4()), 'version': 1, **values}, format='json').status_code, 200)
+                    self.assertEqual(self.client.post(task_path, {'request_id': str(uuid.uuid4()), 'version': 2}, format='json').status_code, 200)
+                original = list(self.change.review_rounds.get(number=1).tasks.values_list('owner_id', 'result', 'status', 'date', 'confirmed_at'))
+                for number in [1, 2]:
+                    self.client.force_authenticate(self.applicant)
+                    self.assertEqual(self.client.post(self.path + f'review-rounds/{number}/return/', {'request_id': str(uuid.uuid4()), 'issues': [{'tab': 'overview', 'text': 'Revise'}]}, format='json').status_code, 200)
+                    issue = self.change.review_issues.latest('pk')
+                    self.assertEqual(self.client.post(self.path + f'review-rounds/{number}/respond/', {'request_id': str(uuid.uuid4()), 'issue_id': issue.pk, 'version': issue.version, 'text': 'Revised'}, format='json').status_code, 200)
+                    if number == 2:
+                        self.assertEqual(self.client.patch(assignment, {'owner_user_ids': [self.second.pk, self.outsider.pk]}, format='json').status_code, 200)
+                        expected = {self.second.pk: expected[self.second.pk], self.outsider.pk: ('', '', None)}
+                    response = self.client.post(self.path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': number}, format='json')
+                    self.assertEqual(response.status_code, 200)
+                    tasks = list(self.change.review_rounds.get(number=number + 1).tasks.all())
+                    self.assertEqual({task.owner_id for task in tasks}, set(expected))
+                    for task in tasks:
+                        self.assertEqual((task.result, task.status, task.date.isoformat() if task.date else None), expected[task.owner_id])
+                        self.assertIsNone(task.confirmed_at)
+                        self.assertEqual(task.version, 1)
+                self.assertEqual(list(self.change.review_rounds.get(number=1).tasks.values_list('owner_id', 'result', 'status', 'date', 'confirmed_at')), original)

@@ -26,10 +26,15 @@ export function checkedEngineering(value: unknown, actor: number): EngineeringDa
 export function processMenu(stage: 'ecr' | 'eco', reviewOnly = false) {
   return [
     { key: 'summary', label: '流程总览' },
-    { type: 'group' as const, label: '基础资料', children: [{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料与处置' }, { key: 'questions', label: '问题评估 · 27题' }] },
-    { type: 'group' as const, label: '行动表', children: [{ key: 'ecr', label: stage === 'eco' ? 'ECR评估 · 来源只读' : 'ECR评估 · 本流程' }, { key: 'eco', label: stage === 'ecr' ? 'ECO执行 · 本流程不填写' : 'ECO执行 · 本流程' }] },
-    { type: 'group' as const, label: '辅助表', children: [{ key: 'emc', label: 'EMC参考' }, { key: 'execution-plan', label: '设计变更执行计划' }, { key: 'significant-change', label: '实质性评估 · 主表与子表' }] },
-    { key: 'history', label: '意见与历史' },
+    { key: 'overview', label: '概述' },
+    { key: 'materials', label: '物料与处置' },
+    { key: 'questions', label: '问题评估' },
+    { key: 'ecr', label: stage === 'eco' ? 'ECR评估 · 来源只读' : 'ECR评估 · 本流程' },
+    { key: 'eco', label: stage === 'ecr' ? 'ECO执行 · 本流程不填写' : 'ECO执行 · 本流程' },
+    { key: 'emc', label: 'EMC参考' },
+    { key: 'execution-plan', label: '设计变更执行计划' },
+    { key: 'significant-change', label: '实质性评估 · 主表与子表' },
     ...(!reviewOnly ? [{ key: 'submission', label: `提交${stage.toUpperCase()}审核` }] : []),
+    { key: 'history', label: '意见与历史' },
   ]
 }

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Checkbox, Drawer, Input, Select, Table, Tag } from 'antd'
+import { Alert, App, Button, Checkbox, Descriptions, Drawer, Input, Select, Table, Tag } from 'antd'
 import { api, ApiError, type ChangeRequest, type User } from './api'
-import { actorUser, canEdit, backLabel } from './workflow'
+import { actorUser, canEdit } from './workflow'
 import { newestResponse } from './latestResponse'
 import { checkedReviewers } from './submission'
+import { checkedPublication } from './publication'
+import { checkedReview } from './review'
 import { saveResultUnconfirmed } from './questionDraft'
 import useAutosave from './useAutosave'
 import DateInput from './DateInput'
@@ -121,24 +123,26 @@ function TaskEditor({ record, task, leaving, accept, read, onReauthenticate, ...
   </>
 }
 
-export function StageActions({ record, leaving, onBack, onPrevious, onNext, onEditorOpen, onReauthenticate, ...callbacks }: Callbacks & { record: ChangeRequest; leaving: boolean; onBack: () => void; onPrevious: () => void; onNext: () => void; onEditorOpen: (value: boolean) => void; onReauthenticate: () => void }) {
+export function StageActions({ record, leaving, onPrevious, onNext, onEditorOpen, onReauthenticate, ...callbacks }: Callbacks & { record: ChangeRequest; leaving: boolean; onBack: () => void; onPrevious: () => void; onNext: () => void; onEditorOpen: (value: boolean) => void; onReauthenticate: () => void }) {
   const { actor, query, accept, read } = useStage(record), client = useQueryClient(), { modal } = App.useApp()
-  const [selected, setSelected] = useState<string | null>(null), [all, setAll] = useState(false), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null), [range, setRange] = useState({ context: '', all: false }), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false)
   const callbackRef = useRef(callbacks)
   useEffect(() => { callbackRef.current = callbacks }, [callbacks])
   useEffect(() => () => { callbackRef.current.onBusy(false); callbackRef.current.onDirty(false) }, [])
   const data = query.data, currentRecord = data?.change ?? record
   const editingAssignment = canEdit(currentRecord, actorUser(client))
   const assignmentPhase = ['draft', 'returned'].includes(currentRecord.status)
+  const rangeContext = `${currentRecord.status}:${data?.current_round ?? record.current_review_round}:${editingAssignment}`
+  const all = range.all && (record.stage !== 'eco' || range.context === rangeContext)
   const tasks = data?.tasks.filter(task => task.round === data.current_round) ?? []
   useEffect(() => { onEditorOpen(!!selected); return () => onEditorOpen(false) }, [selected, onEditorOpen])
   const close = () => { if (busy || leaving) return; const finish = () => { setSelected(null); setDirty(false); callbacks.onDirty(false) }; if (dirty) modal.confirm({ title: '放弃未保存的输入？', content: '已保存内容不会撤销。', onOk: finish }); else finish() }
   const action = data?.actions.find(row => row.id === selected), task = tasks.find(row => row.action_key === selected && row.owner_id === actor) ?? tasks.find(row => row.action_key === selected)
   return <>
-    <div className="page-heading"><h1>{record.stage?.toUpperCase()}行动分配与处理</h1><Button disabled={busy || leaving} onClick={onBack}>{backLabel(client)}</Button></div>
+    <div className="page-heading"><h1>{record.stage?.toUpperCase()}行动分配与处理</h1></div>
     <Alert type="info" title={assignmentPhase ? editingAssignment ? '草稿／修订时仅分配负责人和补充任务；结果由提交后的负责人填写。' : '当前ECO由指定填写人编辑，此处只读查看行动分配。' : `第${data?.current_round ?? record.current_review_round}轮：已确认 ${tasks.filter(task => task.confirmed_at).length}/${tasks.length} 项；基础内容锁定。`} className="form-alert" />
     {query.error && <Alert type="error" title={query.error.message} action={<Button onClick={() => void query.refetch()}>重试</Button>} />}
-    <Select aria-label="行动范围" disabled={!!selected} value={all ? 'all' : 'required'} options={[{ value: 'required', label: '本轮行动' }, { value: 'all', label: '全部行动' }]} onChange={value => setAll(value === 'all')} />
+    <Select aria-label="行动范围" disabled={!!selected} value={all ? 'all' : 'required'} options={[{ value: 'required', label: record.stage === 'eco' && !editingAssignment ? '已选行动' : '本轮行动' }, { value: 'all', label: '全部行动' }]} onChange={value => setRange({ context: rangeContext, all: value === 'all' })} />
     <Table rowKey="id" pagination={false} loading={query.isPending} dataSource={(data?.actions ?? []).filter(row => all || (assignmentPhase ? row.required : tasks.some(task => task.action_key === row.id)))} columns={[
       { title: '行动', render: (_, row) => <><Tag>{row.id} · 问题{row.number}</Tag><p>{row.text}</p></> },
       { title: '负责人', render: (_, row) => (assignmentPhase ? row.owner_name : tasks.filter(task => task.action_key === row.id).map(task => task.owner_name).join('、') || row.owner_name) || '未分配' },
@@ -152,11 +156,20 @@ export function StageActions({ record, leaving, onBack, onPrevious, onNext, onEd
   </>
 }
 
-export function StageSubmission({ record, leaving, onBack, onPrevious, reviewDraftDirty = false, ...callbacks }: Callbacks & { record: ChangeRequest; leaving: boolean; onBack: () => void; onPrevious: () => void; reviewDraftDirty?: boolean }) {
+export function StageSubmission({ record, leaving, onPrevious, onReauthenticate, reviewDraftDirty = false, ...callbacks }: Callbacks & { record: ChangeRequest; leaving: boolean; onBack: () => void; onPrevious: () => void; onReauthenticate: () => void; reviewDraftDirty?: boolean }) {
   const { actor, query, accept, read } = useStage(record), { modal } = App.useApp(), client = useQueryClient()
   const [acknowledge, setAcknowledge] = useState(false), [unknown, setUnknown] = useState<StageSubmitPayload | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
   const current = query.data?.change ?? record, editable = canEdit(current, actorUser(client))
   const people = useQuery({ queryKey: ['action-owners', actor], enabled: editable, queryFn: async () => checkedReviewers(await api<unknown>('/api/action-owners/', 'GET', undefined, actor)) })
+  const publication = useQuery({ queryKey: ['publication', actor, record.id], enabled: !editable && !!query.data?.change, refetchOnWindowFocus: false,
+    queryFn: async () => checkedPublication(await api(`/api/changes/${record.id}/publication/`, 'GET', undefined, actor), record.id, actor) })
+  const approvalRound = useQuery({ queryKey: ['review-round', actor, record.id, current.current_review_round], enabled: !editable && !!query.data?.change && current.current_review_round > 0, refetchOnWindowFocus: false,
+    queryFn: async () => checkedReview(await api(`/api/changes/${record.id}/review-rounds/${current.current_review_round}/`, 'GET', undefined, actor), record.id, current.current_review_round) })
+  const approverNames = (current.stage_approver_ids ?? []).map(id => {
+    const person = approvalRound.data?.round.required_approvers?.find(person => person.id === id) ?? people.data?.find(person => person.id === id)
+    return person ? `${person.display_name}（${person.username}）` : `账号 #${id}`
+  })
+  const publisherDetails = publication.data?.change.publisher_id === current.publisher_id ? publication.data : undefined
   const publisher = useAutosave({ fields: { publisher_id: current.publisher_id == null ? null : String(current.publisher_id), stage_approver_ids: JSON.stringify(current.stage_approver_ids ?? []) }, enabled: editable && !leaving && !unknown, paused: busy,
     onDirty: value => callbacks.onDirty(value || !!unknown), onBusy: value => callbacks.onBusy(value || busy || !!unknown),
     send: async patch => { await api(`/api/changes/${record.id}/`, 'PATCH', { ...('publisher_id' in patch ? { publisher_id: patch.publisher_id === null ? null : Number(patch.publisher_id) } : {}), ...('stage_approver_ids' in patch ? { stage_approver_ids: JSON.parse(String(patch.stage_approver_ids)) } : {}) }, actor); const data = await read(); return { publisher_id: data.change?.publisher_id == null ? null : String(data.change.publisher_id), stage_approver_ids: JSON.stringify(data.change?.stage_approver_ids ?? []) } } })
@@ -188,7 +201,7 @@ export function StageSubmission({ record, leaving, onBack, onPrevious, reviewDra
   }
   useEffect(() => { callbacks.onBusy(busy || !!unknown || publisher.pending); callbacks.onDirty(!!unknown || publisher.dirty) }, [callbacks, busy, unknown, publisher.pending, publisher.dirty])
   return <>
-    <div className="page-heading"><h1>提交{record.stage?.toUpperCase()}行动任务</h1><Button disabled={busy || !!unknown || leaving || publisher.pending} onClick={onBack}>返回工程变更</Button></div>
+    <div className="page-heading"><h1>提交{record.stage?.toUpperCase()}行动任务</h1></div>
     {query.error && <Alert type="error" title={query.error.message} action={<Button onClick={() => void query.refetch()}>重试</Button>} />}
     <p>已回答 {27 - (query.data?.unanswered.length ?? 27)}/27 题；本轮 {required.length} 项行动。</p>
     {editable ? <>
@@ -203,8 +216,15 @@ export function StageSubmission({ record, leaving, onBack, onPrevious, reviewDra
       {!required.length && <Checkbox disabled={busy || !!unknown} checked={acknowledge} onChange={event => setAcknowledge(event.target.checked)}>确认本阶段无行动需处理，提交后仍须全部指定批准人同意</Checkbox>}
       <p className="muted">提交后冻结行动、负责人和批准人；每位负责人独立填写并确认任务，正式意见解决后，还须全部指定批准人同意才能发布。</p>
       <Button type="primary" disabled={blocked || busy || !!unknown || leaving || publisher.dirty || publisher.pending} onClick={() => modal.confirm({ title: `提交本轮${record.stage?.toUpperCase()}任务？`, content: '基础内容将锁定，每位负责人确认各自任务后，全部指定批准人需同意批准。', onOk: () => send({ expected_round: current.current_review_round, request_id: crypto.randomUUID(), acknowledge_no_tasks: acknowledge }) })}>提交{record.stage?.toUpperCase()}审核</Button>
-    </> : <Alert type={['approved', 'published'].includes(current.status) ? 'success' : 'info'} title={['draft', 'returned'].includes(current.status) ? `当前由${current.applicant_name || '指定填写人'}填写或修订，你仅可查看，不能代为提交。` : current.status === 'published' ? `${record.stage?.toUpperCase()}已发布，基线只读。` : current.status === 'approved' ? `${record.stage?.toUpperCase()}阶段已批准，等待指定发布人发布。` : `阶段处理中，基础内容已锁定。负责人进入${record.stage?.toUpperCase()}行动页处理任务。`} />}
-    {unknown && <Alert type="warning" title="提交结果未确认，原UUID已保留" action={<><Button disabled={busy || leaving} onClick={() => void check()}>查询结果</Button><Button disabled={busy || leaving} onClick={() => void send(unknown)}>按原请求重试</Button></>} />}
+    </> : <>
+      <Alert className="form-alert" type={['approved', 'published'].includes(current.status) ? 'success' : 'info'} title={['draft', 'returned'].includes(current.status) ? `当前由${current.applicant_name || '指定填写人'}填写或修订，你仅可查看，不能代为提交。` : current.status === 'published' ? `${record.stage?.toUpperCase()}已发布，基线只读。` : current.status === 'approved' ? `${record.stage?.toUpperCase()}阶段已批准，等待指定发布人发布。` : `阶段处理中，基础内容已锁定。负责人进入${record.stage?.toUpperCase()}行动页处理任务。`} />
+      <Descriptions column={1} items={[
+        { key: 'publisher', label: '已选发布人', children: current.publisher_id ? `${publisherDetails?.publisher_name || '姓名尚未读取'}（账号 #${current.publisher_id}）${publisherDetails && !publisherDetails.publisher_active ? ' · 已停用' : ''}` : '未指定' },
+        { key: 'approvers', label: '已选批准人', children: approverNames.join('、') || '未指定' },
+      ]} />
+      {(publication.error || approvalRound.error) && <Alert className="form-alert" type="warning" title="人员摘要读取失败，已选账号仍保留" description={publication.error?.message || approvalRound.error?.message} action={<Button disabled={busy || leaving} onClick={() => { void publication.refetch(); if (current.current_review_round > 0) void approvalRound.refetch() }}>重试读取人员</Button>} />}
+    </>}
+    {unknown && <Alert type="warning" title="提交结果未确认，原UUID已保留" action={<><Button disabled={busy || leaving} onClick={() => void check()}>查询结果</Button><Button disabled={busy || leaving} onClick={() => void send(unknown)}>按原请求重试</Button><Button disabled={busy || leaving} onClick={onReauthenticate}>原账号重新登录</Button></>} />}
     {error && <Alert type="error" title={error} />}
     <Button disabled={busy || !!unknown || leaving || publisher.pending} onClick={onPrevious}>上一页</Button>
   </>

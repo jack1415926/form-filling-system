@@ -1,4 +1,4 @@
-import { actorUser, canEdit, backLabel } from './workflow'
+import { actorUser, canEdit } from './workflow'
 import { newestResponse } from './latestResponse'
 import DateInput from './DateInput'
 import { useEffect, useState } from 'react'
@@ -47,7 +47,7 @@ function ActionForm({ action, record, leaving, paused, onDirty, onBusy, onSaved,
   </div>
 }
 
-function SourceEcrEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen }: {
+function SourceEcrEditor({ record, onDirty, onBusy, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen }: {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void
   onBack: () => void; onPrevious: () => void; onNext: () => void; leaving: boolean; onReauthenticate: () => void; onEditorOpen: (value: boolean) => void
 }) {
@@ -77,7 +77,7 @@ function SourceEcrEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, 
   }
   const rows = (actions.data?.actions ?? []).filter((row) => all || row.question_answer === 'Y' || row.extra_required || !!row.task_results?.length)
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>ECR 评估行动</h1><p className="muted">默认显示问题触发、手工补充及已有确认结果的行动；其他内容可在全部行动中查看。</p></div><Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>ECR 评估行动</h1><p className="muted">默认显示问题触发、手工补充及已有确认结果的行动；其他内容可在全部行动中查看。</p></div></div>
     {actions.error && <Alert type="error" showIcon title={actions.data ? '评估刷新失败，当前内容仍保留' : '无法读取 ECR 评估'} description={actions.error.message} className="form-alert" action={<Button disabled={busy} loading={actions.isFetching} onClick={() => void actions.refetch()}>重试</Button>} />}
     <section className="panel list-panel"><div className="section-heading"><h2>ECR 评估行动</h2><Select aria-label="行动筛选" disabled={busy || !!editor} style={{ width: 190 }} value={all ? 'all' : 'relevant'} options={[{ value: 'relevant', label: '当前触发' }, { value: 'all', label: '全部行动' }]} onChange={(value) => setAll(value === 'all')} /></div>
       <Table<EcrAction> rowKey="id" pagination={false} loading={actions.isPending} dataSource={rows} scroll={{ x: 1035 }} locale={{ emptyText: <Empty description={actions.error ? '读取失败，请重试' : '暂无当前触发的行动，可先保存问题答案或查看全部行动。'} /> }} columns={[

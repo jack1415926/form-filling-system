@@ -77,21 +77,36 @@ class DraftFlowTests(TestCase):
             self.assertEqual(response.status_code, 201)
             self.assertEqual(response.json()["ecr_no"], "")
             self.assertEqual(response.json()["eco_no"], "")
-        record = ChangeRequest.objects.create(applicant=self.owner, ecr_no="000001", eco_no="ECO-ONE")
+        record = ChangeRequest.objects.create(applicant=self.owner, ecr_no="000001")
         same = self.client.patch(f"/api/changes/{record.pk}/", {"ecr_no": " 000001 ", "title": "新标题"}, format="json")
         self.assertEqual(same.status_code, 200)
         self.assertEqual(same.json()["ecr_no"], "000001")
         cleared = self.client.patch(f"/api/changes/{record.pk}/", {"ecr_no": "", "eco_no": ""}, format="json")
         self.assertEqual(cleared.status_code, 200)
         self.assertEqual(cleared.json()["ecr_no"], "")
-        reused = self.client.post("/api/changes/", {"ecr_no": "000001", "eco_no": "ECO-ONE"}, format="json")
+        reused = self.client.post("/api/changes/", {"ecr_no": "000001"}, format="json")
         self.assertEqual(reused.status_code, 201)
+
+        eco_id = self.create_eco_draft()
+        for value in ['ECO-ONE', '', 'ECO-ONE']:
+            response = self.client.patch(f'/api/changes/{eco_id}/', {'eco_no': value}, format='json')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['eco_no'], value)
+
+    def create_eco_draft(self):
+        source = ChangeRequest.objects.create(applicant=self.owner, stage='ecr', status='published',
+            published_by=self.owner, published_at=timezone.now(), publication_request_id=uuid.uuid4())
+        response = self.client.post(f'/api/changes/{source.pk}/eco/',
+            {'request_id': str(uuid.uuid4()), 'filler_id': self.owner.pk}, format='json')
+        self.assertEqual(response.status_code, 201)
+        return response.json()['change']['id']
 
     def test_number_types_are_independently_unique_and_internal_fields_are_hidden(self):
         first = self.client.post("/api/changes/", {"ecr_no": "SHARED-TEXT"}, format="json")
-        second = self.client.post("/api/changes/", {"eco_no": "SHARED-TEXT"}, format="json")
+        eco_id = self.create_eco_draft()
+        second = self.client.patch(f'/api/changes/{eco_id}/', {"eco_no": "SHARED-TEXT"}, format="json")
         self.assertEqual(first.status_code, 201)
-        self.assertEqual(second.status_code, 201)
+        self.assertEqual(second.status_code, 200)
         for response in (first, second):
             self.assertNotIn("ecr_no_unique", response.json())
             self.assertNotIn("eco_no_unique", response.json())
@@ -266,18 +281,18 @@ class ConcurrentDraftTests(TransactionTestCase):
 
     def test_concurrent_creates_with_same_number_return_field_error(self):
         original_validate = ChangeRequestSerializer.validate
-        for field in ("ecr_no", "eco_no"):
-            barrier = Barrier(2)
-            def validate_together(serializer, attrs):
-                validated = original_validate(serializer, attrs)
-                barrier.wait(timeout=10)
-                return validated
-            with self.subTest(field=field), patch.object(ChangeRequestSerializer, "validate", validate_together), ThreadPoolExecutor(max_workers=2) as executor:
-                futures = [executor.submit(self.create_from_connection, {field: "RACE-CREATE"}) for _ in range(2)]
-                responses = [future.result(timeout=15) for future in futures]
-            self.assertEqual(sorted(code for code, _ in responses), [201, 400])
-            self.assertEqual(set(next(data for code, data in responses if code == 400)), {field})
-            self.assertEqual(ChangeRequest.objects.filter(**{field: "RACE-CREATE"}).count(), 1)
+        barrier = Barrier(2)
+        def validate_together(serializer, attrs):
+            validated = original_validate(serializer, attrs)
+            barrier.wait(timeout=10)
+            return validated
+        # /api/changes/ creates only ECR; ECO number races use the PATCH path below.
+        with patch.object(ChangeRequestSerializer, "validate", validate_together), ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(self.create_from_connection, {"ecr_no": "RACE-CREATE"}) for _ in range(2)]
+            responses = [future.result(timeout=15) for future in futures]
+        self.assertEqual(sorted(code for code, _ in responses), [201, 400])
+        self.assertEqual(set(next(data for code, data in responses if code == 400)), {"ecr_no"})
+        self.assertEqual(ChangeRequest.objects.filter(ecr_no="RACE-CREATE").count(), 1)
 
     def test_concurrent_patches_with_same_number_roll_back_loser(self):
         original_validate = ChangeRequestSerializer.validate

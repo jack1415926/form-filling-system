@@ -1,4 +1,4 @@
-import { actorUser, canEdit, backLabel } from './workflow'
+import { actorUser, canEdit } from './workflow'
 import { useEffect, useImperativeHandle, useState, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Drawer, Input, Select } from 'antd'
@@ -18,7 +18,7 @@ type Props = {
   paused?: boolean; saveRef?: Ref<SaveHandle>
 }
 
-function EmcForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen, paused, saveRef }: Props & { data: EmcData }) {
+function EmcForm({ data, record, onDirty, onBusy, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen, paused, saveRef }: Props & { data: EmcData }) {
   const queryClient = useQueryClient()
   const actorId = actorUser(queryClient).id
   const { message } = App.useApp()
@@ -54,7 +54,7 @@ function EmcForm({ data, record, onDirty, onBusy, onBack, onPrevious, onNext, le
   const saveButton = <Button type="primary" disabled={locked || save.manual || leaving || !dirty} loading={save.manual} onClick={manualSave}>保存 EMC 填写</Button>
   const status = save.status
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>EMC 参考与填写</h1><p className="muted">填写测试标记与说明。典型变更、表头与测试列为只读参考，维护功能另行接入。</p></div><Button disabled={busy} onClick={onBack}>{backLabel(queryClient)}</Button></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>EMC 参考与填写</h1><p className="muted">填写测试标记与说明。典型变更、表头与测试列为只读参考，维护功能另行接入。</p></div></div>
     {locked && <Alert type="info" title="申请已锁定，EMC 仅供查看。" className="form-alert" />}
     <section className="panel list-panel emc-section"><div className="section-heading"><h2>{matrix.title}</h2>{saveButton}</div>
       <ReferenceNotes matrix={matrix} /><ReferenceTable matrix={matrix} editLabel={locked ? '查看' : '填写'} edit={busy || rowId ? undefined : setRowId} />
@@ -86,6 +86,6 @@ export default function EmcEditor(props: Props) {
     return newestResponse(queryClient.getQueryData<EmcData>(queryKey), result)
   } })
   return <>{query.error && <Alert type="error" title={query.data ? 'EMC 刷新失败，当前填写仍保留' : '无法读取 EMC'} description={query.error.message} className="form-alert" action={<Button disabled={leaving} loading={query.isFetching} onClick={() => void query.refetch()}>重试</Button>} />}
-    {query.data ? <EmcForm {...props} data={query.data} /> : query.isPending ? <p>正在读取 EMC…</p> : <Button onClick={props.onBack}>{backLabel(queryClient)}</Button>}
+    {query.data ? <EmcForm {...props} data={query.data} /> : query.isPending ? <p>正在读取 EMC…</p> : null}
   </>
 }

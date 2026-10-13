@@ -118,6 +118,8 @@ class StageSubmission(APIView):
             if data['issue_blockers']: errors['issues'] = data['issue_blockers']
             _, _, relation = stage_parts(record)
             rows = {row.action_key: row for row in relation.all()}
+            previous_tasks = {(task.action_key, task.owner_id): task for task in ActionTask.objects.filter(
+                round__change=record, round__number=record.current_review_round)}
             required = [row for row in data['actions'] if row['required']]
             if any(not row['owner_active'] for row in required): errors['owners'] = '所有本轮行动都须指定有效负责人。'
             if not required and not values['acknowledge_no_tasks']: errors['tasks'] = '请明确确认本阶段无行动需处理。'
@@ -137,8 +139,15 @@ class StageSubmission(APIView):
             # Unresolved original authors retain opinion-only responsibility after reassignment.
             participants.update(record.review_issues.exclude(state='resolved').values_list('author_id', flat=True))
             ReviewRecord.objects.bulk_create([ReviewRecord(change=record, round=round, reviewer_id=pk, approval_required=pk in approvers) for pk in participants])
-            ActionTask.objects.bulk_create([ActionTask(round=round, action_key=row['id'], owner_id=owner_id,
-                result=rows[row['id']].result, status=rows[row['id']].status, date=rows[row['id']].date) for row in required for owner_id in row['owner_user_ids']])
+            tasks = []
+            for row in required:
+                for owner_id in row['owner_user_ids']:
+                    # Retain this person's previous result, never another owner's projection.
+                    previous = previous_tasks.get((row['id'], owner_id)) if record.current_review_round else rows[row['id']]
+                    tasks.append(ActionTask(round=round, action_key=row['id'], owner_id=owner_id,
+                        result=previous.result if previous else '', status=previous.status if previous else '',
+                        date=previous.date if previous else None))
+            ActionTask.objects.bulk_create(tasks)
             record.status = 'pending'; record.current_review_round = round.number; record.review_mode = 'designated'
             record.submitted_at = record.updated_at = now
             record.save(update_fields=['status', 'current_review_round', 'review_mode', 'submitted_at', 'updated_at'])
