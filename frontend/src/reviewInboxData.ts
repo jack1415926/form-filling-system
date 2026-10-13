@@ -1,13 +1,13 @@
 import { ApiError, type User } from './api.ts'
 
 export type InboxItem = { context: 'applicant' | 'reviewer'; change_id: number; round: number; title: string; ecr_no: string; eco_no?: string; stage?: 'legacy' | 'ecr' | 'eco'; status: 'pending' | 'returned' | 'approved'; count: number; summary: string; open_issues: boolean; message_key: string; is_read: boolean }
-export type InboxData = { actor_id: number; role: User['role']; count: number; unread_count: number; items: InboxItem[] }
+export type InboxData = { actor_id: number; count: number; unread_count: number; items: InboxItem[] }
 export type InboxNavigation = { actor_id: number; item: InboxItem; onOpened: () => void }
 export const inboxNavigationEvent = 'review-inbox-open-application'
-export function checkedInbox(value: unknown, user: Pick<User, 'id' | 'role'>): InboxData {
+export function checkedInbox(value: unknown, user: Pick<User, 'id'>): InboxData {
   const data = value as InboxData | null
   const positive = (value: unknown) => Number.isSafeInteger(value) && Number(value) > 0
-  if (!data || data.actor_id !== user.id || data.role !== user.role || !Array.isArray(data.items)
+  if (!data || data.actor_id !== user.id || !Array.isArray(data.items)
     || !data.items.every(item => item && positive(item.change_id) && positive(item.round) && positive(item.count)
       && typeof item.title === 'string' && typeof item.ecr_no === 'string' && typeof item.summary === 'string'
       && ['pending', 'returned', 'approved'].includes(item.status) && (item.stage === undefined || ['legacy', 'ecr', 'eco'].includes(item.stage)) && (item.stage !== 'eco' || typeof item.eco_no === 'string') && typeof item.open_issues === 'boolean'

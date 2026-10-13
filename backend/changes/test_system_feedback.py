@@ -13,7 +13,8 @@ from django.test import TestCase, TransactionTestCase, override_settings, tag
 from rest_framework.test import APIClient
 
 from .models import ChangeRequest, SystemFeedback, SystemFeedbackEvent
-from .roles import FEEDBACK_ADMIN_GROUP, REVIEWER_GROUP
+from .roles import FEEDBACK_ADMIN_GROUP
+REVIEWER_GROUP = '审核员'  # arbitrary group must not grant business permissions
 from .views import user_data
 
 BASE = '/api/system-feedback/'
@@ -98,7 +99,7 @@ class SystemFeedbackTests(TestCase):
             self.assertEqual(client.post(BASE+f'manage/{row["id"]}/actions/', action_payload(), format='json').status_code, 403)
             self.assertFalse(user_data(user)['can_manage_feedback'])
         self.reviewer.groups.add(Group.objects.get(name=FEEDBACK_ADMIN_GROUP))
-        self.assertEqual(user_data(self.reviewer)['role'], 'reviewer')
+        self.assertNotIn('role', user_data(self.reviewer))
         self.assertTrue(user_data(self.reviewer)['can_manage_feedback'])
         self.assertEqual(client_for(self.reviewer).get(BASE+'manage/').status_code, 200)
         self.assertEqual(self.admin_client.get(f'/api/changes/{self.change.pk}/').status_code, 404)

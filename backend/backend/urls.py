@@ -20,17 +20,19 @@ from changes import views
 from changes.emc_views import EmcDetail
 from changes.execution_plan_views import ExecutionPlanDetail
 from changes.significant_change_views import SignificantChangeDetail
-from changes.submission_views import ReviewerList, SubmissionDetail, ActionOwnerList
+from changes.submission_views import ReviewerList, ActionOwnerList
 from changes.review_views import ReviewList, ReviewDetail
 from changes.stage_workflow import StageDetail, StageSubmission, TaskDetail
 from changes.publication import PublicationList, AllPublicationList, PublicationDetail, CreateEco
 from changes.eco_filler import EcoFillerDetail, EcoFillerReceipt
 from changes.stage_navigation import StageNavigation, SourceEcr
+from changes.engineering_changes import EngineeringChanges
 from changes.review_inbox import ReviewInbox, MarkInboxRead
 from changes.system_feedback_views import FeedbackList, FeedbackDetail, FeedbackRequest, ManagedList, ManagedDetail, ManagedAction, ManagedRequest
 from changes.system_feedback_views import FeedbackFollowup, FollowupRequest, FeedbackInbox, FeedbackMarkRead
 
 urlpatterns = [
+    path('api/engineering-changes/', EngineeringChanges.as_view()),
     path('api/publications/', AllPublicationList.as_view()),
     path('api/changes/<int:pk>/stage-navigation/', StageNavigation.as_view()),
     path('api/changes/<int:pk>/source-ecr/', SourceEcr.as_view()),
@@ -65,7 +67,6 @@ urlpatterns = [
     path('api/review/inbox/read/', MarkInboxRead.as_view()),
     path('api/changes/<int:pk>/review-rounds/<int:number>/', ReviewDetail.as_view()),
     path('api/changes/<int:pk>/review-rounds/<int:number>/<str:action>/', ReviewDetail.as_view()),
-    path('api/changes/<int:pk>/submission/', SubmissionDetail.as_view()),
     path('api/changes/<int:pk>/emc/', EmcDetail.as_view()),
     path('api/changes/<int:pk>/execution-plan/', ExecutionPlanDetail.as_view()),
     path('api/changes/<int:pk>/significant-change/', SignificantChangeDetail.as_view()),

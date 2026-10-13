@@ -39,7 +39,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
     if (!active.current || actorUser(client)?.id !== actor.id) return incoming
     const latest = newestResponse(client.getQueryData<ReviewData>(key), incoming)
     client.setQueryData(key, latest)
-    if (latest.form && latest.form.applicant === actor.id) client.setQueryData<ChangeRequest>(['change', actor.id, changeId], (current) => newestResponse(current, latest.form!))
+    if (latest.form) client.setQueryData<ChangeRequest>(['change', actor.id, changeId], (current) => newestResponse(current, latest.form!))
     for (const resource of ['review-list', 'changes', 'submission', 'review-inbox', 'stage-workflow', 'stage-navigation', 'publication']) void client.invalidateQueries({ queryKey: [resource, actor.id] })
     return latest
   }
@@ -52,7 +52,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
     const latest = accept(result)
     if (actionConfirmed(action, latest, actor.id)) {
       setUnknown(null); setError(null)
-      if (action.kind === 'approve') message.success(latest.round.state === 'approved' ? '整份申请审核已通过。' : `你的批准已记录。${approvalProgress(latest.round)}`)
+      if (action.kind === 'approve') message.success(latest.round.state === 'approved' ? '本流程审核已通过。' : `你的批准已记录。${approvalProgress(latest.round)}`)
       if (action.kind === 'return') setDrafts([])
       if (action.issue_id) setReplies((current) => { const next = { ...current }; delete next[action.issue_id!]; return next })
     } else if (!actionCanRetry(action, latest)) {
@@ -107,7 +107,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
         <Descriptions column={1} items={[{ key: 'title', label: '提交时标题', children: data.round.title }, { key: 'numbers', label: '提交时编号', children: `ECR：${data.round.ecr_no} · ECO：${data.round.eco_no || '未填写'}` }, { key: 'mode', label: '方式', children: modeLabel(data.round.review_mode) }, { key: 'people', label: '指定人员', children: data.round.reviewers.map((row) => row.display_name).join('、') || '不指定人员' }, { key: 'approved', label: '个人通过', children: data.round.approvals.map((row) => `${row.display_name}（${new Date(row.approved_at).toLocaleString('zh-CN')}）`).join('、') || '尚无人通过' }]} />
         {data.round.returned_by && <Alert type="warning" title={`退回人：${data.round.returned_by.display_name}`} description={<div className="question-text">{data.round.return_reason}</div>} className="form-alert" />}
         {!data.can_view_form && <Alert type="info" title="当前仅开放基本信息与意见记录；修订中的表单和历史完整表单不开放。" className="form-alert" />}
-        <Alert type={data.round.state === 'approved' ? 'success' : 'info'} showIcon title={approvalProgress(data.round)} description={['ecr', 'eco'].includes(data.round.stage ?? '') ? '每位行动负责人确认任务、正式意见解决且全部指定批准人同意后，阶段才能通过。' : data.round.review_mode === 'public' ? '公开审核需要两名不同审核人员同意批准，无须先退回修改；达到人数条件后自动批准整份申请。' : '指定审核需要全部指定人员同意批准；达到人数条件后自动批准整份申请。'} className="form-alert" />
+        <Alert type={data.round.state === 'approved' ? 'success' : 'info'} showIcon title={approvalProgress(data.round)} description={['ecr', 'eco'].includes(data.round.stage ?? '') ? '每位行动负责人确认任务、正式意见解决且全部指定批准人同意后，阶段才能通过。' : data.round.review_mode === 'public' ? '公开审核需要两名不同审核人员同意批准，无须先退回修改；达到人数条件后自动批准本流程。' : '指定审核需要全部指定人员同意批准；达到人数条件后自动批准本流程。'} className="form-alert" />
         <div className="review-actions"><div className="form-actions">{data.is_current && data.round.state === 'pending' && (data.can_approve || data.round.required_approvers?.some(person => person.id === actor.id)) && <Button type="primary" disabled={!!approvalReason} onClick={() => setConfirm('approve')}>本人同意批准</Button>}{data.can_return && data.can_add_issue !== false && <Button danger disabled={blocked} onClick={() => { openReview(); if (!drafts.length) setDrafts([{ tab: 'overview', location: '', text: '' }]) }}>列出修改意见并退回</Button>}<Button disabled={busy} onClick={openReview}>查看审核意见（{data.unresolved_count}）</Button></div><Button disabled={busy || !!confirm} onClick={onReauthenticate}>重新登录</Button></div>
         {data.is_current && data.round.state === 'pending' && (data.can_approve || data.round.required_approvers?.some(person => person.id === actor.id)) && approvalReason && <p role="status">暂不能批准：{approvalReason}</p>}
         {data.unresolved_count > 0 && <Alert type="warning" title={`尚有 ${data.unresolved_count} 条未解决意见，全部解决后才能批准。`} className="form-alert" />}
@@ -115,7 +115,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
       {renderForm && data.can_view_form && data.form && renderForm(data.form)}
       {!compact && <section className="panel list-panel material-section"><h2>审核过程</h2>{data.history.map((round) => <p key={round.number}>第{round.number}轮 · {labels[round.state]} · {modeLabel(round.review_mode)} · {new Date(round.submitted_at).toLocaleString('zh-CN')}{round.return_reason && ` · 退回原因：${round.return_reason}`}</p>)}</section>}
       <Drawer title={`审核修改意见 · 未解决 ${data.unresolved_count} 条`} open={open} size={640} extra={<Button disabled={busy || !!unknown || !!confirm} onClick={() => window.dispatchEvent(new Event('system-feedback-open'))}>系统反馈</Button>} onClose={() => { if (!busy && !unknown && !confirm) setOpen(false) }} closable={!busy && !unknown && !confirm} maskClosable={!busy && !unknown && !confirm} keyboard={!busy && !unknown && !confirm}>
-        <p className="muted">整份申请共用此意见清单。正式意见保留原提出者及轮次；申请者已回应不等于审核人员已确认解决。</p>
+        <p className="muted">本流程共用此意见清单。正式意见保留原提出者及轮次；申请者已回应不等于审核人员已确认解决。</p>
         <Button disabled={blocked} onClick={() => void query.refetch()}>刷新意见</Button>
         {data.issue_blockers.map((text) => <Alert key={text} type="warning" title={text} className="form-alert" />)}
         {unknown && <Alert type="warning" title="操作结果未确认，原请求及输入已保留" className="form-alert" action={<div className="form-actions"><Button disabled={busy || leaving} onClick={() => void check()}>查询结果</Button><Button disabled={busy || leaving} onClick={() => void perform(unknown)}>按原请求重试</Button></div>} />}
@@ -141,7 +141,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
             <Input.TextArea aria-label={`意见${index + 1}具体问题`} disabled={blocked} maxLength={10000} value={row.text} placeholder="具体问题／继续修改理由" autoSize={{ minRows: 2, maxRows: 8 }} onChange={(event) => setDrafts((current) => current.map((item, i) => i === index ? { ...item, text: event.target.value } : item))} />
             <Button disabled={blocked} onClick={() => setDrafts((current) => current.filter((_, i) => i !== index))}>删除未提交意见</Button>
           </section>)}
-          <Button danger disabled={blocked || !validDrafts} onClick={() => setConfirm('return')}>确认清单并退回整单</Button>
+          <Button danger disabled={blocked || !validDrafts} onClick={() => setConfirm('return')}>确认清单并退回本流程</Button>
         </>}
         {!data.can_return && drafts.length > 0 && <Alert type="warning" title="本轮不能再退回，以下意见尚未提交" description={drafts.map((row, i) => <p className="question-text" key={i}>{row.text}</p>)} />}
         <h3>审核过程</h3>{data.history.map((round) => <section className="review-note" key={round.number}>
@@ -151,13 +151,13 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
           <p>个人通过：{round.approvals.map((person) => `${person.display_name}（${person.username}） · ${new Date(person.approved_at).toLocaleString('zh-CN')}`).join('；') || '尚无人通过'}</p>
           {round.returned_by && <p className="question-text">退回：{round.returned_by.display_name}{round.returned_at && ` · ${new Date(round.returned_at).toLocaleString('zh-CN')}`} · {round.return_reason}</p>}
           {round.tasks?.map(task => <div key={`${task.action_key}:${task.owner.id}`}><p>{task.action_key} · {task.owner.display_name} · {task.confirmed_at ? '已确认' : '未确认'} · {task.date || '未填日期'}</p><p className="question-text">{task.result || '未填结果'} · {task.status || '未填业务状态'}</p>{task.confirmed_at && <p>确认时间：{new Date(task.confirmed_at).toLocaleString('zh-CN')}</p>}</div>)}
-          {round.approved_at && <p>整单批准：{new Date(round.approved_at).toLocaleString('zh-CN')}</p>}
+          {round.approved_at && <p>本流程批准：{new Date(round.approved_at).toLocaleString('zh-CN')}</p>}
         </section>)}
         <h3>历史留言，只读</h3>{data.feedback.map((note) => <div className="review-note" key={note.id}><strong>第{note.round_number}轮 · {note.author.display_name}</strong><span className="muted"> · {new Date(note.created_at).toLocaleString('zh-CN')}</span><p className="question-text">{note.text}</p></div>)}
       </Drawer>
     </>}
-    <Modal open={!!confirm} title={confirm === 'return' ? '确认多条意见并退回整单？' : '同意批准整份申请？'} okText={confirm === 'return' ? '确认退回' : '确认批准'} cancelText="继续检查" onCancel={() => setConfirm(null)} okButtonProps={{ disabled: confirm === 'return' && !validDrafts, danger: confirm === 'return' }} onOk={() => { if (confirm) void perform(newAction(confirm, confirm === 'return' ? { issues: drafts.map((row) => ({ ...row, text: row.text.trim() })) } : {})) }}>
-      {confirm === 'return' ? <><p>以下清单一次提交并结束本轮，申请者须逐条回应后重提。</p>{drafts.map((row, index) => <p className="question-text" key={index}>{index + 1}. {row.issue_id ? `意见 #${row.issue_id}` : issueTabs[row.tab as keyof typeof issueTabs]} {row.location}：{row.text}</p>)}</> : <><p>此操作记录你对整份申请的批准，与单条意见的“确认解决”不同。</p><p>{data && approvalProgress(data.round)}</p><p>达到人数条件后自动完成整单审核，无需另点整单通过按钮。</p></>}
+    <Modal open={!!confirm} title={confirm === 'return' ? '确认多条意见并退回本流程？' : '同意批准本流程？'} okText={confirm === 'return' ? '确认退回' : '确认批准'} cancelText="继续检查" onCancel={() => setConfirm(null)} okButtonProps={{ disabled: confirm === 'return' && !validDrafts, danger: confirm === 'return' }} onOk={() => { if (confirm) void perform(newAction(confirm, confirm === 'return' ? { issues: drafts.map((row) => ({ ...row, text: row.text.trim() })) } : {})) }}>
+      {confirm === 'return' ? <><p>以下清单一次提交并结束本轮，申请者须逐条回应后重提。</p>{drafts.map((row, index) => <p className="question-text" key={index}>{index + 1}. {row.issue_id ? `意见 #${row.issue_id}` : issueTabs[row.tab as keyof typeof issueTabs]} {row.location}：{row.text}</p>)}</> : <><p>此操作记录你对本流程的批准，与单条意见的“确认解决”不同。</p><p>{data && approvalProgress(data.round)}</p><p>任务和意见满足条件、全部指定批准人同意后，本流程获批；发布仍需单独操作。</p></>}
     </Modal>
   </>
 }

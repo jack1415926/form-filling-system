@@ -50,9 +50,9 @@ def review_data(record, round, user):
     notes = ReviewFeedback.objects.filter(round__in=rounds).select_related('author', 'round').order_by('created_at', 'id')
     return {'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'current_round': record.current_review_round,
             'round': round_data(round), 'is_current': current, 'can_view_form': may_view,
-            'can_approve': (record.stage == 'legacy' or approver and tasks_complete) and may_review and not record.review_issues.exclude(state='resolved').exists() and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
-            'can_return': may_review and (record.stage == 'legacy' or task_owner or opinion_owner or approver),
-            'can_add_issue': record.stage == 'legacy' or task_owner or approver, 'can_feedback': False,
+            'can_approve': (approver and tasks_complete) and may_review and not record.review_issues.exclude(state='resolved').exists() and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
+            'can_return': may_review and (task_owner or opinion_owner or approver),
+            'can_add_issue': task_owner or approver, 'can_feedback': False,
             'issues': issue_data(record, round, user, owner, allowed, current),
             'unresolved_count': record.review_issues.exclude(state='resolved').count() if current else 0,
             'issue_blockers': blockers(record) if current else [],
@@ -74,7 +74,7 @@ class ReviewList(APIView):
         own_approved = ReviewRecord.objects.filter(round_id=OuterRef('pk'), reviewer=request.user, approved_at__isnull=False)
         pending_task = ActionTask.objects.filter(round_id=OuterRef('pk'), owner=request.user, confirmed_at__isnull=True)
         done_task = ActionTask.objects.filter(round_id=OuterRef('pk'), owner=request.user, confirmed_at__isnull=False)
-        rows = ReviewRound.objects.exclude(change__applicant=request.user, change__stage='legacy').filter(reviewer_rounds(request.user)).annotate(my_approved=Exists(own_approved), my_pending=Exists(pending_task), my_done=Exists(done_task))
+        rows = ReviewRound.objects.filter(change__stage__in=['ecr', 'eco']).filter(reviewer_rounds(request.user)).annotate(my_approved=Exists(own_approved), my_pending=Exists(pending_task), my_done=Exists(done_task))
         if kind == 'handled':
             rows = rows.filter(Q(my_approved=True) | Q(returned_by=request.user) | Q(my_done=True))
         elif kind == 'returned':
@@ -82,7 +82,7 @@ class ReviewList(APIView):
         else:
             rows = rows.filter(number=F('change__current_review_round'), state='pending', change__status='pending', my_approved=False,
                                review_mode=kind).filter(reviewer_rounds(request.user))
-            rows = rows.filter(Q(change__stage='legacy') | Q(my_pending=True) | Q(records__reviewer=request.user, records__approval_required=True, records__approved_at__isnull=True) | Q(change__review_issues__author=request.user, change__review_issues__state='awaiting_review'))
+            rows = rows.filter(Q(my_pending=True) | Q(records__reviewer=request.user, records__approval_required=True, records__approved_at__isnull=True) | Q(change__review_issues__author=request.user, change__review_issues__state='awaiting_review'))
         return Response([{'change_id': row.change_id, **round_data(row)} for row in rows.select_related('change', 'returned_by').distinct().order_by('-submitted_at', '-pk')])
 
 
@@ -160,11 +160,6 @@ class ReviewDetail(APIView):
                     return Response({'detail': '存在未解决正式意见，不能批准。'}, status=409)
                 row = existing or ReviewRecord(change=record, round=round, reviewer=request.user, assigned=False)
                 row.approved_at = timezone.now(); row.save()
-                approvals = round.records.filter(approved_at__isnull=False).count()
-                done = approvals >= 2 if round.review_mode == 'public' else not round.records.filter(assigned=True, approved_at__isnull=True).exists()
-                if done and record.stage == 'legacy':
-                    round.state = 'approved'; round.approved_at = row.approved_at; round.save(update_fields=['state', 'approved_at'])
-                    record.status = 'approved'
                 event(record, round, request.user, action, values)
             elif action == 'return':
                 if record.status != 'pending' or round.state != 'pending':
@@ -185,4 +180,5 @@ class ReviewDetail(APIView):
             if record.stage in ['ecr', 'eco']:
                 from .stage_workflow import approve_if_complete
                 approve_if_complete(record)
+                round.refresh_from_db()
             return Response(review_data(record, round, request.user))

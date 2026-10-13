@@ -10,10 +10,10 @@ fs.mkdirSync(folder, { recursive: true });
 async function checkInputRecovery() {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   const results = {};
-  async function scenario({ roleChange = false, unknownCreate = false, newAccount = false } = {}) {
+  async function scenario({ unknownCreate = false, newAccount = false } = {}) {
     const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
     const page = await context.newPage();
-    let user = { id: 101, username: 'mock-review-only', display_name: '模拟用户', role: 'filler', can_manage_feedback: false };
+    let user = { id: 101, username: 'mock-review-only', display_name: '模拟用户', can_manage_feedback: false };
     const record = { id: 501, applicant: 101, title: '模拟草稿', ecr_no: 'MOCK', eco_no: '', affected_products: '', affected_region: '', initiating_factory: '', affected_factories: '', ccb_owner: '', change_owner: '', planned_eco_date: null, change_reason: '', status: 'draft', review_mode: '', submitted_at: null, current_review_round: 0, created_at: '2026-10-08T00:00:00Z', updated_at: '2026-10-08T00:00:00Z' };
     const calls = []; let feedback;
     await page.route('**/api/**', async route => {
@@ -23,7 +23,7 @@ async function checkInputRecovery() {
       if (path === '/api/auth/me/') body = user;
       else if (path === '/api/system-feedback/inbox/') body = { unread_count: 0, items: [] };
       else if (path === '/api/auth/csrf/') body = { csrfToken: 'mock-csrf' };
-      else if (path === '/api/auth/login/') { if (roleChange) user = { ...user, role: 'reviewer' }; if (newAccount) user = { ...user, id: 202, username: 'mock-new-account' }; body = { user, csrfToken: 'mock-csrf' }; }
+      else if (path === '/api/auth/login/') { if (newAccount) user = { ...user, id: 202, username: 'mock-new-account' }; body = { user, csrfToken: 'mock-csrf' }; }
       else if (path === '/api/changes/') body = user.id === 101 ? [record] : [];
       else if (path === '/api/changes/501/') { body = record; if (request.method() === 'PATCH') { status = 400; body = { detail: '模拟校验失败以保留未保存输入' }; } }
       else if (path === '/api/review/') body = [];
@@ -39,7 +39,7 @@ async function checkInputRecovery() {
       }
       else if (path === '/api/system-feedback/701/') body = feedback;
       else if (path === '/api/system-feedback/') body = { count: feedback ? 1 : 0, next: null, previous: null, results: feedback ? [feedback] : [] };
-      else if (path === '/api/review/inbox/') body = { actor_id: user.id, role: user.role, count: 0, unread_count: 0, items: [] };
+      else if (path === '/api/review/inbox/') body = { actor_id: user.id, count: 0, unread_count: 0, items: [] };
       else { status = 404; body = { detail: '模拟接口不存在' }; }
       await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     });
@@ -77,9 +77,9 @@ async function checkInputRecovery() {
     results.confirmed_navigation_discards_feedback = true;
     await first.context.close();
 
-    const second = await scenario({ roleChange: true }); const q = second.page;
+    const second = await scenario({}); const q = second.page;
     await openSystemFeedback(q);
-    await q.getByLabel('反馈内容', { exact: true }).fill('同账号角色变化不应丢失的反馈');
+    await q.getByLabel('反馈内容', { exact: true }).fill('同账号重新登录不应丢失的反馈');
     await q.locator('.ant-drawer-open').getByRole('button', { name: '重新登录', exact: true }).click();
     const modal = q.locator('.ant-modal:visible');
     await modal.getByLabel('用户名', { exact: true }).fill('mock-review-only');
@@ -87,11 +87,11 @@ async function checkInputRecovery() {
     await modal.getByRole('button', { name: /登\s*录/ }).click();
     await q.getByRole('heading', { name: '我的申请', exact: true }).waitFor();
     if (!await q.locator('.ant-drawer-open').count()) await openSystemFeedback(q);
-    results.same_account_role_change = { id_unchanged: true, feedback_after_login: await q.getByLabel('反馈内容', { exact: true }).inputValue() };
-    assert.equal(results.same_account_role_change.feedback_after_login, '同账号角色变化不应丢失的反馈');
-    await q.screenshot({ path: folder+'/same-account-role.png', fullPage: true });
+    results.same_account_relogin = { id_unchanged: true, feedback_after_login: await q.getByLabel('反馈内容', { exact: true }).inputValue() };
+    assert.equal(results.same_account_relogin.feedback_after_login, '同账号重新登录不应丢失的反馈');
+    await q.screenshot({ path: folder+'/same-account-relogin.png', fullPage: true });
     await second.context.close();
-    const third = await scenario({ roleChange: true, unknownCreate: true }); const u = third.page;
+    const third = await scenario({ unknownCreate: true }); const u = third.page;
     await openSystemFeedback(u);
     await u.getByLabel('反馈内容', { exact: true }).fill('未知请求保留原UUID');
     await u.getByRole('button', { name: '提交系统反馈', exact: true }).click();
@@ -106,7 +106,7 @@ async function checkInputRecovery() {
     await u.getByRole('button', { name: '查询结果', exact: true }).click();
     await u.getByText('操作结果未确认，原请求和输入已保留', { exact: true }).waitFor({ state: 'hidden' });
     assert.equal(third.calls.filter(call => call.path === '/api/system-feedback/' && call.method === 'POST').length, 1);
-    results.role_change_preserves_unknown_request = true;
+    results.relogin_preserves_unknown_request = true;
     await third.context.close();
 
     const fourth = await scenario({ newAccount: true }); const v = fourth.page;
@@ -131,7 +131,7 @@ async function checkLatePermission() {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
   const page = await context.newPage();
-  const userA = { id: 101, username: 'mock-a', display_name: '模拟账号A', role: 'filler', can_manage_feedback: true };
+  const userA = { id: 101, username: 'mock-a', display_name: '模拟账号A', can_manage_feedback: true };
   const userB = { ...userA, id: 202, username: 'mock-b', display_name: '模拟账号B' };
   let user = userA, lateA, refreshB;
   try {

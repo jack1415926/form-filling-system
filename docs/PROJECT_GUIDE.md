@@ -9,7 +9,7 @@
 | 登录、工作台与页签 | App.tsx、api.ts | views.py、permissions.py、signals.py |
 | 基础概述与物料／处置 | App.tsx、MaterialEditor.tsx、DispositionFields.tsx | views.py、serializers.py、dispositions.py |
 | 27题 | QuestionEditor.tsx、questionDraft.ts | questions.py、views.py |
-| ECR／ECO任务 | StageWorkflow.tsx、ecrStage.ts；旧编辑器服务legacy | stage_workflow.py、ecr.py／eco.py及两份行动JSON |
+| ECR／ECO任务 | StageWorkflow.tsx、ecrStage.ts；EcrEditor只读展示ECO来源 | stage_workflow.py、ecr.py／eco.py及两份行动JSON |
 | 发布与事务复制 | PublicationPanel.tsx、publication.ts | publication.py |
 | 六阶段及来源摘要 | StageNavigation.tsx、stageNavigationData.ts | stage_navigation.py |
 | 正式意见与历史 | ReviewPanel.tsx、review.ts、ReviewWorkbench.tsx | review_access.py、review_views.py、review_issues.py |
@@ -18,20 +18,21 @@
 | 独立系统反馈 | SystemFeedbackPanel.tsx、systemFeedback.ts | system_feedback_views.py |
 | 保存与切页 | useAutosave.ts、autosave.ts、SaveBeforeSwitch.tsx、latestResponse.ts | 各写接口的事务／父申请锁 |
 
-前端入口位于`frontend/src/`，后端业务位于`backend/changes/`；URL在[urls.py](../backend/backend/urls.py)，结构与约束在[models.py](../backend/changes/models.py)。当前未使用路由框架，刷新重建React页面状态，已保存内容从MySQL读取。
+前端入口位于`frontend/src/`，后端业务位于`backend/changes/`；URL在[urls.py](../backend/backend/urls.py)，结构与约束在[models.py](../backend/changes/models.py)。旧整单提交、旧role及停用脚本／测试归档已删除；账号名单接口仍用于选择有效用户，不按旧角色授权。当前未使用路由框架，刷新重建React页面状态，已保存内容从MySQL读取。
 
-## 先理解二十五个业务表
+## 先理解业务数据组
 
 | 数据组 | 业务表及职责 |
 | --- | --- |
+| ECO交接 | eco_filler_event记录创建、历史基线及填写人交接；行动负责人及批准人集合另有三张关联表 |
 | 申请与基础 | change_request保存阶段、来源、编号和发布证据；material_change／material_disposition按物料与位置独立保存；question_response保存27题 |
 | 行动与轮次 | ecr_action_response／eco_action_response保存当前值；review_round冻结轮次；review_record保存参与关系；action_task按轮保存负责人／结果／确认；task_operation保存原请求回执 |
-| 意见与提醒 | review_issue／review_issue_event保留原提出者、回应与解决过程；review_feedback仅旧留言；review_inbox_read按账号／轮次保存消息签名 |
+| 意见与提醒 | review_issue／review_issue_event保留原提出者、回应与解决过程；review_feedback仅保留历史结构，旧单流程申请及留言数据已清理；review_inbox_read按账号／轮次保存消息签名 |
 | 评估 | execution_plan_response保存11条计划；significant_assessment／significant_chart_response／significant_question_response分开保存人工总论、组论和逐题填写 |
 | EMC | emc_reference及row／test／cell四表保存本单定义和交叉格，复合外键防止跨参考关联 |
 | 系统反馈 | system_feedback／system_feedback_event／system_feedback_read保存独立双向沟通和入站已读版本 |
 
-[完整字段与关系](design/DATABASE-ER-FULL.md)使用0021结构；用户、会话、组、权限、迁移记录是系统表。八张Excel不等于八张数据库表，也不等于八个网页页签：概述／物料拆开，实质性主表／子表合为分组抽屉。
+当前0024为26个业务模型及3张人员关联表；[字段与关系快照](design/DATABASE-ER-FULL.md)仍是0021结构，不包含0022多人关联及0023交接记录。用户、会话、组、权限、迁移记录是系统表。八张Excel不等于八张数据库表，也不等于八个网页页签：概述／物料拆开，实质性主表／子表合为分组抽屉。
 
 ## 一次保存怎样到达数据库
 

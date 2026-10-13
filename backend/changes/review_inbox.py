@@ -2,16 +2,14 @@ import hashlib
 import json
 
 from django.db import transaction
-from django.db.models import Count, Exists, F, Max, OuterRef, Q
+from django.db.models import Count, F, Max, Q
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ChangeRequest, ReviewInboxRead, ReviewRecord, ReviewRound
+from .models import ChangeRequest, ReviewInboxRead, ReviewRound
 from .permissions import ExpectedAccountPermission
-from .review_access import reviewer_rounds
-from .roles import business_role
 from .review_issues import StrictValues
 
 
@@ -20,29 +18,17 @@ class ReviewInbox(APIView):
     http_method_names = ['get', 'head', 'options']
 
     def get(self, request):
-        role = business_role(request.user)
-        items = self.context_items(request, 'filler')
-        items += self.context_items(request, 'reviewer')
+        items = self.applicant_items(request)
         items += self.stage_items(request)
         items += self.publication_items(request)
-        return Response({'actor_id': request.user.pk, 'role': role,
+        return Response({'actor_id': request.user.pk,
                          'count': sum(item['count'] for item in items),
                          'unread_count': sum(item['count'] for item in items if not item['is_read']), 'items': items})
 
-    def context_items(self, request, role):
+    def applicant_items(self, request):
         rows = ReviewRound.objects.filter(number=F('change__current_review_round'),
                                          state=F('change__status'), state__in=['pending', 'returned'])
-        if role == 'reviewer':
-            rows = rows.filter(change__stage='legacy')
-            vote = ReviewRecord.objects.filter(round_id=OuterRef('pk'), reviewer=request.user, approved_at__isnull=False)
-            rows = rows.exclude(change__applicant=request.user).filter(reviewer_rounds(request.user)).annotate(
-                my_approved=Exists(vote),
-                replies=Count('change__review_issues', filter=Q(change__review_issues__author=request.user,
-                              change__review_issues__state='awaiting_review'), distinct=True),
-                latest_incoming=Max('change__issue_events__id', filter=Q(change__issue_events__kind='respond',
-                                    change__issue_events__issue__author=request.user)))
-        else:
-            rows = rows.filter(change__applicant=request.user, state='returned').annotate(
+        rows = rows.filter(change__stage__in=['ecr', 'eco'], change__applicant=request.user, state='returned').annotate(
                 unanswered=Count('change__review_issues', filter=Q(change__review_issues__state='awaiting_reply'), distinct=True),
                 latest_incoming=Max('change__issue_events__id', filter=Q(change__issue_events__kind='return')))
         rows = list(rows.select_related('change').distinct().order_by('-change__updated_at', '-pk'))
@@ -50,24 +36,16 @@ class ReviewInbox(APIView):
                      .values_list('round_id', 'signature'))
         items = []
         for row in rows:
-            if role == 'reviewer':
-                review = int(row.state == 'pending' and not row.my_approved)
-                count = review + row.replies
-                notes = (['申请待审核'] if review else [])
-                if row.replies:
-                    notes.append(f'{row.replies}条申请者回应' + ('待复核' if row.state == 'pending' else '（待申请者重提）'))
-                open_issues = bool(row.replies)
-            else:
-                count = max(1, row.unanswered)
-                notes = [f'{row.unanswered}条审核意见待回应' if row.unanswered else '申请已退回，待修订或重新提交']
-                open_issues = bool(row.unanswered)
+            count = max(1, row.unanswered)
+            notes = [f'{row.unanswered}条审核意见待回应' if row.unanswered else '申请已退回，待修订或重新提交']
+            open_issues = bool(row.unanswered)
             if count:
                 # Only incoming messages/new rounds notify again; own replies/resolutions do not.
-                signature = hashlib.sha256(json.dumps([role, row.pk, row.latest_incoming or 0]).encode()).hexdigest()
-                items.append({'change_id': row.change_id, 'round': row.number, 'title': row.title if role == 'reviewer' else row.change.title,
-                              'context': 'reviewer' if role == 'reviewer' else 'applicant',
+                signature = hashlib.sha256(json.dumps(['filler', row.pk, row.latest_incoming or 0]).encode()).hexdigest()
+                items.append({'change_id': row.change_id, 'round': row.number, 'title': row.change.title,
+                              'context': 'applicant',
                               'stage': row.change.stage, 'eco_no': row.eco_no,
-                              'ecr_no': row.ecr_no if role == 'reviewer' else row.change.source_ecr.ecr_no if row.change.stage == 'eco' else row.change.ecr_no, 'status': row.state, 'count': count,
+                              'ecr_no': row.change.source_ecr.ecr_no if row.change.stage == 'eco' else row.change.ecr_no, 'status': row.state, 'count': count,
                               'summary': '；'.join(notes), 'open_issues': open_issues,
                               'message_key': signature, 'is_read': reads.get(row.pk) == signature})
         return items

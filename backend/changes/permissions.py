@@ -14,10 +14,3 @@ class ExpectedAccountPermission(BasePermission):
             error.status_code = 409
             raise error
         return True
-
-
-class FillerPermission(BasePermission):
-    def has_permission(self, request, view):
-        # Ownership and state are checked by each endpoint; review capability
-        # does not prevent an authenticated user from filling their own forms.
-        return True

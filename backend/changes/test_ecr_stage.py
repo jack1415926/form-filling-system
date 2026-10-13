@@ -56,7 +56,7 @@ class EcrStageTests(TestCase):
         response, _ = self.submit(); self.assertEqual(response.status_code, 200)
         own_messages = self.client.get('/api/review/inbox/').data['items']
         self.assertTrue(any('ECR行动待处理1项' in item['summary'] and item['context'] == 'applicant' for item in own_messages))
-        self.assertEqual(self.client.post(self.path + 'submission/', {'review_mode': 'designated', 'reviewer_ids': [self.b.pk]}, format='json').status_code, 409)
+        self.assertEqual(self.client.post(self.path + 'submission/', {'review_mode': 'designated', 'reviewer_ids': [self.b.pk]}, format='json').status_code, 404)
         self.assertEqual(self.action(1, 'approve', {}, self.b).status_code, 409)
         own, foreign = list(self.change.review_rounds.get(number=1).tasks.order_by('action_key'))
         self.client.force_authenticate(self.a)

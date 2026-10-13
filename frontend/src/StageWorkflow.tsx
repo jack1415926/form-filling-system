@@ -188,7 +188,7 @@ export function StageSubmission({ record, leaving, onBack, onPrevious, reviewDra
   }
   useEffect(() => { callbacks.onBusy(busy || !!unknown || publisher.pending); callbacks.onDirty(!!unknown || publisher.dirty) }, [callbacks, busy, unknown, publisher.pending, publisher.dirty])
   return <>
-    <div className="page-heading"><h1>提交{record.stage?.toUpperCase()}行动任务</h1><Button disabled={busy || !!unknown || leaving || publisher.pending} onClick={onBack}>返回我的申请</Button></div>
+    <div className="page-heading"><h1>提交{record.stage?.toUpperCase()}行动任务</h1><Button disabled={busy || !!unknown || leaving || publisher.pending} onClick={onBack}>返回工程变更</Button></div>
     {query.error && <Alert type="error" title={query.error.message} action={<Button onClick={() => void query.refetch()}>重试</Button>} />}
     <p>已回答 {27 - (query.data?.unanswered.length ?? 27)}/27 题；本轮 {required.length} 项行动。</p>
     {editable ? <>
@@ -202,7 +202,7 @@ export function StageSubmission({ record, leaving, onBack, onPrevious, reviewDra
       {!!query.data?.issue_blockers.length && <Alert type="warning" title={query.data.issue_blockers.join(' ')} />}
       {!required.length && <Checkbox disabled={busy || !!unknown} checked={acknowledge} onChange={event => setAcknowledge(event.target.checked)}>确认本阶段无行动需处理，提交后仍须全部指定批准人同意</Checkbox>}
       <p className="muted">提交后冻结行动、负责人和批准人；每位负责人独立填写并确认任务，正式意见解决后，还须全部指定批准人同意才能发布。</p>
-      <Button type="primary" disabled={blocked || busy || !!unknown || leaving || publisher.dirty || publisher.pending} onClick={() => modal.confirm({ title: `提交本轮${record.stage?.toUpperCase()}任务？`, content: '基础内容将锁定，每位负责人确认各自任务后，全部指定批准人需同意批准。', onOk: () => send({ expected_round: current.current_review_round, request_id: crypto.randomUUID(), acknowledge_no_tasks: acknowledge }) })}>提交阶段</Button>
+      <Button type="primary" disabled={blocked || busy || !!unknown || leaving || publisher.dirty || publisher.pending} onClick={() => modal.confirm({ title: `提交本轮${record.stage?.toUpperCase()}任务？`, content: '基础内容将锁定，每位负责人确认各自任务后，全部指定批准人需同意批准。', onOk: () => send({ expected_round: current.current_review_round, request_id: crypto.randomUUID(), acknowledge_no_tasks: acknowledge }) })}>提交{record.stage?.toUpperCase()}审核</Button>
     </> : <Alert type={['approved', 'published'].includes(current.status) ? 'success' : 'info'} title={['draft', 'returned'].includes(current.status) ? `当前由${current.applicant_name || '指定填写人'}填写或修订，你仅可查看，不能代为提交。` : current.status === 'published' ? `${record.stage?.toUpperCase()}已发布，基线只读。` : current.status === 'approved' ? `${record.stage?.toUpperCase()}阶段已批准，等待指定发布人发布。` : `阶段处理中，基础内容已锁定。负责人进入${record.stage?.toUpperCase()}行动页处理任务。`} />}
     {unknown && <Alert type="warning" title="提交结果未确认，原UUID已保留" action={<><Button disabled={busy || leaving} onClick={() => void check()}>查询结果</Button><Button disabled={busy || leaving} onClick={() => void send(unknown)}>按原请求重试</Button></>} />}
     {error && <Alert type="error" title={error} />}

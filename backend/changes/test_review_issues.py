@@ -3,13 +3,11 @@ from importlib import import_module
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.apps import apps
 from django.test import TestCase, override_settings, tag
 from rest_framework.test import APIClient
 
-from .models import ChangeRequest, ReviewIssue, ReviewIssueEvent
-from .roles import REVIEWER_GROUP
+from .models import ChangeRequest, ReviewIssue, ReviewIssueEvent, QuestionResponse
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -18,13 +16,14 @@ class ReviewIssueTests(TestCase):
     def setUpTestData(cls):
         cls.owner = get_user_model().objects.create_user('issues-owner', password='test')
         cls.other = get_user_model().objects.create_user('issues-other', password='test')
-        group, _ = Group.objects.get_or_create(name=REVIEWER_GROUP)
         cls.people = [get_user_model().objects.create_user('issues-reviewer-'+str(i), password='test') for i in range(3)]
-        for person in cls.people:
-            person.groups.add(group)
 
     def setUp(self):
         self.change = ChangeRequest.objects.create(applicant=self.owner, title='Issues', ecr_no='ISSUES')
+        self.change.publisher = self.owner
+        self.change.save()
+        self.change.stage_approvers.set(self.people[:2])
+        QuestionResponse.objects.bulk_create([QuestionResponse(change=self.change, number=i, answer='N') for i in range(1, 28)])
         self.base = f'/api/changes/{self.change.pk}/'
         self.owner_client = self.client_for(self.owner)
         self.clients = [self.client_for(person) for person in self.people]
@@ -35,9 +34,10 @@ class ReviewIssueTests(TestCase):
 
     def submit(self, mode='designated', people=None):
         self.change.refresh_from_db()
-        return self.owner_client.post(self.base+'submission/', {'review_mode': mode,
-            'reviewer_ids': [person.pk for person in self.people[:2]] if people is None else people,
-            'expected_round': self.change.current_review_round, 'request_id': str(uuid.uuid4())}, format='json')
+        if people is not None:
+            self.change.stage_approvers.set(people)
+        return self.owner_client.post(self.base+'stage-submission/', {
+            'expected_round': self.change.current_review_round, 'request_id': str(uuid.uuid4()), 'acknowledge_no_tasks': True}, format='json')
 
     def act(self, client, kind, values=None, number=None):
         self.change.refresh_from_db()
@@ -78,26 +78,6 @@ class ReviewIssueTests(TestCase):
         self.assertEqual(ReviewIssue.objects.count(), 2)
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'pending')
 
-    def test_resubmit_requires_every_reply_and_original_arrangement(self):
-        _, issues = self.return_two()
-        self.assertEqual(self.submit().status_code, 409)
-        self.assertEqual(self.reply(issues[0]).status_code, 200)
-        self.assertEqual(self.submit().status_code, 409)
-        self.assertEqual(self.reply(issues[1]).status_code, 200)
-        self.assertEqual(self.submit('public', []).status_code, 400)
-        self.assertEqual(self.submit(people=[self.people[2].pk]).status_code, 409)
-        self.assertEqual(self.submit().status_code, 200)
-        self.change.refresh_from_db(); self.assertEqual(self.change.current_review_round, 2)
-        self.assertFalse(self.change.review_rounds.get(number=2).records.filter(approved_at__isnull=False).exists())
-        self.assertEqual(self.act(self.clients[1], 'approve').status_code, 409)
-        self.assertEqual(self.resolve(issues[0], self.clients[1]).status_code, 409)
-        self.assertEqual(self.resolve(issues[0]).status_code, 200)
-        self.assertEqual(self.act(self.clients[1], 'approve').status_code, 409)
-        self.assertEqual(self.resolve(issues[1]).status_code, 200)
-        self.assertEqual(self.act(self.clients[0], 'approve').status_code, 200)
-        self.change.refresh_from_db(); self.assertEqual(self.change.status, 'pending')
-        self.assertEqual(self.act(self.clients[1], 'approve').status_code, 200)
-        self.change.refresh_from_db(); self.assertEqual(self.change.status, 'approved')
 
     def test_assigned_original_author_closes_but_does_not_vote_automatically(self):
         _, issues = self.return_two()
@@ -118,7 +98,7 @@ class ReviewIssueTests(TestCase):
         values = {'request_id': str(uuid.uuid4()), 'issues': [{'issue_id': issues[0].pk,
             'version': issues[0].version, 'text': 'Still missing evidence'}]}
         self.assertEqual(self.act(self.clients[0], 'return', values).status_code, 200)
-        self.assertEqual(self.submit().status_code, 409)
+        self.assertEqual(self.submit().status_code, 400)
         self.assertEqual(self.reply(issues[0]).status_code, 200)
         self.assertEqual(self.submit().status_code, 200)
         self.assertEqual(self.resolve(issues[0]).status_code, 200)
@@ -147,23 +127,10 @@ class ReviewIssueTests(TestCase):
         _, issues = self.return_two()
         for issue in issues: self.reply(issue)
         person = self.people[0]; person.is_active = False; person.save()
-        self.assertEqual(self.submit().status_code, 409)
+        self.assertEqual(self.submit().status_code, 400)
         person.is_active = True; person.save(); person.groups.clear()
         self.assertEqual(self.submit().status_code, 200)
 
-    def test_permissions_hidden_body_and_historical_round_event_boundary(self):
-        _, issues = self.return_two()
-        for suffix in ['', 'materials/', 'questions/', 'ecr-actions/', 'eco-actions/', 'emc/', 'execution-plan/', 'significant-change/']:
-            self.assertEqual(self.clients[0].get(self.base+suffix).status_code, 404)
-        self.assertEqual(self.client_for(self.other).get(self.base+'review-rounds/1/').status_code, 404)
-        values = {'request_id': str(uuid.uuid4()), 'issue_id': issues[0].pk, 'version': 1, 'text': 'Impersonation'}
-        self.assertEqual(self.act(self.clients[0], 'respond', values).status_code, 403)
-        for issue in issues: self.reply(issue)
-        self.submit(); self.resolve(issues[0])
-        old = self.clients[0].get(self.base+'review-rounds/1/').json()
-        self.assertEqual(old['issues'][0]['state'], 'awaiting_review')
-        self.assertFalse(any(row['kind'] == 'resolve' for row in old['issues'][0]['events']))
-        self.assertTrue(all(not row['can_resolve'] for row in old['issues']))
 
     def test_strict_payload_no_empty_return_and_atomic_rollback(self):
         self.submit()

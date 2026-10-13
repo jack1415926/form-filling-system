@@ -12,7 +12,7 @@ export default function ReviewInbox({ user, leaving, onSystem, systemCount = 0 }
   const currentAvailable = useSyncExternalStore(subscribeReviewDrawer, hasReviewDrawer)
   const currentCount = useSyncExternalStore(subscribeReviewDrawer, getReviewDrawerCount)
   const prompted = useRef(false), intro = useRef<ReturnType<typeof modal.confirm> | null>(null)
-  const query = useQuery({ queryKey: ['review-inbox', user.id, user.role], refetchInterval: 30_000,
+  const query = useQuery({ queryKey: ['review-inbox', user.id], refetchInterval: 30_000,
     queryFn: async () => checkedInbox(await api<unknown>('/api/review/inbox/', 'GET', undefined, user.id), user) })
   const markRead = useMutation({
     mutationFn: async (items: InboxItem[]) => checkedInbox(await api<unknown>('/api/review/inbox/read/', 'POST', {

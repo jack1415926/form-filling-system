@@ -18,7 +18,7 @@ class ChangeRequest(models.Model):
         PUBLISHED = "published", "已发布"
 
     applicant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
-    stage = models.CharField(max_length=8, default='legacy', choices=[('legacy', '旧流程'), ('ecr', 'ECR'), ('eco', 'ECO')])
+    stage = models.CharField(max_length=8, default='ecr', choices=[('legacy', '停用的旧流程标记'), ('ecr', 'ECR'), ('eco', 'ECO')])
     publisher = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
     stage_approvers = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+')
     published_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')

@@ -91,3 +91,21 @@
 .emc-section .ant-collapse { margin-bottom: 20px; }
 
 .emc-group-title { width: max-content; max-width: 100%; margin: 0 auto; position: sticky; left: 300px; }
+.workspace-navigation { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 28px; }
+.engineering-filters { flex-wrap: wrap; gap: 16px; }
+.engineering-process { display: grid; gap: 8px; }
+.engineering-process .ant-tag { width: fit-content; margin: 0; }
+.process-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; margin: 0 0 22px; }
+.process-heading h1 { font-size: 26px; margin: 8px 0; }
+.process-layout { display: grid; grid-template-columns: 245px minmax(0, 1fr); gap: 24px; align-items: start; }
+.process-sidebar { padding: 12px 0; overflow: hidden; }
+.process-sidebar .ant-menu { border-inline-end: none !important; }
+.process-sidebar .ant-menu-item { font-size: 13px; }
+.process-sidebar .ant-menu-item-selected { background: #e7f1eb; color: #176b5b; }
+.process-body { min-width: 0; }
+.process-body .page-heading h1 { font-size: 23px; }
+.process-summary { padding: 24px; margin-bottom: 24px; }
+.process-summary .ant-descriptions { margin-bottom: 18px; }
+.process-body .ant-steps { margin-bottom: 20px; }
+@media (max-width: 950px) { .process-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 16px; } }
+@media (max-width: 720px) { .process-layout { grid-template-columns: 1fr; } .process-heading h1 { font-size: 22px; } }

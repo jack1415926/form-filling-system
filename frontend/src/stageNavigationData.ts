@@ -7,6 +7,9 @@ export type NavigationData = { actor_id: number; current_change_id: number; stag
 export function currentStageIndex(record: Pick<ChangeRequest, 'stage' | 'status'>) {
   return (record.stage === 'eco' ? 3 : 0) + (['approved', 'published'].includes(record.status) ? 2 : record.status === 'pending' ? 1 : 0)
 }
+export function currentProcessIndex(record: Pick<ChangeRequest, 'status'>) {
+  return record.status === 'published' ? 3 : record.status === 'approved' ? 2 : record.status === 'pending' ? 1 : 0
+}
 const integer = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0
 const date = (value: unknown) => value === null || typeof value === 'string' && Number.isFinite(Date.parse(value))
 

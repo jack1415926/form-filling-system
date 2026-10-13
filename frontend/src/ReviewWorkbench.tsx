@@ -24,13 +24,13 @@ export default function ReviewWorkbench({ user, target: selected, onSelect: setS
       {publicationKind ? <>
         {publications.error && <Alert type="error" title={publications.error.message} />}
         <section className="panel list-panel"><Table rowKey="id" loading={publications.isPending} dataSource={publications.data ?? []} columns={[
-          { title: '标题', dataIndex: 'title' }, { title: '阶段／编号', render: (_, row) => `${row.stage?.toUpperCase()} · ${row.stage === 'eco' ? row.eco_no : row.ecr_no}` }, { title: '状态', render: (_, row) => row.status === 'published' ? '已发布' : '已批准待发布' },
+          { title: '标题', dataIndex: 'title' }, { title: '流程／编号', render: (_, row) => `${row.stage?.toUpperCase()} · ${row.stage === 'eco' ? row.eco_no : row.ecr_no}` }, { title: '状态', render: (_, row) => row.status === 'published' ? '已发布' : '已批准待发布' },
           { title: '操作', render: (_, row) => <Button disabled={busy} onClick={() => setSelected({ id: row.id, number: row.current_review_round })}>查看申请</Button> },
         ]} /></section>
       </> : <>
       {list.error && <Alert type="error" title={list.error.message} className="form-alert" />}
       <section className="panel list-panel"><Table rowKey={(row) => `${row.change_id}:${row.number}`} loading={list.isPending} dataSource={list.data ?? []} pagination={{ pageSize: 10 }} locale={{ emptyText: <Empty description="暂无记录" /> }} columns={[
-        { title: '提交时标题', dataIndex: 'title' }, { title: 'ECR／ECO', render: (_, row) => `${row.ecr_no}／${row.eco_no || '未填写'}` },
+        { title: '提交时标题', dataIndex: 'title' }, { title: '流程／编号', render: (_, row) => `${row.stage?.toUpperCase()} · ${row.stage === 'eco' ? row.eco_no || '未填写' : row.ecr_no}` },
         { title: '轮次', dataIndex: 'number' }, { title: '审核方式', render: (_, row) => modeLabel(row.review_mode) }, { title: '状态', render: (_, row) => <Tag>{reviewStateLabels[row.state]}</Tag> },
         { title: '操作', render: (_, row) => <Button disabled={busy} onClick={() => setSelected({ id: row.change_id, number: row.number })}>查看申请</Button> },
       ]} /></section>

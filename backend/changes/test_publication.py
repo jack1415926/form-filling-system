@@ -9,6 +9,7 @@ from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import close_old_connections, connection
 from django.test import TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import (ChangeRequest, QuestionResponse, MaterialChange, MaterialDisposition,
@@ -207,7 +208,7 @@ class PublicationTests(PublicationFixture, TestCase):
             self.assertEqual(self.client.patch(path + 'eco-actions/eco_001/', body, format='json').status_code, 400)
         self.assertEqual(self.client.patch(path + 'ecr-actions/ecr_001/', {'owner_user_id': self.a.pk}, format='json').status_code, 409)
         submission = {'review_mode': 'designated', 'reviewer_ids': [self.b.pk], 'request_id': str(uuid.uuid4())}
-        self.assertEqual(self.client.post(path + 'submission/', submission, format='json').status_code, 409)
+        self.assertEqual(self.client.post(path + 'submission/', submission, format='json').status_code, 404)
         self.assertEqual(self.client.post(path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': 0}, format='json').status_code, 400)
         self.assertEqual(self.client.post(path + 'publication/', {'request_id': str(uuid.uuid4()), 'expected_round': 1}, format='json').status_code, 409)
         self.assertEqual(self.client.post(f'/api/changes/{legacy.pk}/eco/', {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}, format='json').status_code, 409)
@@ -250,7 +251,8 @@ class PublicationConcurrencyTests(PublicationFixture, TransactionTestCase):
 
     def test_parallel_number_reservation_leaves_one_winner(self):
         self.approve(); self.publish(); first = self.create_eco()
-        second = ChangeRequest.objects.create(applicant=self.a, title='other')
+        other_source = ChangeRequest.objects.create(applicant=self.a, stage='ecr', status='published', title='other source', ecr_no='OTHER-SOURCE', publisher=self.c, published_by=self.c, published_at=timezone.now(), publication_request_id=uuid.uuid4())
+        second = ChangeRequest.objects.create(applicant=self.a, stage='eco', source_ecr=other_source, eco_creation_request_id=uuid.uuid4(), title='other')
         barrier = Barrier(2)
         def reserve(pk):
             close_old_connections()

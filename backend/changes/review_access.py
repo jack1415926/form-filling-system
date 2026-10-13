@@ -2,7 +2,6 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound
 from .models import ChangeRequest
-from .roles import business_role
 
 
 def is_owner(user, change):
@@ -18,7 +17,7 @@ def is_eco_coordinator(user, record):
 
 
 def editable_change(request, pk):
-    record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk)
+    record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, stage__in=['ecr', 'eco'])
     if record.applicant_id != request.user.pk:
         if record.stage == 'eco' and (is_eco_coordinator(request.user, record) or record.filler_events.filter(previous_filler=request.user).exists()):
             from .review_issues import conflict
@@ -32,18 +31,14 @@ def is_publication_reader(user, change):
 
 
 def eligible(user, round):
-    if not user.is_active:
+    if not user.is_active or round.change.stage not in ['ecr', 'eco']:
         return False
-    if round.change.stage in ['ecr', 'eco']:
-        return round.records.filter(reviewer=user, assigned=True).exists()
-    if user.pk == round.change.applicant_id:
-        return False
-    if round.review_mode == 'public':
-        return business_role(user) == 'reviewer'
     return round.records.filter(reviewer=user, assigned=True).exists()
 
 
 def can_read_round(user, round):
+    if round.change.stage not in ['ecr', 'eco']:
+        return False
     if is_owner(user, round.change) or eligible(user, round) or is_publication_reader(user, round.change) or is_eco_coordinator(user, round.change) or is_ecr_coordinator(user, round.change):
         return True
     if round.review_mode == 'public':
@@ -53,6 +48,8 @@ def can_read_round(user, round):
 
 
 def can_read_body(user, record):
+    if record.stage not in ['ecr', 'eco']:
+        return False
     if is_owner(user, record) or is_publication_reader(user, record) or is_eco_coordinator(user, record) or is_ecr_coordinator(user, record):
         return True
     current = record.review_rounds.filter(number=record.current_review_round).first()
@@ -69,5 +66,4 @@ def readable_change(request, pk):
 def reviewer_rounds(user):
     if not user.is_active:
         return Q(pk__in=[])
-    assigned = Q(review_mode='designated', records__reviewer=user, records__assigned=True)
-    return assigned | Q(review_mode='public') if business_role(user) == 'reviewer' else assigned
+    return Q(change__stage__in=['ecr', 'eco'], review_mode='designated', records__reviewer=user, records__assigned=True)

@@ -3,9 +3,11 @@ from django.contrib.sessions.models import Session
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from threading import Barrier, Event
 from unittest.mock import patch
+import uuid
 
 from django.db import IntegrityError, connection, connections, transaction
 from django.test import TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import ChangeRequest
@@ -76,7 +78,7 @@ class DraftFlowTests(TestCase):
             self.assertEqual(response.json()["ecr_no"], "")
             self.assertEqual(response.json()["eco_no"], "")
         record = ChangeRequest.objects.create(applicant=self.owner, ecr_no="000001", eco_no="ECO-ONE")
-        same = self.client.patch(f"/api/changes/{record.pk}/", {"ecr_no": " 000001 ", "eco_no": "ECO-ONE", "title": "新标题"}, format="json")
+        same = self.client.patch(f"/api/changes/{record.pk}/", {"ecr_no": " 000001 ", "title": "新标题"}, format="json")
         self.assertEqual(same.status_code, 200)
         self.assertEqual(same.json()["ecr_no"], "000001")
         cleared = self.client.patch(f"/api/changes/{record.pk}/", {"ecr_no": "", "eco_no": ""}, format="json")
@@ -281,6 +283,13 @@ class ConcurrentDraftTests(TransactionTestCase):
         original_validate = ChangeRequestSerializer.validate
         for field in ("ecr_no", "eco_no"):
             records = [ChangeRequest.objects.create(applicant=self.owner, title=f"原内容{index}") for index in range(2)]
+            if field == 'eco_no':
+                for record in records:
+                    source = ChangeRequest.objects.create(applicant=self.owner, stage='ecr', status='published', published_by=self.owner, published_at=timezone.now(), publication_request_id=uuid.uuid4())
+                    record.stage = 'eco'
+                    record.source_ecr = source
+                    record.eco_creation_request_id = uuid.uuid4()
+                    record.save()
             barrier = Barrier(2)
             def validate_together(serializer, attrs):
                 validated = original_validate(serializer, attrs)

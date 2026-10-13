@@ -47,7 +47,7 @@ function ActionForm({ action, record, leaving, paused, onDirty, onBusy, onSaved,
   </div>
 }
 
-function LegacyEcrEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen }: {
+function SourceEcrEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, leaving, onReauthenticate, onEditorOpen }: {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void
   onBack: () => void; onPrevious: () => void; onNext: () => void; leaving: boolean; onReauthenticate: () => void; onEditorOpen: (value: boolean) => void
 }) {
@@ -100,6 +100,6 @@ function LegacyEcrEditor({ record, onDirty, onBusy, onBack, onPrevious, onNext, 
   </>
 }
 
-export default function EcrEditor(props: Parameters<typeof LegacyEcrEditor>[0]) {
-  return props.record.stage === 'ecr' ? <StageActions {...props} /> : <LegacyEcrEditor {...props} record={props.record.stage === 'eco' ? { ...props.record, status: 'published' } : props.record} />
+export default function EcrEditor(props: Parameters<typeof SourceEcrEditor>[0]) {
+  return props.record.stage === 'ecr' ? <StageActions {...props} /> : <SourceEcrEditor {...props} record={{ ...props.record, status: 'published' }} />
 }

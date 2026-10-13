@@ -25,13 +25,13 @@ export function approvalProgress(round: RoundInfo): string {
   if (['ecr', 'eco'].includes(round.stage ?? '')) return `${round.stage?.toUpperCase()}行动已确认 ${round.tasks?.filter(task => task.confirmed_at).length ?? 0}/${round.tasks?.length ?? 0} 项 · 已批准 ${round.approvals.length}/${round.required_approvers?.length ?? 0} 人 · ${reviewStateLabels[round.state]}`
   const required = round.review_mode === 'public' ? 2 : round.reviewers.length
   const count = round.approvals.length
-  if (round.state === 'approved') return `已批准 ${count}/${required} 人，整份申请审核已通过。`
+  if (round.state === 'approved') return `已批准 ${count}/${required} 人，本流程审核已通过。`
   if (round.state === 'returned') return '本轮已退回；重新提交后，个人批准重新计算。'
-  return `已批准 ${count}/${required} 人；还需 ${Math.max(0, required - count)} 名不同审核人员同意，整份申请才会通过。`
+  return `已批准 ${count}/${required} 人；还需 ${Math.max(0, required - count)} 名不同审核人员同意，本流程才会通过。`
 }
 export function approvalBlockReason(data: ReviewData, actorId: number, draftCount: number): string | null {
   if (!data.is_current) return '这是历史轮次，请打开当前审核轮次。'
-  if (data.round.state !== 'pending') return data.round.state === 'approved' ? '整份申请已批准。' : '申请已退回，须由申请者修订并重新提交。'
+  if (data.round.state !== 'pending') return data.round.state === 'approved' ? '本流程已批准。' : '申请已退回，须由申请者修订并重新提交。'
   if (data.round.approvals.some((row) => row.id === actorId)) return '你已同意批准本轮申请，无需重复批准；请等待其他审核人员。'
   if (data.unresolved_count) return `尚有 ${data.unresolved_count} 条未解决意见，须由原提出者确认解决后才能批准。`
   if (['ecr', 'eco'].includes(data.round.stage ?? '') && data.round.tasks?.some(task => !task.confirmed_at)) return '全部行动负责人确认任务后才能批准。'

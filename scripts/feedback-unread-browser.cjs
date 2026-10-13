@@ -27,10 +27,10 @@ fs.mkdirSync(folder, { recursive: true });
       await page.route('**/api/**', async route => {
         const request = route.request(), path = new URL(request.url()).pathname;
         let body;
-        if (path === '/api/auth/me/') body = { ...actor, username: 'mock-unread', role: 'filler', can_manage_feedback: managed };
+        if (path === '/api/auth/me/') body = { ...actor, username: 'mock-unread', can_manage_feedback: managed };
         else if (path === '/api/auth/csrf/') body = { csrfToken: 'mock-token' };
         else if (path === '/api/changes/') body = [];
-        else if (path === '/api/review/inbox/') body = { actor_id: actor.id, role: 'filler', count: 0, unread_count: 0, items: [] };
+        else if (path === '/api/review/inbox/') body = { actor_id: actor.id, count: 0, unread_count: 0, items: [] };
         else if (path === '/api/system-feedback/inbox/') body = inbox();
         else if (path === '/api/system-feedback/inbox/read/') { assert.deepEqual(request.postDataJSON(), { id: 901, message_version: 3 }); readVersion = 3; body = inbox(); }
         else if (path === `/api/system-feedback/${managed ? 'manage/' : ''}901/`) { detailReads++; body = data(); }

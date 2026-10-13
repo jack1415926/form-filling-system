@@ -20,11 +20,11 @@ from .eco import ECO_ACTIONS, ECO_ACTION_IDS
 from .questions import QUESTIONS
 from .dispositions import LOCATIONS
 from .permissions import account_changed
-from .roles import business_role, can_manage_feedback, can_review
+from .roles import can_manage_feedback, can_review
 
 
 def user_data(user):
-    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "role": business_role(user), "can_review": can_review(user), "can_manage_feedback": can_manage_feedback(user)}
+    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "can_review": can_review(user), "can_manage_feedback": can_manage_feedback(user)}
 
 
 @require_GET
@@ -74,7 +74,7 @@ class ChangeList(generics.ListCreateAPIView):
             return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
-        return ChangeRequest.objects.filter(applicant=self.request.user)
+        return ChangeRequest.objects.filter(applicant=self.request.user, stage__in=['ecr', 'eco'])
 
     def perform_create(self, serializer):
         serializer.save(applicant=self.request.user, stage='ecr', status=ChangeRequest.Status.DRAFT)
@@ -310,7 +310,7 @@ class EcoActionDetail(APIView):
                 return Response({'detail': 'ECO阶段尚未启动。'}, status=409)
             if record.stage == 'eco' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'owner_user_ids', 'extra_required'}):
                 return Response({'detail': '草稿／退回时仅可分配ECO负责人及补充任务，结果由提交后的负责人填写。'}, status=400)
-            if isinstance(request.data, dict) and 'extra_required' in request.data and (record.stage == 'legacy' or type(request.data['extra_required']) is not bool):
+            if isinstance(request.data, dict) and 'extra_required' in request.data and type(request.data['extra_required']) is not bool:
                 return Response({'detail': '补充任务标记必须为布尔值。'}, status=400)
             if action_key not in ECO_ACTION_IDS:
                 return Response({"detail": "行动不存在。"}, status=404)
