@@ -1,9 +1,10 @@
 import { ApiError, type ChangeRequest } from './api.ts'
 import { checkedChange } from './submission.ts'
 import { newestResponse } from './latestResponse.ts'
+import { checkedFillerReceipt, type FillerReceipt } from './ecoFiller.ts'
 
-export type PublicationData = { actor_id: number; change: ChangeRequest; publisher_name: string; publisher_active: boolean; can_publish: boolean; can_create_eco: boolean; eco_id: number | null }
-export type PublicationOperation = { kind: 'publish'; request_id: string; expected_round: number } | { kind: 'create'; request_id: string }
+export type PublicationData = { actor_id: number; change: ChangeRequest; publisher_name: string; publisher_active: boolean; can_publish: boolean; can_create_eco: boolean; eco_id: number | null; eco_filler_id?: number | null; eco_creation_receipt?: FillerReceipt | null }
+export type PublicationOperation = { kind: 'publish'; request_id: string; expected_round: number } | { kind: 'create'; request_id: string; filler_id: number }
 const id = (value: unknown) => Number.isSafeInteger(value) && Number(value) > 0
 const uuid = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 export function checkedPublication(value: unknown, changeId: number, actor: number): PublicationData {
@@ -16,22 +17,28 @@ export function checkedPublication(value: unknown, changeId: number, actor: numb
     || (change.status === 'published' ? !(uuid(change.publication_request_id) && id(change.published_by_id) && typeof change.published_at === 'string' && Number.isFinite(Date.parse(change.published_at)))
       : !(change.publication_request_id === null && change.published_by_id === null && change.published_at === null))
     || data.can_publish && !(change.status === 'approved' && change.publisher_id === actor && data.publisher_active)
-    || data.can_create_eco && !(change.stage === 'ecr' && change.status === 'published' && change.applicant === actor && data.eco_id === null)
-    || data.eco_id !== null && !(change.stage === 'ecr' && change.status === 'published' && change.applicant === actor)) return invalid()
+    || data.can_create_eco && !(change.stage === 'ecr' && change.status === 'published' && [change.applicant, change.published_by_id].includes(actor) && data.eco_id === null)
+    || data.eco_id !== null && !(change.stage === 'ecr' && change.status === 'published' && [change.applicant, change.published_by_id].includes(actor))
+    || data.eco_filler_id !== undefined && !(data.eco_id === null ? data.eco_filler_id === null : id(data.eco_filler_id))) return invalid()
+  if (data.eco_creation_receipt) checkedFillerReceipt(data.eco_creation_receipt, data.eco_id!)
   return data
 }
 
-export function checkedCreatedEco(value: unknown, sourceId: number, actor: number): ChangeRequest {
-  const data = value as { created: boolean; change: ChangeRequest } | null
+export function checkedCreatedEco(value: unknown, sourceId: number, actor: number, filler = actor, requestId?: string): ChangeRequest {
+  const data = value as { created: boolean; change: ChangeRequest; receipt?: FillerReceipt | null } | null
   if (!data || typeof data.created !== 'boolean' || !id(data.change?.id)) throw new ApiError(200, 'ECO创建响应不完整，请查询原请求。')
-  const change = checkedChange(data.change, { id: data.change.id, applicant: actor })
+  const change = checkedChange(data.change, { id: data.change.id })
+  if (data.receipt) {
+    const receipt = checkedFillerReceipt(data.receipt, change.id, actor, requestId ? { request_id: requestId, filler_id: filler } : undefined)
+    if (receipt.kind !== 'create') throw new ApiError(200, 'ECO创建回执类型不正确。')
+  } else if (data.created && requestId || change.applicant !== filler) throw new ApiError(200, 'ECO填写人或创建回执未确认。')
   if (change.stage !== 'eco' || change.source_ecr_id !== sourceId || typeof change.source_ecr_no !== 'string'
     || !uuid(change.eco_creation_request_id) || change.ecr_no !== '') throw new ApiError(200, 'ECO来源或创建回执不完整，请查询原请求。')
   return change
 }
 
 export function publicationSettled(data: PublicationData, operation: PublicationOperation) {
-  return operation.kind === 'publish' ? data.change.status === 'published' : data.eco_id !== null
+  return operation.kind === 'publish' ? data.change.status === 'published' : data.eco_id !== null && data.eco_creation_receipt?.request_id === operation.request_id && data.eco_creation_receipt.filler_id === operation.filler_id && data.eco_creation_receipt.actor_id === data.actor_id
 }
 
 export function newestPublication(current: PublicationData | undefined, incoming: PublicationData): PublicationData {

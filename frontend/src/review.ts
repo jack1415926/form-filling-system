@@ -3,6 +3,7 @@ import { checkedChange, type Reviewer } from './submission.ts'
 
 export type RoundInfo = {
   stage?: 'legacy' | 'ecr' | 'eco'
+  required_approvers?: Reviewer[]
   tasks?: { action_key: string; owner: Reviewer; result: string; status: string; date: string | null; confirmed_at: string | null }[]
   number: number; title: string; ecr_no: string; eco_no: string; review_mode: 'designated' | 'public'; state: 'pending' | 'approved' | 'returned'
   submitted_at: string; approved_at: string | null; returned_at: string | null; returned_by: Reviewer | null; return_reason: string
@@ -21,7 +22,7 @@ export const issueTabs = { overview: '概述', materials: '物料明细', questi
 export const issueStateLabels = { awaiting_reply: '待回应', awaiting_review: '待复核', resolved: '已解决' }
 export const reviewStateLabels = { pending: '待审核', returned: '已退回', approved: '已批准' }
 export function approvalProgress(round: RoundInfo): string {
-  if (['ecr', 'eco'].includes(round.stage ?? '')) return `${round.stage?.toUpperCase()}行动已确认 ${round.tasks?.filter(task => task.confirmed_at).length ?? 0}/${round.tasks?.length ?? 0} 项 · ${reviewStateLabels[round.state]}`
+  if (['ecr', 'eco'].includes(round.stage ?? '')) return `${round.stage?.toUpperCase()}行动已确认 ${round.tasks?.filter(task => task.confirmed_at).length ?? 0}/${round.tasks?.length ?? 0} 项 · 已批准 ${round.approvals.length}/${round.required_approvers?.length ?? 0} 人 · ${reviewStateLabels[round.state]}`
   const required = round.review_mode === 'public' ? 2 : round.reviewers.length
   const count = round.approvals.length
   if (round.state === 'approved') return `已批准 ${count}/${required} 人，整份申请审核已通过。`
@@ -33,6 +34,7 @@ export function approvalBlockReason(data: ReviewData, actorId: number, draftCoun
   if (data.round.state !== 'pending') return data.round.state === 'approved' ? '整份申请已批准。' : '申请已退回，须由申请者修订并重新提交。'
   if (data.round.approvals.some((row) => row.id === actorId)) return '你已同意批准本轮申请，无需重复批准；请等待其他审核人员。'
   if (data.unresolved_count) return `尚有 ${data.unresolved_count} 条未解决意见，须由原提出者确认解决后才能批准。`
+  if (['ecr', 'eco'].includes(data.round.stage ?? '') && data.round.tasks?.some(task => !task.confirmed_at)) return '全部行动负责人确认任务后才能批准。'
   if (!data.can_approve) return '当前账号没有本轮批准权限，请刷新身份和审核记录核对。'
   if (draftCount) return '存在未提交的修改意见，请先处理或删除未提交意见，再同意批准。'
   return null
@@ -43,6 +45,7 @@ const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Da
 const person = (value: unknown) => object(value) && Number.isSafeInteger(value.id) && Number(value.id) > 0 && typeof value.username === 'string' && typeof value.display_name === 'string'
 function validRound(value: unknown): boolean {
   return object(value) && (value.stage === undefined || ['legacy', 'ecr', 'eco'].includes(String(value.stage)))
+    && (value.required_approvers === undefined || Array.isArray(value.required_approvers) && value.required_approvers.every(person) && new Set(value.required_approvers.map(row => row.id)).size === value.required_approvers.length)
     && (!['ecr', 'eco'].includes(String(value.stage)) || Array.isArray(value.tasks) && value.tasks.every(task => object(task) && typeof task.action_key === 'string' && new RegExp(`^${value.stage}_\\d{3}$`).test(task.action_key) && person(task.owner) && typeof task.result === 'string' && ['', 'completed', 'not_applicable', ...(value.stage === 'eco' ? ['implementation_stage'] : [])].includes(String(task.status)) && (task.date === null || date(task.date)) && (task.confirmed_at === null || date(task.confirmed_at))))
     && Number.isSafeInteger(value.number) && Number(value.number) > 0
     && ['title', 'ecr_no', 'eco_no', 'return_reason'].every((key) => typeof value[key] === 'string')

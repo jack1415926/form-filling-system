@@ -1,8 +1,12 @@
-import { ApiError } from './api.ts'
+import { ApiError, type ChangeRequest } from './api.ts'
 import { newestResponse } from './latestResponse.ts'
 
 export type StageSummary = { stage: 'ecr' | 'eco'; id: number | null; status: 'draft' | 'pending' | 'returned' | 'approved' | 'published' | 'not_created' | 'unavailable'; number: string | null; current_round: number | null; confirmed: number | null; total: number | null; approved_at: string | null; published_at: string | null; updated_at: string | null; can_open: boolean }
 export type NavigationData = { actor_id: number; current_change_id: number; stages: StageSummary[] }
+
+export function currentStageIndex(record: Pick<ChangeRequest, 'stage' | 'status'>) {
+  return (record.stage === 'eco' ? 3 : 0) + (['approved', 'published'].includes(record.status) ? 2 : record.status === 'pending' ? 1 : 0)
+}
 const integer = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0
 const date = (value: unknown) => value === null || typeof value === 'string' && Number.isFinite(Date.parse(value))
 

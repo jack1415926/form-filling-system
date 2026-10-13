@@ -17,6 +17,7 @@ class EcrStageTests(TestCase):
     def setUp(self):
         self.client = APIClient(); self.client.force_authenticate(self.a)
         self.change = ChangeRequest.objects.create(applicant=self.a, stage='ecr', publisher=self.c, title='Stage', ecr_no='ECR-STAGE')
+        self.change.stage_approvers.set([self.a])
         QuestionResponse.objects.bulk_create([QuestionResponse(change=self.change, number=number, answer='N') for number in range(1, 28)])
         self.path = f'/api/changes/{self.change.pk}/'
 
@@ -40,6 +41,10 @@ class EcrStageTests(TestCase):
         task.refresh_from_db(); self.client.force_authenticate(task.owner)
         return self.client.post(self.path + f'action-tasks/{task.pk}/', {'request_id': str(uuid.uuid4()), 'version': task.version}, format='json')
 
+    def approve_stage(self, number=1):
+        client = APIClient(); client.force_authenticate(self.a)
+        self.assertEqual(client.post(self.path + f'review-rounds/{number}/approve/', {'request_id': str(uuid.uuid4())}, format='json').status_code, 200)
+
     def test_assignment_self_permissions_required_values_and_legacy_entry_rejection(self):
         self.assertEqual(connection.vendor, 'mysql')
         created = self.client.post('/api/changes/', {}, format='json')
@@ -60,11 +65,13 @@ class EcrStageTests(TestCase):
         self.assertEqual(self.confirm_task(own).status_code, 400)
         self.assertEqual(self.save_task(own).status_code, 200)
         self.assertEqual(self.confirm_task(own).status_code, 200)
-        self.assertFalse(self.client.get('/api/review/inbox/').data['items'])
+        self.assertTrue(any('待本人批准' in item['summary'] for item in self.client.get('/api/review/inbox/').data['items']))
         self.assertEqual(self.save_task(own).status_code, 409)
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'pending')
         self.assertEqual(self.save_task(foreign).status_code, 200)
         self.assertEqual(self.confirm_task(foreign).status_code, 200)
+        self.change.refresh_from_db(); self.assertEqual(self.change.status, 'pending')
+        self.approve_stage()
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'approved')
         self.client.force_authenticate(self.c)
         self.assertEqual(self.client.get(self.path).status_code, 200)
@@ -93,6 +100,7 @@ class EcrStageTests(TestCase):
         self.assertEqual(self.action(2, 'return', {'issues': [{'tab': 'overview', 'text': '未授权新增意见'}]}, self.b).status_code, 403)
         response = self.action(2, 'resolve', {'issue_id': issue.pk, 'version': issue.version, 'text': '确认修订'}, self.b)
         self.assertEqual(response.status_code, 200)
+        self.approve_stage(2)
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'approved')
         first.refresh_from_db(); self.assertEqual(first.result, '完成评估')
         self.client.force_authenticate(self.b)
@@ -118,6 +126,7 @@ class EcrStageTests(TestCase):
         self.client.force_authenticate(self.c)
         self.assertEqual(self.client.get(self.path + 'stage-workflow/').status_code, 404)
         zero = ChangeRequest.objects.create(applicant=self.a, stage='ecr', publisher=self.c, title='Zero', ecr_no='ZERO')
+        zero.stage_approvers.set([self.a])
         QuestionResponse.objects.bulk_create([QuestionResponse(change=zero, number=n, answer='N') for n in range(1, 28)])
         self.client.force_authenticate(self.a)
         url = f'/api/changes/{zero.pk}/stage-submission/'
@@ -125,6 +134,8 @@ class EcrStageTests(TestCase):
         self.assertEqual(self.client.post(url, payload, format='json').status_code, 400)
         payload['acknowledge_no_tasks'] = True
         self.assertEqual(self.client.post(url, payload, format='json').status_code, 200)
+        zero.refresh_from_db(); self.assertEqual(zero.status, 'pending')
+        self.assertEqual(self.client.post(f'/api/changes/{zero.pk}/review-rounds/1/approve/', {'request_id': str(uuid.uuid4())}, format='json').status_code, 200)
         zero.refresh_from_db(); self.assertEqual(zero.status, 'approved')
         self.assertTrue(zero.review_rounds.get().submission_payload['acknowledge_no_tasks'])
 

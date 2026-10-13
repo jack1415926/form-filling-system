@@ -18,6 +18,7 @@ import SubmissionEditor from './SubmissionEditor'
 import ReviewWorkbench from './ReviewWorkbench'
 import ReviewPanel from './ReviewPanel'
 import PublicationPanel from './PublicationPanel'
+import EcoFillerPanel from './EcoFillerPanel'
 import StageNavigation, { SourceOverview } from './StageNavigation'
 import { submissionChoiceWarning } from './submission'
 import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
@@ -107,8 +108,8 @@ function OverviewEditor({ record, onDirty, onSaved, onBack, onBusy, leaving, onN
   return <>
     <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{['ecr', 'eco'].includes(record.stage ?? '') && record.status === 'pending' ? '处理中' : stateLabels[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div><Button onClick={onBack} disabled={(save.pending || save.manual) || leaving}>{backLabel(queryClient)}</Button></div>
     <section className="panel overview-panel">
-      <div className="section-heading"><div><h2>概述基本信息</h2><p className="muted">申请者由登录账号确定，业务负责人单独填写。</p></div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.status}</span></div>
-      {locked && <Alert type="info" title="申请已锁定，概述仅供查看。" className="form-alert" />}
+      <div className="section-heading"><div><h2>概述基本信息</h2><p className="muted">{record.stage === 'eco' ? 'ECO填写人由创建或交接时指定，业务负责人单独填写。' : '申请者由登录账号确定，业务负责人单独填写。'}</p></div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.status}</span></div>
+      {locked && <Alert type="info" title={['draft', 'returned'].includes(record.status) ? '当前由指定填写人编辑，概述仅供查看。' : '申请已锁定，概述仅供查看。'} className="form-alert" />}
       <Form form={form} initialValues={{ ...record, planned_eco_date: record.planned_eco_date ?? '' }} layout="vertical" onValuesChange={changed} onFinish={save.clickSave} disabled={locked || save.manual || leaving} {...save.composition} requiredMark={false}>
         <Form.Item name="title" label="ECR/ECO 标题" rules={[{ max: 255, message: '标题最多 255 个字符' }]}><Input placeholder="填写这项设计变更的标题" maxLength={255} /></Form.Item>
         <Form.Item name="affected_products" label="受影响产品和型号"><Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="填写涉及的产品及型号" /></Form.Item>
@@ -129,6 +130,7 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
   const [editorOpen, setEditorOpen] = useState(false)
   const [issueBusy, setIssueBusy] = useState(false), [issueDirty, setIssueDirty] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [fillerBusy, setFillerBusy] = useState(false)
   const [publicationBusy, setPublicationBusy] = useState(false)
   const saveRef = useRef<SaveHandle>(null)
   const { modal } = AntApp.useApp()
@@ -136,20 +138,20 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
   useEffect(() => { onLeaveMessage(tab === 'submission' ? submissionChoiceWarning : discardSavedWarning); return () => onLeaveMessage(discardSavedWarning) }, [tab, onLeaveMessage])
   useEffect(() => {
     const handleUnload = (event: BeforeUnloadEvent) => {
-      if (dirty || busy || issueDirty || issueBusy || publicationBusy) { event.preventDefault(); event.returnValue = '' }
+      if (dirty || busy || issueDirty || issueBusy || publicationBusy || fillerBusy) { event.preventDefault(); event.returnValue = '' }
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [dirty, busy, issueDirty, issueBusy, publicationBusy])
+  }, [dirty, busy, issueDirty, issueBusy, publicationBusy, fillerBusy])
   const editorProps = { ...props,
-    leaving: props.leaving || issueBusy || publicationBusy,
+    leaving: props.leaving || issueBusy || publicationBusy || fillerBusy,
     saveRef,
     paused: confirming,
     onDirty: (value: boolean) => { setDirty(value); props.onDirty(value || issueDirty) },
-    onBusy: (value: boolean) => { setBusy(value); props.onBusy(value || issueBusy || publicationBusy) },
+    onBusy: (value: boolean) => { setBusy(value); props.onBusy(value || issueBusy || publicationBusy || fillerBusy) },
   }
   const switchTab = (key: string) => {
-    if (busy || issueBusy || publicationBusy || editorOpen || props.leaving || key === tab) return
+    if (busy || issueBusy || publicationBusy || fillerBusy || editorOpen || props.leaving || key === tab) return
     const change = () => { setDirty(false); props.onDirty(issueDirty); setTab(key); window.scrollTo({ top: 0 }) }
     if (!dirty) { change(); return }
     setConfirming(true)
@@ -162,11 +164,12 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
       switchPage={change} discard={() => { setConfirming(false); change(); dialog.destroy() }} close={() => { setConfirming(false); dialog.destroy() }}
     /> })
   }
-  return <>{['ecr', 'eco'].includes(props.record.stage ?? '') && <StageNavigation record={props.record} leaving={props.leaving || busy || issueBusy || publicationBusy || editorOpen} onOpenChange={props.onOpenChange} />}
-    {['ecr', 'eco'].includes(props.record.stage ?? '') && <PublicationPanel record={props.record} leaving={props.leaving || busy || issueBusy || dirty || issueDirty || editorOpen} onBusy={value => { setPublicationBusy(value); props.onBusy(value || busy || issueBusy) }} onReauthenticate={props.onReauthenticate} onOpenChange={props.onOpenChange} />}
+  return <>{['ecr', 'eco'].includes(props.record.stage ?? '') && <StageNavigation record={props.record} leaving={props.leaving || busy || issueBusy || publicationBusy || fillerBusy || editorOpen} onOpenChange={props.onOpenChange} />}
+    {['ecr', 'eco'].includes(props.record.stage ?? '') && <PublicationPanel record={props.record} leaving={props.leaving || busy || issueBusy || fillerBusy || dirty || issueDirty || editorOpen} onBusy={value => { setPublicationBusy(value); props.onBusy(value || busy || issueBusy || fillerBusy) }} onReauthenticate={props.onReauthenticate} onOpenChange={props.onOpenChange} />}
+    {props.record.stage === 'eco' && <EcoFillerPanel record={props.record} leaving={props.leaving || busy || issueBusy || publicationBusy || dirty || issueDirty || editorOpen} onBusy={value => { setFillerBusy(value); props.onBusy(value || busy || issueBusy || publicationBusy) }} onReauthenticate={props.onReauthenticate} />}
     {props.record.stage === 'eco' && <SourceOverview record={props.record} />}
-    {!props.reviewOnly && !!props.record.current_review_round && <ReviewPanel compact initialOpen={props.initialReviewOpen} key={`${props.record.id}:${props.record.current_review_round}`} changeId={props.record.id} number={props.record.current_review_round} leaving={props.leaving || busy || confirming} onReauthenticate={props.onReauthenticate} onBusy={(value) => { setIssueBusy(value); props.onBusy(value || busy || publicationBusy) }} onDirty={(value) => { setIssueDirty(value); props.onDirty(value || dirty) }} />}
-    <Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }, { key: 'execution-plan', label: '执行计划' }, { key: 'significant-change', label: '实质性变更评估' }, { key: 'submission', label: '提交审核' }].filter((item) => !props.reviewOnly || item.key !== 'submission').map((item) => ({ ...item, disabled: busy || issueBusy || publicationBusy || editorOpen || props.leaving }))} />
+    {!props.reviewOnly && !!props.record.current_review_round && <ReviewPanel compact initialOpen={props.initialReviewOpen} key={`${props.record.id}:${props.record.current_review_round}`} changeId={props.record.id} number={props.record.current_review_round} leaving={props.leaving || busy || confirming} onReauthenticate={props.onReauthenticate} onBusy={(value) => { setIssueBusy(value); props.onBusy(value || busy || publicationBusy || fillerBusy) }} onDirty={(value) => { setIssueDirty(value); props.onDirty(value || dirty) }} />}
+    <Tabs activeKey={tab} onChange={switchTab} items={[{ key: 'overview', label: '概述' }, { key: 'materials', label: '物料明细' }, { key: 'questions', label: '问题评估' }, { key: 'ecr', label: 'ECR 评估' }, { key: 'eco', label: 'ECO 执行' }, { key: 'emc', label: 'EMC 参考' }, { key: 'execution-plan', label: '执行计划' }, { key: 'significant-change', label: '实质性变更评估' }, { key: 'submission', label: '提交审核' }].filter((item) => !props.reviewOnly || item.key !== 'submission').map((item) => ({ ...item, disabled: busy || issueBusy || publicationBusy || fillerBusy || editorOpen || props.leaving }))} />
     {tab === 'overview' ? <OverviewEditor {...editorProps} onNext={() => switchTab('materials')} /> : tab === 'materials' ? <MaterialEditor {...editorProps} onEditorOpen={setEditorOpen} onNext={() => switchTab('questions')} /> : tab === 'questions' ? <QuestionEditor {...editorProps} onPrevious={() => switchTab('materials')} onNext={() => switchTab('ecr')} /> : tab === 'ecr' ? <EcrEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('questions')} onNext={() => switchTab('eco')} /> : tab === 'eco' && props.record.stage === 'ecr' ? <Alert type="info" title="ECO需从已发布ECR明确创建；请使用上方发布与创建入口。" action={<Button onClick={() => switchTab('emc')}>继续填写EMC</Button>} /> : tab === 'eco' ? <EcoEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('ecr')} onNext={() => switchTab('emc')} /> : tab === 'emc' ? <EmcEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('eco')} onNext={() => switchTab('execution-plan')} /> : tab === 'execution-plan' ? <ExecutionPlanEditor {...editorProps} onPrevious={() => switchTab('emc')} onNext={() => switchTab('significant-change')} /> : tab === 'significant-change' ? <SignificantChangeEditor {...editorProps} onEditorOpen={setEditorOpen} onPrevious={() => switchTab('execution-plan')} onNext={props.reviewOnly ? undefined : () => switchTab('submission')} /> : <SubmissionEditor {...editorProps} reviewDraftDirty={issueDirty} onPrevious={() => switchTab('significant-change')} />}
   </>
 }
@@ -279,6 +282,16 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
     onError: (error, id) => { if (error instanceof ApiError && error.status === 404) refreshAfterRemoval(id) },
   })
   useEffect(() => { onLeaving(exit.isPending || confirming); return () => onLeaving(false) }, [exit.isPending, confirming, onLeaving])
+  useEffect(() => {
+    const handedOff = (event: Event) => {
+      const detail = (event as CustomEvent<{ actor_id: number; change_id: number }>).detail
+      if (detail.actor_id !== user.id || detail.change_id !== selectedId) return
+      setSelectedId(null); setDirty(false); setSaving(false); setSection('mine')
+      void queryClient.invalidateQueries({ queryKey: ['changes', user.id] })
+    }
+    window.addEventListener('eco-filler-handed-off', handedOff)
+    return () => window.removeEventListener('eco-filler-handed-off', handedOff)
+  }, [user.id, selectedId, queryClient])
   const listBusy = create.isPending || exit.isPending || remove.isPending || reauthBusy
   const navigateApplication = (action: () => void) => {
     if (saving || listBusy || confirming || reauthenticate) return

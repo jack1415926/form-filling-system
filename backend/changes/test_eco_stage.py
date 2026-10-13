@@ -20,6 +20,7 @@ class EcoFixture(PublicationFixture):
         super().setUp()
         self.approve(); self.publish()
         self.eco = self.create_eco()
+        self.eco.stage_approvers.set([self.a])
         self.ecr_path = self.path; self.path = f'/api/changes/{self.eco.pk}/'
         self.source_before = ChangeRequestSerializer(self.source).data
         self.client.force_authenticate(self.a)
@@ -54,6 +55,10 @@ class EcoFixture(PublicationFixture):
         self.eco.refresh_from_db(); payload['expected_round'] = self.eco.current_review_round
         return self.client.post(self.path + 'publication/', payload, format='json'), payload
 
+    def approve_stage(self, number=1):
+        client = APIClient(); client.force_authenticate(self.a)
+        self.assertEqual(client.post(self.path + f'review-rounds/{number}/approve/', {'request_id': str(uuid.uuid4())}, format='json').status_code, 200)
+
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
 class EcoStageTests(EcoFixture, TestCase):
@@ -74,7 +79,7 @@ class EcoStageTests(EcoFixture, TestCase):
         self.assertEqual(self.eco.review_rounds.count(), 1)
         self.assertEqual(self.eco.review_rounds.get().ecr_no, self.source.ecr_no)
 
-    def test_owner_tasks_implementation_state_receipts_and_auto_approval(self):
+    def test_owner_tasks_implementation_state_receipts_and_explicit_approval(self):
         self.assign(owner=self.a); self.assign('eco_002', self.b)
         self.assertEqual(self.submit()[0].status_code, 200)
         own, other = self.eco.review_rounds.get().tasks.order_by('action_key')
@@ -86,6 +91,8 @@ class EcoStageTests(EcoFixture, TestCase):
         self.assertEqual(self.client.patch(self.path + f'action-tasks/{own.pk}/', payload, format='json').status_code, 200)
         self.save(own, status='not_applicable', text='not applicable reason'); self.assertEqual(self.confirm(own)[0].status_code, 200)
         self.save(other); response, confirmation = self.confirm(other); self.assertEqual(response.status_code, 200)
+        self.eco.refresh_from_db(); self.assertEqual(self.eco.status, 'pending')
+        self.approve_stage()
         self.eco.refresh_from_db(); self.assertEqual(self.eco.status, 'approved')
         self.assertEqual(self.client.post(self.path + f'action-tasks/{other.pk}/', confirmation, format='json').status_code, 200)
         self.assertEqual(self.review('approve', self.b).status_code, 409)
@@ -112,6 +119,7 @@ class EcoStageTests(EcoFixture, TestCase):
         self.assertEqual(self.review('return', self.b, round=2, issues=[{'tab': 'eco', 'text': 'new unauthorized issue'}]).status_code, 403)
         issue.refresh_from_db()
         self.assertEqual(self.review('resolve', self.b, round=2, issue_id=issue.pk, version=issue.version, text='verified').status_code, 200)
+        self.approve_stage(2)
         self.eco.refresh_from_db(); self.assertEqual(self.eco.status, 'approved')
         history = self.client.get(self.path + 'review-rounds/2/').data['history']
         self.assertEqual(history[0]['tasks'][0]['result'], 'ECO result')
@@ -130,10 +138,13 @@ class EcoStageTests(EcoFixture, TestCase):
         self.assertIsNone(nav['stages'][0]['total']); self.assertTrue(nav['stages'][1]['can_open'])
         self.assertEqual(self.client.get(self.path + 'ecr-actions/').status_code, 200)
         task = self.eco.review_rounds.get().tasks.get(); self.save(task); self.confirm(task)
+        self.approve_stage()
         self.client.force_authenticate(self.c)
+        self.eco.refresh_from_db()
         masked = self.client.get(self.ecr_path + 'stage-navigation/').data['stages'][1]
-        self.assertEqual(masked['status'], 'unavailable'); self.assertIsNone(masked['id']); self.assertIsNone(masked['number'])
-        self.assertEqual(self.client.get(self.path).status_code, 404)
+        self.assertEqual(masked['status'], 'approved'); self.assertEqual(masked['id'], self.eco.pk); self.assertEqual(masked['number'], self.eco.eco_no)
+        self.assertEqual(self.client.get(self.path).status_code, 200)
+        self.assertEqual(self.client.patch(self.path, {'title': 'read only'}, format='json').status_code, 409)
         response, payload = self.publish_eco(); self.assertEqual(response.status_code, 200, response.data)
         self.assertFalse(response.data['can_create_eco']); self.assertIsNone(response.data['eco_id'])
         self.assertEqual(self.client.post(self.path + 'publication/', payload, format='json').status_code, 200)
@@ -150,6 +161,7 @@ class EcoStageTests(EcoFixture, TestCase):
     def test_zero_task_publication_inbox_reads_are_unique_and_do_not_publish(self):
         self.client.patch(self.path, {'publisher_id': self.a.pk}, format='json')
         response, _ = self.submit(acknowledge_no_tasks=True); self.assertEqual(response.status_code, 200)
+        self.approve_stage()
         inbox = self.client.get('/api/review/inbox/').data
         items = [item for item in inbox['items'] if item['change_id'] == self.eco.pk]
         self.assertEqual(len(items), 1); self.assertEqual(items[0]['status'], 'approved'); self.assertEqual(items[0]['stage'], 'eco')
@@ -195,12 +207,12 @@ class EcoConcurrencyTests(EcoFixture, TransactionTestCase):
                 close_old_connections()
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(action, ['confirm', 'return']))
-        self.assertEqual(sorted(results), [200, 409])
-        self.eco.refresh_from_db(); self.assertIn(self.eco.status, ['approved', 'returned'])
+        self.assertIn(sorted(results), [[200, 200], [200, 409]])
+        self.eco.refresh_from_db(); self.assertEqual(self.eco.status, 'returned')
         self.source.refresh_from_db(); self.assertEqual(ChangeRequestSerializer(self.source).data, self.source_before)
 
     def test_parallel_eco_publication_finishes_once(self):
-        self.submit(acknowledge_no_tasks=True); barrier = Barrier(2)
+        self.submit(acknowledge_no_tasks=True); self.approve_stage(); barrier = Barrier(2)
         def publish():
             close_old_connections()
             try:

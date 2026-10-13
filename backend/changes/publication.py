@@ -1,6 +1,7 @@
 """Publish an immutable ECR and copy its base into one independent ECO."""
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import serializers
@@ -11,13 +12,15 @@ from .emc_views import matrix_data, persist
 from .models import (ChangeRequest, MaterialChange, MaterialDisposition, QuestionResponse,
                      ExecutionPlanResponse, SignificantAssessment, SignificantChartResponse,
                      SignificantQuestionResponse)
-from .review_access import readable_change, is_publication_reader
-from .review_issues import StrictValues, conflict
+from .review_access import readable_change, is_publication_reader, is_ecr_coordinator
+from .review_issues import StrictValues, conflict, canonical
+from .models import EcoFillerEvent
+from .eco_filler import receipt
 from .serializers import ChangeRequestSerializer
 
 
 def publication_data(record, actor):
-    owner = record.applicant_id == actor.pk
+    owner = is_ecr_coordinator(actor, record)
     eco = ChangeRequest.objects.filter(source_ecr=record).first() if owner and record.stage == 'ecr' else None
     publisher = record.publisher
     return {'actor_id': actor.pk, 'change': ChangeRequestSerializer(record).data,
@@ -25,7 +28,9 @@ def publication_data(record, actor):
             'publisher_active': bool(publisher and publisher.is_active),
             'can_publish': is_publication_reader(actor, record) and record.status == 'approved',
             'can_create_eco': record.stage == 'ecr' and owner and record.status == 'published' and eco is None,
-            'eco_id': eco.pk if eco else None}
+            'eco_id': eco.pk if eco else None,
+            'eco_filler_id': eco.applicant_id if eco else None,
+            'eco_creation_receipt': receipt(eco.filler_events.filter(kind='create').first()) if eco and eco.filler_events.filter(kind='create').exists() else None}
 
 
 class PublicationList(APIView):
@@ -37,7 +42,7 @@ class PublicationList(APIView):
         stage = request.query_params.get('stage', 'all') if self.default_stage == 'all' else 'ecr'
         if stage not in ['all', 'ecr', 'eco']:
             raise serializers.ValidationError({'stage': '阶段不合法。'})
-        rows = ChangeRequest.objects.filter(stage__in=['ecr', 'eco'] if stage == 'all' else [stage], status=state, publisher=request.user)
+        rows = ChangeRequest.objects.filter(stage__in=['ecr', 'eco'] if stage == 'all' else [stage], status=state).filter(Q(publisher=request.user) | Q(stage='ecr', status='published', published_by=request.user))
         return Response(ChangeRequestSerializer(rows, many=True).data)
 
 
@@ -114,20 +119,35 @@ def copy_base(source, eco):
 
 class CreateEcoValues(StrictValues):
     request_id = serializers.UUIDField()
+    filler_id = serializers.IntegerField(min_value=1)
 
 
 class CreateEco(APIView):
     def post(self, request, pk):
         values = CreateEcoValues(data=request.data); values.is_valid(raise_exception=True)
         with transaction.atomic():
-            source = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            source = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk)
+            if request.user.pk not in [source.applicant_id, source.published_by_id] or not request.user.is_active:
+                from rest_framework.exceptions import NotFound
+                raise NotFound('没有ECO创建权限。')
             if source.stage != 'ecr' or source.status != 'published':
                 conflict('只有已发布的新ECR可以创建ECO。')
             existing = ChangeRequest.objects.filter(source_ecr=source).first()
             if existing:
-                return Response({'created': False, 'change': ChangeRequestSerializer(existing).data})
-            eco = ChangeRequest.objects.create(applicant=request.user, stage='eco', source_ecr=source,
+                event = existing.filler_events.filter(request_id=values.validated_data['request_id']).first()
+                if event:
+                    if event.kind != 'create' or event.actor_id != request.user.pk or event.payload != canonical(values.validated_data):
+                        conflict('相同创建标识的填写人或内容不同。')
+                elif existing.applicant_id != values.validated_data['filler_id']:
+                    conflict('关联ECO已经创建，填写人与本次选择不同；请打开ECO使用更换填写人。')
+                return Response({'created': False, 'change': ChangeRequestSerializer(existing).data, 'receipt': receipt(event) if event else None})
+            filler = get_user_model().objects.select_for_update().filter(pk=values.validated_data['filler_id'], is_active=True).first()
+            if filler is None:
+                raise serializers.ValidationError({'filler_id': '请选择有效填写人，不能选择停用账号。'})
+            eco = ChangeRequest.objects.create(applicant=filler, stage='eco', source_ecr=source,
                 eco_creation_request_id=values.validated_data['request_id'],
                 **{field: getattr(source, field) for field in BASE_FIELDS})
             copy_base(source, eco)
-            return Response({'created': True, 'change': ChangeRequestSerializer(eco).data}, status=201)
+            event = EcoFillerEvent.objects.create(eco=eco, kind='create', actor=request.user, filler=filler,
+                request_id=values.validated_data['request_id'], payload=canonical(values.validated_data))
+            return Response({'created': True, 'change': ChangeRequestSerializer(eco).data, 'receipt': receipt(event)}, status=201)

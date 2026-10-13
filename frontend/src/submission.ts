@@ -14,6 +14,7 @@ const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Da
 export function checkedChange(value: unknown, owner: { id: number; applicant?: number }): ChangeRequest {
   if (!object(value) || value.id !== owner.id || !Number.isSafeInteger(value.applicant) || Number(value.applicant) <= 0
       || owner.applicant !== undefined && value.applicant !== owner.applicant
+      || value.stage_approver_ids !== undefined && (!Array.isArray(value.stage_approver_ids) || new Set(value.stage_approver_ids).size !== value.stage_approver_ids.length || !value.stage_approver_ids.every(id => Number.isSafeInteger(id) && Number(id) > 0))
       || typeof value.status !== 'string' || !['draft', 'pending', 'approved', 'returned', 'published'].includes(value.status) || typeof value.review_mode !== 'string' || !['', 'designated', 'public'].includes(value.review_mode)
       || !Number.isSafeInteger(value.current_review_round) || Number(value.current_review_round) < 0
       || !date(value.updated_at) || !date(value.created_at) || !(value.submitted_at === null || date(value.submitted_at))

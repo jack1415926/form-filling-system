@@ -34,21 +34,21 @@ function Assignment({ record, action, leaving, accept, ...callbacks }: Callbacks
   const client = useQueryClient(), actor = actorUser(client).id
   const editable = canEdit(record, actorUser(client)) && !leaving
   const people = useQuery({ queryKey: ['action-owners', actor], enabled: editable, queryFn: async () => checkedReviewers(await api<unknown>('/api/action-owners/', 'GET', undefined, actor)) })
-  const save = useAutosave({ ...callbacks, fields: { owner_user_id: action.owner_user_id === null ? null : String(action.owner_user_id), extra_required: action.extra_required ? 'Y' : 'N' }, enabled: editable,
+  const save = useAutosave({ ...callbacks, fields: { owner_user_ids: JSON.stringify(action.owner_user_ids ?? (action.owner_user_id ? [action.owner_user_id] : [])), extra_required: action.extra_required ? 'Y' : 'N' }, enabled: editable,
     send: async patch => {
       await api(`/api/changes/${record.id}/${record.stage}-actions/${action.id}/`, 'PATCH', {
-        ...('owner_user_id' in patch ? { owner_user_id: patch.owner_user_id === null ? null : Number(patch.owner_user_id) } : {}),
+        ...('owner_user_ids' in patch ? { owner_user_ids: JSON.parse(String(patch.owner_user_ids)) } : {}),
         ...('extra_required' in patch ? { extra_required: patch.extra_required === 'Y' } : {}),
       }, actor)
       const data = accept(await api<unknown>(`/api/changes/${record.id}/stage-workflow/`, 'GET', undefined, actor))
       const latest = data.actions.find(row => row.id === action.id)!
-      return { owner_user_id: latest.owner_user_id === null ? null : String(latest.owner_user_id), extra_required: latest.extra_required ? 'Y' : 'N' }
+      return { owner_user_ids: JSON.stringify(latest.owner_user_ids ?? []), extra_required: latest.extra_required ? 'Y' : 'N' }
     } })
   const options = (people.data ?? []).map(person => ({ value: String(person.id), label: `${person.display_name}（${person.username}）` }))
-  if (action.owner_user_id && !options.some(option => option.value === String(action.owner_user_id))) options.push({ value: String(action.owner_user_id), label: `${action.owner_name} · ${action.owner_active ? '' : '已停用'}` })
+  for (const owner of action.owner_users ?? []) if (!options.some(option => option.value === String(owner.id))) options.push({ value: String(owner.id), label: `${owner.display_name}${owner.is_active ? '' : ' · 已停用'}` })
   return <>
     <p className="question-text">{action.text}</p>
-    <label>行动负责人</label><Select aria-label="行动负责人" style={{ width: '100%' }} options={options} value={save.values.owner_user_id ?? undefined} showSearch optionFilterProp="label" allowClear disabled={!editable || save.manual} onChange={value => save.update({ owner_user_id: value ?? null })} />
+    <label>行动负责人</label><Select mode="multiple" aria-label="行动负责人" style={{ width: '100%' }} options={options} value={(JSON.parse(String(save.values.owner_user_ids)) as number[]).map(String)} showSearch optionFilterProp="label" allowClear disabled={!editable || save.manual} onChange={value => save.update({ owner_user_ids: JSON.stringify(value.map(Number).sort((a: number, b: number) => a - b)) })} />
     <p><Checkbox checked={save.values.extra_required === 'Y'} disabled={!editable || save.manual || action.question_answer === 'Y'} onChange={event => save.update({ extra_required: event.target.checked ? 'Y' : 'N' })}>补充为本轮必须处理的行动</Checkbox></p>
     <p className="muted">问题触发的行动自动纳入；结果、状态和日期由负责人提交后填写。</p>
     {people.error && <Alert type="error" title={people.error.message} />}
@@ -129,24 +129,25 @@ export function StageActions({ record, leaving, onBack, onPrevious, onNext, onEd
   useEffect(() => () => { callbackRef.current.onBusy(false); callbackRef.current.onDirty(false) }, [])
   const data = query.data, currentRecord = data?.change ?? record
   const editingAssignment = canEdit(currentRecord, actorUser(client))
+  const assignmentPhase = ['draft', 'returned'].includes(currentRecord.status)
   const tasks = data?.tasks.filter(task => task.round === data.current_round) ?? []
   useEffect(() => { onEditorOpen(!!selected); return () => onEditorOpen(false) }, [selected, onEditorOpen])
   const close = () => { if (busy || leaving) return; const finish = () => { setSelected(null); setDirty(false); callbacks.onDirty(false) }; if (dirty) modal.confirm({ title: '放弃未保存的输入？', content: '已保存内容不会撤销。', onOk: finish }); else finish() }
-  const action = data?.actions.find(row => row.id === selected), task = tasks.find(row => row.action_key === selected)
+  const action = data?.actions.find(row => row.id === selected), task = tasks.find(row => row.action_key === selected && row.owner_id === actor) ?? tasks.find(row => row.action_key === selected)
   return <>
     <div className="page-heading"><h1>{record.stage?.toUpperCase()}行动分配与处理</h1><Button disabled={busy || leaving} onClick={onBack}>{backLabel(client)}</Button></div>
-    <Alert type="info" title={editingAssignment ? '草稿／修订时仅分配负责人和补充任务；结果由提交后的负责人填写。' : `第${data?.current_round ?? record.current_review_round}轮：已确认 ${tasks.filter(task => task.confirmed_at).length}/${tasks.length} 项；基础内容锁定。`} className="form-alert" />
+    <Alert type="info" title={assignmentPhase ? editingAssignment ? '草稿／修订时仅分配负责人和补充任务；结果由提交后的负责人填写。' : '当前ECO由指定填写人编辑，此处只读查看行动分配。' : `第${data?.current_round ?? record.current_review_round}轮：已确认 ${tasks.filter(task => task.confirmed_at).length}/${tasks.length} 项；基础内容锁定。`} className="form-alert" />
     {query.error && <Alert type="error" title={query.error.message} action={<Button onClick={() => void query.refetch()}>重试</Button>} />}
     <Select aria-label="行动范围" disabled={!!selected} value={all ? 'all' : 'required'} options={[{ value: 'required', label: '本轮行动' }, { value: 'all', label: '全部行动' }]} onChange={value => setAll(value === 'all')} />
-    <Table rowKey="id" pagination={false} loading={query.isPending} dataSource={(data?.actions ?? []).filter(row => all || (editingAssignment ? row.required : tasks.some(task => task.action_key === row.id)))} columns={[
+    <Table rowKey="id" pagination={false} loading={query.isPending} dataSource={(data?.actions ?? []).filter(row => all || (assignmentPhase ? row.required : tasks.some(task => task.action_key === row.id)))} columns={[
       { title: '行动', render: (_, row) => <><Tag>{row.id} · 问题{row.number}</Tag><p>{row.text}</p></> },
-      { title: '负责人', render: (_, row) => (editingAssignment ? row.owner_name : tasks.find(task => task.action_key === row.id)?.owner_name || row.owner_name) || '未分配' },
-      { title: '状态', render: (_, row) => { const task = editingAssignment ? undefined : tasks.find(task => task.action_key === row.id); return task ? task.confirmed_at ? '已确认' : '待处理' : row.extra_required ? '手工补充' : row.required ? '问题触发' : '不纳入' } },
-      { title: '操作', render: (_, row) => <Button disabled={!!selected || busy || leaving} onClick={() => setSelected(row.id)}>{editingAssignment ? '分配' : tasks.some(task => task.action_key === row.id && task.can_edit && task.owner_id === actor) ? '处理任务' : '查看'}</Button> },
+      { title: '负责人', render: (_, row) => (assignmentPhase ? row.owner_name : tasks.filter(task => task.action_key === row.id).map(task => task.owner_name).join('、') || row.owner_name) || '未分配' },
+      { title: '状态', render: (_, row) => { const assigned = assignmentPhase ? [] : tasks.filter(task => task.action_key === row.id); return assigned.length ? `已确认 ${assigned.filter(task => task.confirmed_at).length}/${assigned.length} 人` : row.extra_required ? '手工补充' : row.required ? '问题触发' : '不纳入' } },
+      { title: '操作', render: (_, row) => <Button disabled={!!selected || busy || leaving} onClick={() => setSelected(row.id)}>{assignmentPhase ? editingAssignment ? '分配' : '查看分配' : tasks.some(task => task.action_key === row.id && task.can_edit && task.owner_id === actor) ? '处理任务' : '查看'}</Button> },
     ]} />
     <div className="form-footer"><Button disabled={!!selected || busy || leaving} onClick={onPrevious}>上一页</Button><Button disabled={!!selected || busy || leaving} onClick={onNext}>下一页</Button></div>
     <Drawer open={!!selected} title={action?.text ?? `${record.stage?.toUpperCase()}行动`} size={720} onClose={close} closable={!busy && !leaving} maskClosable={!busy && !leaving} keyboard={!busy && !leaving}>
-      {action && (editingAssignment ? <Assignment key={action.id} record={currentRecord} action={action} leaving={leaving} accept={accept} onDirty={value => { setDirty(value); callbacks.onDirty(value) }} onBusy={value => { setBusy(value); callbacks.onBusy(value) }} /> : task ? <TaskEditor key={task.id} record={currentRecord} task={task} leaving={leaving} onReauthenticate={onReauthenticate} accept={accept} read={read} onDirty={value => { setDirty(value); callbacks.onDirty(value) }} onBusy={value => { setBusy(value); callbacks.onBusy(value) }} /> : <p>本行动没有在当前轮次派发。</p>)}
+      {action && (assignmentPhase ? <Assignment key={action.id} record={currentRecord} action={action} leaving={leaving} accept={accept} onDirty={value => { setDirty(value); callbacks.onDirty(value) }} onBusy={value => { setBusy(value); callbacks.onBusy(value) }} /> : task ? <><p>本行动负责人：{tasks.filter(row => row.action_key === selected).map(row => `${row.owner_name}（${row.confirmed_at ? '已确认' : '待处理'}）`).join('、')}</p><TaskEditor key={task.id} record={currentRecord} task={task} leaving={leaving} onReauthenticate={onReauthenticate} accept={accept} read={read} onDirty={value => { setDirty(value); callbacks.onDirty(value) }} onBusy={value => { setBusy(value); callbacks.onBusy(value) }} /></> : <p>本行动没有在当前轮次派发。</p>)}
     </Drawer>
   </>
 }
@@ -156,11 +157,11 @@ export function StageSubmission({ record, leaving, onBack, onPrevious, reviewDra
   const [acknowledge, setAcknowledge] = useState(false), [unknown, setUnknown] = useState<StageSubmitPayload | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
   const current = query.data?.change ?? record, editable = canEdit(current, actorUser(client))
   const people = useQuery({ queryKey: ['action-owners', actor], enabled: editable, queryFn: async () => checkedReviewers(await api<unknown>('/api/action-owners/', 'GET', undefined, actor)) })
-  const publisher = useAutosave({ fields: { publisher_id: current.publisher_id == null ? null : String(current.publisher_id) }, enabled: editable && !leaving && !unknown, paused: busy,
+  const publisher = useAutosave({ fields: { publisher_id: current.publisher_id == null ? null : String(current.publisher_id), stage_approver_ids: JSON.stringify(current.stage_approver_ids ?? []) }, enabled: editable && !leaving && !unknown, paused: busy,
     onDirty: value => callbacks.onDirty(value || !!unknown), onBusy: value => callbacks.onBusy(value || busy || !!unknown),
-    send: async patch => { await api(`/api/changes/${record.id}/`, 'PATCH', { publisher_id: patch.publisher_id === null ? null : Number(patch.publisher_id) }, actor); const data = await read(); return { publisher_id: data.change?.publisher_id == null ? null : String(data.change.publisher_id) } } })
+    send: async patch => { await api(`/api/changes/${record.id}/`, 'PATCH', { ...('publisher_id' in patch ? { publisher_id: patch.publisher_id === null ? null : Number(patch.publisher_id) } : {}), ...('stage_approver_ids' in patch ? { stage_approver_ids: JSON.parse(String(patch.stage_approver_ids)) } : {}) }, actor); const data = await read(); return { publisher_id: data.change?.publisher_id == null ? null : String(data.change.publisher_id), stage_approver_ids: JSON.stringify(data.change?.stage_approver_ids ?? []) } } })
   const required = query.data?.actions.filter(action => action.required) ?? []
-  const blocked = !query.data || query.data.unanswered.length > 0 || required.some(action => !action.owner_active) || !current.publisher_id || query.data.issue_blockers.length > 0 || reviewDraftDirty || (!required.length && !acknowledge)
+  const blocked = !query.data || query.data.unanswered.length > 0 || required.some(action => !action.owner_active) || !current.publisher_id || !JSON.parse(String(publisher.values.stage_approver_ids)).length || query.data.issue_blockers.length > 0 || reviewDraftDirty || (!required.length && !acknowledge)
   const settleSubmission = (data: StageData, payload: StageSubmitPayload, rejected = false) => {
     const state = stageSubmissionState(data, payload)
     if (state === 'confirmed') { setUnknown(null); setError('') }
@@ -192,14 +193,17 @@ export function StageSubmission({ record, leaving, onBack, onPrevious, reviewDra
     <p>已回答 {27 - (query.data?.unanswered.length ?? 27)}/27 题；本轮 {required.length} 项行动。</p>
     {editable ? <>
       <label>指定发布人（阶段批准后执行发布）</label><Select aria-label="指定发布人" style={{ width: '100%' }} disabled={busy || !!unknown || leaving} allowClear showSearch optionFilterProp="label" value={publisher.values.publisher_id ?? undefined} options={(people.data ?? []).map(person => ({ value: String(person.id), label: `${person.display_name}（${person.username}）` }))} onChange={value => publisher.update({ publisher_id: value ?? null })} />
+      <label>指定批准人（全部人员同意后才能发布）</label><Select mode="multiple" aria-label="指定批准人" style={{ width: '100%' }} disabled={busy || !!unknown || leaving} allowClear showSearch optionFilterProp="label" value={(JSON.parse(String(publisher.values.stage_approver_ids)) as number[]).map(String)} options={(people.data ?? []).map(person => ({ value: String(person.id), label: `${person.display_name}（${person.username}）` }))} onChange={value => publisher.update({ stage_approver_ids: JSON.stringify(value.map(Number).sort((a: number, b: number) => a - b)) })} />
+      {people.error && <Alert type="error" title="人员名单读取失败" description={people.error.message} action={<Button onClick={() => void people.refetch()}>重试</Button>} />}
+      {!JSON.parse(String(publisher.values.stage_approver_ids)).length && <Alert type="warning" title="请至少选择一位批准人；可以选择多人，全部同意后才能发布。" />}
       <p>{publisher.status}</p>{publisher.error && <Alert type="error" title={publisher.error.message} action={<Button onClick={publisher.clickSave}>重试保存发布人</Button>} />}
       {required.some(action => !action.owner_active) && <Alert type="warning" title="本轮行动仍有未分配或停用负责人，请返回当前阶段行动页调整。" />}
       {!!query.data?.unanswered.length && <Alert type="warning" title={`未回答问题：${query.data.unanswered.join('、')}`} />}
       {!!query.data?.issue_blockers.length && <Alert type="warning" title={query.data.issue_blockers.join(' ')} />}
-      {!required.length && <Checkbox disabled={busy || !!unknown} checked={acknowledge} onChange={event => setAcknowledge(event.target.checked)}>确认本阶段无行动需处理，提交后直接批准，仍需后续发布</Checkbox>}
-      <p className="muted">提交冻结任务清单与负责人；全部任务确认且正式意见解决后阶段自动批准。</p>
-      <Button type="primary" disabled={blocked || busy || !!unknown || leaving || publisher.dirty || publisher.pending} onClick={() => modal.confirm({ title: `提交本轮${record.stage?.toUpperCase()}任务？`, content: '基础内容将锁定，负责人填写并确认各自行动。', onOk: () => send({ expected_round: current.current_review_round, request_id: crypto.randomUUID(), acknowledge_no_tasks: acknowledge }) })}>提交阶段</Button>
-    </> : <Alert type={['approved', 'published'].includes(current.status) ? 'success' : 'info'} title={current.status === 'published' ? `${record.stage?.toUpperCase()}已发布，基线只读。` : current.status === 'approved' ? `${record.stage?.toUpperCase()}阶段已批准，等待指定发布人发布。` : `阶段处理中，基础内容已锁定。负责人进入${record.stage?.toUpperCase()}行动页处理任务。`} />}
+      {!required.length && <Checkbox disabled={busy || !!unknown} checked={acknowledge} onChange={event => setAcknowledge(event.target.checked)}>确认本阶段无行动需处理，提交后仍须全部指定批准人同意</Checkbox>}
+      <p className="muted">提交后冻结行动、负责人和批准人；每位负责人独立填写并确认任务，正式意见解决后，还须全部指定批准人同意才能发布。</p>
+      <Button type="primary" disabled={blocked || busy || !!unknown || leaving || publisher.dirty || publisher.pending} onClick={() => modal.confirm({ title: `提交本轮${record.stage?.toUpperCase()}任务？`, content: '基础内容将锁定，每位负责人确认各自任务后，全部指定批准人需同意批准。', onOk: () => send({ expected_round: current.current_review_round, request_id: crypto.randomUUID(), acknowledge_no_tasks: acknowledge }) })}>提交阶段</Button>
+    </> : <Alert type={['approved', 'published'].includes(current.status) ? 'success' : 'info'} title={['draft', 'returned'].includes(current.status) ? `当前由${current.applicant_name || '指定填写人'}填写或修订，你仅可查看，不能代为提交。` : current.status === 'published' ? `${record.stage?.toUpperCase()}已发布，基线只读。` : current.status === 'approved' ? `${record.stage?.toUpperCase()}阶段已批准，等待指定发布人发布。` : `阶段处理中，基础内容已锁定。负责人进入${record.stage?.toUpperCase()}行动页处理任务。`} />}
     {unknown && <Alert type="warning" title="提交结果未确认，原UUID已保留" action={<><Button disabled={busy || leaving} onClick={() => void check()}>查询结果</Button><Button disabled={busy || leaving} onClick={() => void send(unknown)}>按原请求重试</Button></>} />}
     {error && <Alert type="error" title={error} />}
     <Button disabled={busy || !!unknown || leaving || publisher.pending} onClick={onPrevious}>上一页</Button>

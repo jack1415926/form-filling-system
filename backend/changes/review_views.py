@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from .models import ChangeRequest, ReviewRound, ReviewRecord, ReviewFeedback, ActionTask
 from .permissions import ExpectedAccountPermission
-from .review_access import is_owner, eligible, can_read_round, reviewer_rounds, is_publication_reader
+from .review_access import is_owner, eligible, can_read_round, reviewer_rounds, is_publication_reader, is_eco_coordinator
 from .serializers import ChangeRequestSerializer
 from .review_issues import (ReturnValues, IssueActionValues, ApproveValues, blockers, issue_data,
                             replay, event, checked_issue, return_issues)
@@ -32,6 +32,7 @@ def round_data(round):
             'returned_at': round.returned_at.isoformat() if round.returned_at else None,
             'returned_by': person(round.returned_by) if round.returned_by_id else None, 'return_reason': round.return_reason,
             'reviewers': [person(row.reviewer) for row in records if row.assigned],
+            'required_approvers': [person(row.reviewer) for row in records if row.approval_required],
             'approvals': [{**person(row.reviewer), 'approved_at': row.approved_at.isoformat()} for row in records if row.approved_at]}
 
 
@@ -41,15 +42,17 @@ def review_data(record, round, user):
     allowed = eligible(user, round)
     may_review = current and record.status == 'pending' and round.state == 'pending' and allowed
     task_owner = record.stage in ['ecr', 'eco'] and round.tasks.filter(owner=user).exists()
+    approver = round.records.filter(reviewer=user, approval_required=True).exists()
+    tasks_complete = not round.tasks.filter(confirmed_at__isnull=True).exists()
     opinion_owner = record.review_issues.filter(author=user).exclude(state='resolved').exists()
-    may_view = current and (owner or is_publication_reader(user, record) or record.status in ['pending', 'approved', 'published'] and allowed)
+    may_view = current and (owner or is_publication_reader(user, record) or is_eco_coordinator(user, record) or record.status in ['pending', 'approved', 'published'] and allowed)
     rounds = [row for row in record.review_rounds.order_by('number') if can_read_round(user, row)]
     notes = ReviewFeedback.objects.filter(round__in=rounds).select_related('author', 'round').order_by('created_at', 'id')
     return {'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'current_round': record.current_review_round,
             'round': round_data(round), 'is_current': current, 'can_view_form': may_view,
-            'can_approve': record.stage == 'legacy' and may_review and not record.review_issues.exclude(state='resolved').exists() and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
-            'can_return': may_review and (record.stage == 'legacy' or task_owner or opinion_owner),
-            'can_add_issue': record.stage == 'legacy' or task_owner, 'can_feedback': False,
+            'can_approve': (record.stage == 'legacy' or approver and tasks_complete) and may_review and not record.review_issues.exclude(state='resolved').exists() and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
+            'can_return': may_review and (record.stage == 'legacy' or task_owner or opinion_owner or approver),
+            'can_add_issue': record.stage == 'legacy' or task_owner or approver, 'can_feedback': False,
             'issues': issue_data(record, round, user, owner, allowed, current),
             'unresolved_count': record.review_issues.exclude(state='resolved').count() if current else 0,
             'issue_blockers': blockers(record) if current else [],
@@ -79,7 +82,7 @@ class ReviewList(APIView):
         else:
             rows = rows.filter(number=F('change__current_review_round'), state='pending', change__status='pending', my_approved=False,
                                review_mode=kind).filter(reviewer_rounds(request.user))
-            rows = rows.filter(Q(change__stage='legacy') | Q(my_pending=True) | Q(change__review_issues__author=request.user, change__review_issues__state='awaiting_review'))
+            rows = rows.filter(Q(change__stage='legacy') | Q(my_pending=True) | Q(records__reviewer=request.user, records__approval_required=True, records__approved_at__isnull=True) | Q(change__review_issues__author=request.user, change__review_issues__state='awaiting_review'))
         return Response([{'change_id': row.change_id, **round_data(row)} for row in rows.select_related('change', 'returned_by').distinct().order_by('-submitted_at', '-pk')])
 
 
@@ -133,8 +136,11 @@ class ReviewDetail(APIView):
                 return Response({'detail': '该页面属于旧审核轮次，请刷新当前状态。'}, status=409)
             owner, reviewer = is_owner(request.user, record), eligible(request.user, round)
             if action == 'approve' and record.stage in ['ecr', 'eco']:
-                return Response({'detail': '新ECR／ECO由行动任务确认自动批准，不接受整单批准。'}, status=409)
-            if action == 'return' and record.stage in ['ecr', 'eco'] and not round.tasks.filter(owner=request.user).exists() and any('issue_id' not in item for item in values['issues']):
+                if not round.records.filter(reviewer=request.user, approval_required=True).exists():
+                    return Response({'detail': '当前账号未被指定为本轮批准人。'}, status=409)
+                if round.tasks.filter(confirmed_at__isnull=True).exists():
+                    return Response({'detail': '全部行动负责人确认任务后才能批准。'}, status=409)
+            if action == 'return' and record.stage in ['ecr', 'eco'] and not round.tasks.filter(owner=request.user).exists() and not round.records.filter(reviewer=request.user, approval_required=True).exists() and any('issue_id' not in item for item in values['issues']):
                 return Response({'detail': '未承担本轮任务的原提出者仅可复核或继续自己的原意见。'}, status=403)
             if action == 'respond' and not owner:
                 return Response({'detail': '只有申请本人可以回应意见。'}, status=403)
@@ -156,7 +162,7 @@ class ReviewDetail(APIView):
                 row.approved_at = timezone.now(); row.save()
                 approvals = round.records.filter(approved_at__isnull=False).count()
                 done = approvals >= 2 if round.review_mode == 'public' else not round.records.filter(assigned=True, approved_at__isnull=True).exists()
-                if done:
+                if done and record.stage == 'legacy':
                     round.state = 'approved'; round.approved_at = row.approved_at; round.save(update_fields=['state', 'approved_at'])
                     record.status = 'approved'
                 event(record, round, request.user, action, values)

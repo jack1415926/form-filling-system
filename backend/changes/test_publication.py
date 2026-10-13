@@ -30,6 +30,7 @@ class PublicationFixture:
 
     def approve(self, with_task=False):
         self.client.force_authenticate(self.a)
+        self.source.stage_approvers.set([self.a])
         if with_task:
             self.assertEqual(self.client.patch(self.path + 'ecr-actions/ecr_001/', {'owner_user_id': self.b.pk, 'extra_required': True}, format='json').status_code, 200)
         response = self.client.post(self.path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': 0, 'acknowledge_no_tasks': not with_task}, format='json')
@@ -42,6 +43,8 @@ class PublicationFixture:
             self.assertEqual(self.client.patch(url, self.save_payload, format='json').status_code, 200)
             self.confirm_payload = {'request_id': str(uuid.uuid4()), 'version': 2}
             self.assertEqual(self.client.post(url, self.confirm_payload, format='json').status_code, 200)
+        self.client.force_authenticate(self.a)
+        self.assertEqual(self.client.post(self.path + 'review-rounds/1/approve/', {'request_id': str(uuid.uuid4())}, format='json').status_code, 200)
         self.source.refresh_from_db(); self.assertEqual(self.source.status, 'approved')
 
     def publish(self):
@@ -54,7 +57,7 @@ class PublicationFixture:
 
     def create_eco(self):
         self.client.force_authenticate(self.a)
-        self.creation_payload = {'request_id': str(uuid.uuid4())}
+        self.creation_payload = {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}
         response = self.client.post(self.path + 'eco/', self.creation_payload, format='json')
         self.assertEqual(response.status_code, 201, response.data)
         return ChangeRequest.objects.get(pk=response.data['change']['id'])
@@ -96,14 +99,14 @@ class PublicationTests(PublicationFixture, TestCase):
         self.d.is_staff = self.d.is_superuser = True; self.d.save()
         self.assertEqual(self.client.get(self.path).status_code, 404)
         self.client.force_authenticate(self.a)
-        self.assertEqual(self.client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4())}, format='json').status_code, 409)
+        self.assertEqual(self.client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}, format='json').status_code, 409)
         self.client.force_authenticate(self.c)
         self.assertEqual(self.client.post(self.path + 'publication/', {'request_id': str(uuid.uuid4()), 'expected_round': 1}, format='json', HTTP_X_EXPECTED_USER=str(self.a.pk)).status_code, 409)
         self.assertEqual(self.client.post(self.path + 'publication/', {'request_id': str(uuid.uuid4()), 'expected_round': 1, 'status': 'published'}, format='json').status_code, 400)
         self.c.is_active = False; self.c.save()
         self.assertIn(self.client.post(self.path + 'publication/', {'request_id': str(uuid.uuid4()), 'expected_round': 1}, format='json').status_code, [404, 409])
         self.c.is_active = True; self.c.save(); self.publish()
-        self.assertEqual(self.client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4())}, format='json').status_code, 404)
+        self.assertEqual(self.client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}, format='json').status_code, 201)
         self.client.force_authenticate(self.a)
         for field in ['stage', 'source_ecr_id', 'publication_request_id', 'published_at', 'eco_creation_request_id']:
             self.assertEqual(self.client.post('/api/changes/', {field: 'forged'}, format='json').status_code, 400)
@@ -196,7 +199,7 @@ class PublicationTests(PublicationFixture, TestCase):
         legacy = ChangeRequest.objects.create(applicant=self.a, ecr_no='LEGACY', eco_no='TAKEN')
         self.assertEqual(self.client.patch(path, {'eco_no': 'TAKEN'}, format='json').status_code, 400)
         self.assertEqual(self.client.patch(path, {'eco_no': 'UNIQUE', 'title': 'changed'}, format='json').status_code, 200)
-        for payload in [self.creation_payload, {'request_id': str(uuid.uuid4())}]:
+        for payload in [self.creation_payload, {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}]:
             again = self.client.post(self.path + 'eco/', payload, format='json')
             self.assertEqual(again.status_code, 200); self.assertFalse(again.data['created']); self.assertEqual(again.data['change']['title'], 'changed')
         self.assertEqual(self.client.patch(path + 'eco-actions/eco_001/', {'owner_user_id': self.a.pk}, format='json').status_code, 200)
@@ -207,7 +210,7 @@ class PublicationTests(PublicationFixture, TestCase):
         self.assertEqual(self.client.post(path + 'submission/', submission, format='json').status_code, 409)
         self.assertEqual(self.client.post(path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': 0}, format='json').status_code, 400)
         self.assertEqual(self.client.post(path + 'publication/', {'request_id': str(uuid.uuid4()), 'expected_round': 1}, format='json').status_code, 409)
-        self.assertEqual(self.client.post(f'/api/changes/{legacy.pk}/eco/', {'request_id': str(uuid.uuid4())}, format='json').status_code, 409)
+        self.assertEqual(self.client.post(f'/api/changes/{legacy.pk}/eco/', {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}, format='json').status_code, 409)
         self.client.force_authenticate(self.b)
         self.assertEqual(self.client.get(path).status_code, 404)
 
@@ -217,7 +220,7 @@ class PublicationTests(PublicationFixture, TestCase):
             QuestionResponse.objects.create(change=eco, number=1, answer='N')
             raise RuntimeError('injected copy failure')
         with patch('changes.publication.copy_base', side_effect=partial_failure), self.assertRaises(RuntimeError):
-            self.client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4())}, format='json')
+            self.client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}, format='json')
         self.assertFalse(ChangeRequest.objects.filter(stage='eco').exists())
         self.assertEqual(QuestionResponse.objects.count(), 27)
         migration = importlib.import_module('changes.migrations.0020_ecr_publication_eco')
@@ -235,7 +238,7 @@ class PublicationConcurrencyTests(PublicationFixture, TransactionTestCase):
             try:
                 client = APIClient(); client.force_authenticate(get_user_model().objects.get(pk=self.a.pk))
                 barrier.wait(timeout=10)
-                response = client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4())}, format='json')
+                response = client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}, format='json')
                 return response.status_code, response.data['change']['id']
             finally:
                 close_old_connections()

@@ -24,6 +24,7 @@ from changes.submission_views import ReviewerList, SubmissionDetail, ActionOwner
 from changes.review_views import ReviewList, ReviewDetail
 from changes.stage_workflow import StageDetail, StageSubmission, TaskDetail
 from changes.publication import PublicationList, AllPublicationList, PublicationDetail, CreateEco
+from changes.eco_filler import EcoFillerDetail, EcoFillerReceipt
 from changes.stage_navigation import StageNavigation, SourceEcr
 from changes.review_inbox import ReviewInbox, MarkInboxRead
 from changes.system_feedback_views import FeedbackList, FeedbackDetail, FeedbackRequest, ManagedList, ManagedDetail, ManagedAction, ManagedRequest
@@ -36,6 +37,8 @@ urlpatterns = [
     path('api/ecr-publications/', PublicationList.as_view()),
     path('api/changes/<int:pk>/publication/', PublicationDetail.as_view()),
     path('api/changes/<int:pk>/eco/', CreateEco.as_view()),
+    path('api/changes/<int:pk>/eco-filler/', EcoFillerDetail.as_view()),
+    path('api/changes/<int:pk>/eco-filler/requests/<uuid:request_id>/', EcoFillerReceipt.as_view()),
     path('api/changes/<int:pk>/stage-workflow/', StageDetail.as_view()),
     path('api/changes/<int:pk>/stage-submission/', StageSubmission.as_view()),
     path('api/changes/<int:pk>/action-tasks/<int:task_id>/', TaskDetail.as_view()),

@@ -10,7 +10,28 @@ from .dates import BusinessDateField
 NUMBER_ERRORS = {"ecr_no": "ECR 编号已存在，请使用其他编号。", "eco_no": "ECO 编号已存在，请使用其他编号。"}
 
 
+class ActiveUserList(serializers.PrimaryKeyRelatedField):
+    def to_internal_value(self, value):
+        if type(value) is not int:
+            raise serializers.ValidationError('请选择有效的人员账号。')
+        return super().to_internal_value(value)
+
+
+def validate_people(users):
+    if len({user.pk for user in users}) != len(users):
+        raise serializers.ValidationError('不能重复选择同一人员。')
+    active = set(get_user_model().objects.select_for_update().filter(pk__in=[u.pk for u in users], is_active=True).values_list('pk', flat=True))
+    if any(user.pk not in active for user in users):
+        raise serializers.ValidationError('请选择有效人员，不能新增停用账号。')
+    return users
+
+
 class ChangeRequestSerializer(serializers.ModelSerializer):
+    applicant_name = serializers.CharField(source='applicant.get_full_name', read_only=True)
+    stage_approver_ids = ActiveUserList(source='stage_approvers', queryset=get_user_model().objects.all(), many=True, required=False)
+
+    def validate_stage_approver_ids(self, users):
+        return validate_people(users)
     source_ecr_id = serializers.IntegerField(read_only=True, allow_null=True)
     published_by_id = serializers.IntegerField(read_only=True, allow_null=True)
     source_ecr_no = serializers.CharField(source='source_ecr.ecr_no', read_only=True, default=None)
@@ -20,13 +41,13 @@ class ChangeRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChangeRequest
         fields = [
-            "id", "applicant", "stage", "publisher_id", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round",
+            "id", "applicant", "applicant_name", "stage", "publisher_id", "stage_approver_ids", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round",
             "source_ecr_id", "source_ecr_no", "eco_creation_request_id", "published_by_id", "published_at", "publication_request_id",
             "title", "ecr_no", "eco_no", "affected_products", "affected_region",
             "initiating_factory", "affected_factories", "ccb_owner", "change_owner",
             "planned_eco_date", "change_reason",
         ]
-        read_only_fields = ["id", "applicant", "stage", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round", "source_ecr_id", "source_ecr_no", "eco_creation_request_id", "published_by_id", "published_at", "publication_request_id"]
+        read_only_fields = ["id", "applicant", "applicant_name", "stage", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round", "source_ecr_id", "source_ecr_no", "eco_creation_request_id", "published_by_id", "published_at", "publication_request_id"]
 
     def validate_publisher_id(self, value):
         if self.instance is None or self.instance.stage not in ['ecr', 'eco']:
@@ -102,14 +123,35 @@ class QuestionValueSerializer(serializers.Serializer):
 
 
 class EcrActionSerializer(serializers.ModelSerializer):
+    owner_user_ids = ActiveUserList(source='owners', queryset=get_user_model().objects.all(), many=True, required=False)
+    owner_users = serializers.SerializerMethodField()
+
+    def get_owner_users(self, instance):
+        return [{'id': user.pk, 'username': user.username, 'display_name': user.get_full_name() or user.username, 'is_active': user.is_active} for user in instance.owners.order_by('pk')]
+
+    def validate_owner_user_ids(self, users):
+        return validate_people(users)
+
+    def validate(self, attrs):
+        if 'owners' in attrs and 'owner_user_id' in attrs:
+            raise serializers.ValidationError('请只使用一种负责人选择方式。')
+        return attrs
+
+    def update(self, instance, validated_data):
+        if 'owner_user_id' in validated_data:
+            owner_id = validated_data['owner_user_id']
+            validated_data['owners'] = list(get_user_model().objects.filter(pk=owner_id)) if owner_id else []
+        elif 'owners' in validated_data:
+            validated_data['owner_user_id'] = validated_data['owners'][0].pk if validated_data['owners'] else None
+        return super().update(instance, validated_data)
     date = BusinessDateField(required=False, allow_null=True)
     owner_user_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     owner_user = serializers.SerializerMethodField()
 
     class Meta:
         model = EcrActionResponse
-        fields = ["owner", "owner_user_id", "owner_user", "extra_required", "result", "status", "date"]
-        read_only_fields = ["owner", "owner_user"]
+        fields = ["owner", "owner_user_id", "owner_user", "owner_user_ids", "owner_users", "extra_required", "result", "status", "date"]
+        read_only_fields = ["owner", "owner_user", "owner_users"]
 
     def get_owner_user(self, instance):
         user = instance.owner_user

@@ -84,14 +84,16 @@ class ReviewInbox(APIView):
                 continue
             tasks = row.tasks.filter(owner=request.user, confirmed_at__isnull=True).count() if row.state == 'pending' else 0
             replies = row.change.review_issues.filter(author=request.user, state='awaiting_review').count()
-            if not tasks and not replies:
+            approval = int(row.state == 'pending' and row.records.filter(reviewer=request.user, approval_required=True, approved_at__isnull=True).exists())
+            if not tasks and not replies and not approval:
                 continue
             latest = row.change.issue_events.filter(kind='respond', issue__author=request.user).exclude(author=request.user).aggregate(value=Max('id'))['value'] or 0
-            signature = hashlib.sha256(json.dumps(['stage', row.pk, latest]).encode()).hexdigest()
+            ready = approval and not row.tasks.filter(confirmed_at__isnull=True).exists()
+            signature = hashlib.sha256(json.dumps(['stage', row.pk, latest, bool(ready)]).encode()).hexdigest()
             items.append({'change_id': row.change_id, 'round': row.number, 'title': row.title, 'context': 'applicant' if row.change.applicant_id == request.user.pk else 'reviewer',
                 'stage': row.change.stage, 'eco_no': row.eco_no,
-                'ecr_no': row.ecr_no, 'status': row.state, 'count': tasks + replies,
-                'summary': f'{row.change.stage.upper()}行动待处理{tasks}项；意见回应待复核{replies}项', 'open_issues': bool(replies),
+                'ecr_no': row.ecr_no, 'status': row.state, 'count': tasks + replies + approval,
+                'summary': f'{row.change.stage.upper()}行动待处理{tasks}项；意见回应待复核{replies}项' + ('；待本人同意批准' if ready else '；任务确认后待本人批准' if approval else ''), 'open_issues': bool(replies),
                 'message_key': signature, 'is_read': reads.get(row.pk) == signature})
         return items
 

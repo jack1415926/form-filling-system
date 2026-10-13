@@ -2,6 +2,7 @@ import type { Fields } from './autosave'
 import definition from '../../backend/changes/significant_change.json' with { type: 'json' }
 
 export type Option = { value: string; label: string }
+export const canOpenSubchart = (applicability: unknown) => applicability === 'Y'
 export type ChartValues = { applicability: string; reason: string; result: string }
 export type ChartRow = ChartValues & { id: string; text: string; next_steps: Record<string, string>; result_options: Option[]; validation_hint: string }
 export type SubValues = { answer: string; reason: string }

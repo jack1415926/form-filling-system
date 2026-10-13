@@ -1,4 +1,4 @@
-from .review_access import readable_change
+from .review_access import readable_change, editable_change
 import json
 import re
 from copy import deepcopy
@@ -118,8 +118,7 @@ class EmcDetail(APIView):
     http_method_names = ["get", "patch", "head", "options"]
 
     def record(self, request, pk):
-        records = ChangeRequest.objects.select_for_update().filter(applicant=request.user)
-        return get_object_or_404(records, pk=pk)
+        return editable_change(request, pk)
 
     def get(self, request, pk):
         with transaction.atomic():

@@ -5,6 +5,8 @@ export type Overview = {
   ccb_owner: string; change_owner: string; planned_eco_date: string | null; change_reason: string
 }
 export type ChangeRequest = Overview & {
+  applicant_name?: string
+  stage_approver_ids?: number[]
   stage?: 'legacy' | 'ecr' | 'eco'; publisher_id?: number | null
   source_ecr_id?: number | null; source_ecr_no?: string | null; eco_creation_request_id?: string | null
   published_by_id?: number | null; published_at?: string | null; publication_request_id?: string | null
@@ -21,8 +23,9 @@ export type Question = {
 export type QuestionData = { updated_at: string; questions: Question[] }
 export type EcrValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable'; date: string | null }
 export type ActionOwner = { id: number; username: string; display_name: string; is_active: boolean }
-export type EcrAction = EcrValues & { owner_user_id: number | null; owner_user: ActionOwner | null; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
-export type EcrData = { updated_at: string; actions: EcrAction[] }
+export type PublishedEcrResult = { id: number; round: number; owner: ActionOwner; result: string; status: 'completed' | 'not_applicable'; date: string; confirmed_at: string }
+export type EcrAction = EcrValues & { task_results?: PublishedEcrResult[]; extra_required?: boolean; owner_user_id: number | null; owner_user: ActionOwner | null; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
+export type EcrData = { source_ecr_id?: number; updated_at: string; actions: EcrAction[] }
 export type EcoValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable' | 'implementation_stage'; date: string | null }
 export type EcoAction = EcoValues & { owner_user_id: number | null; owner_user: ActionOwner | null; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
 export type EcoData = { updated_at: string; actions: EcoAction[] }
@@ -31,8 +34,9 @@ export class ApiError extends Error {
   constructor(status: number, message: string) { super(message); this.status = status }
 }
 export function formatApiErrors(value: unknown, path = ''): string[] {
+  const labels: Record<string, string> = { filler_id: 'ECO填写人', expected_filler_id: '原填写人', expected_updated_at: '记录更新时间', eco_no: 'ECO编号', ecr_no: 'ECR编号', title: '标题', questions: '问题评估', owners: '行动负责人', owner_user_ids: '行动负责人', publisher_id: '发布人', stage_approver_ids: '批准人', tasks: '行动任务', issues: '审核意见', date: '业务日期', result: '结果说明', status: '状态', expected_round: '审核轮次', request_id: '操作标识', version: '记录版本' }
   if (Array.isArray(value)) return value.flatMap((item) => formatApiErrors(item, path))
-  if (value !== null && typeof value === 'object') return Object.entries(value).flatMap(([key, item]) => formatApiErrors(item, key === 'detail' || key === 'non_field_errors' ? path : [path, key].filter(Boolean).join('.')))
+  if (value !== null && typeof value === 'object') return Object.entries(value).flatMap(([key, item]) => formatApiErrors(item, key === 'detail' || key === 'non_field_errors' ? path : [path, labels[key] ?? key].filter(Boolean).join('.')))
   return value == null ? [] : [`${path ? path + '：' : ''}${String(value)}`]
 }
 

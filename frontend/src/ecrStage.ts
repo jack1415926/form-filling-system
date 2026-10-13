@@ -4,7 +4,7 @@ import { newestResponse } from './latestResponse.ts'
 import { saveResultUnconfirmed } from './questionDraft.ts'
 import type { Fields } from './autosave.ts'
 
-export type StageAction = { id: string; number: number; function: string; text: string; question_answer: string; extra_required: boolean; required: boolean; owner_user_id: number | null; owner_name: string; owner_active: boolean }
+export type StageAction = { id: string; number: number; function: string; text: string; question_answer: string; extra_required: boolean; required: boolean; owner_user_ids?: number[]; owner_users?: { id: number; display_name: string; is_active: boolean }[]; owner_user_id: number | null; owner_name: string; owner_active: boolean }
 export type StageTask = { id: number; round: number; action_key: string; owner_id: number; owner_name: string; result: string; status: '' | 'completed' | 'not_applicable' | 'implementation_stage'; date: string | null; version: number; confirmed_at: string | null; can_edit: boolean; confirmed_requests: string[] }
 export type StageData = { stage: 'ecr' | 'eco'; actor_id: number; change: ChangeRequest | null; change_id: number; updated_at: string; status: ChangeRequest['status']; current_round: number; actions: StageAction[]; tasks: StageTask[]; unanswered: number[]; issue_blockers: string[]; submission_request_id: string | null; submission_requests: string[] }
 export type StageSubmitPayload = { expected_round: number; request_id: string; acknowledge_no_tasks: boolean }
@@ -34,7 +34,11 @@ export function checkedStage(value: unknown, changeId: number, actorId?: number,
         && id(action.number) && action.number <= 27 && typeof action.text === 'string' && typeof action.function === 'string'
         && ['', 'Y', 'N'].includes(action.question_answer) && typeof action.extra_required === 'boolean' && typeof action.required === 'boolean'
         && action.required === (action.question_answer === 'Y' || action.extra_required) && (action.owner_user_id === null || id(action.owner_user_id))
-        && typeof action.owner_name === 'string' && typeof action.owner_active === 'boolean')) return invalid()
+        && typeof action.owner_name === 'string' && typeof action.owner_active === 'boolean'
+        && (action.owner_user_ids === undefined || Array.isArray(action.owner_user_ids) && action.owner_user_ids.every(id) && new Set(action.owner_user_ids).size === action.owner_user_ids.length
+          && Array.isArray(action.owner_users) && action.owner_users.length === action.owner_user_ids.length
+          && action.owner_users.every((user, index) => user && user.id === action.owner_user_ids![index] && typeof user.display_name === 'string' && typeof user.is_active === 'boolean')
+          && action.owner_active === (action.owner_users.length > 0 && action.owner_users.every(user => user.is_active))))) return invalid()
   } else if (data.actions.length || data.unanswered.length) return invalid()
   return newestResponse(current, data)
 }

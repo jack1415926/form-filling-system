@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Descriptions, Space, Steps } from 'antd'
 import { api, ApiError, type ChangeRequest, type User } from './api'
-import { checkedNavigation, newestNavigation, stageSteps, type NavigationData } from './stageNavigationData'
+import { checkedNavigation, newestNavigation, stageSteps, currentStageIndex, type NavigationData } from './stageNavigationData'
 
 export default function StageNavigation({ record, leaving, onOpenChange }: { record: ChangeRequest; leaving: boolean; onOpenChange?: (id: number) => void }) {
   const client = useQueryClient(), actor = client.getQueryData<User>(['me'])!.id
@@ -13,7 +13,7 @@ export default function StageNavigation({ record, leaving, onOpenChange }: { rec
   return <section className="panel form-alert">
     <h2>{query.data?.stages[1].status === 'published' ? 'ECR至ECO流程已完成' : '阶段进度'}</h2>
     {query.error && <Alert type="error" title={query.error.message} action={<Button disabled={leaving} onClick={() => void query.refetch()}>刷新进度</Button>} />}
-    <Steps size="small" items={query.data?.stages.flatMap(stageSteps) ?? []} />
+    <Steps size="small" current={currentStageIndex(record)} items={query.data?.stages.flatMap(stageSteps) ?? []} />
     <Space wrap>{query.data?.stages.map(stage => <span key={stage.stage}>
       {stage.can_open && stage.id !== record.id && onOpenChange ? <Button disabled={leaving} onClick={() => onOpenChange(stage.id!)}>打开{stage.stage.toUpperCase()} {stage.number}</Button> : stage.number && <span>{stage.stage.toUpperCase()}：{stage.number}</span>}
       {stage.published_at && <span> · 发布于{new Date(stage.published_at).toLocaleString('zh-CN')}</span>}

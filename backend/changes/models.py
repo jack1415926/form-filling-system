@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from .execution_plan import PLAN_ACTIVITY_IDS
 from django.db.models.functions import NullIf
 from .dispositions import LOCATIONS, DISPOSITIONS
@@ -19,6 +20,7 @@ class ChangeRequest(models.Model):
     applicant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     stage = models.CharField(max_length=8, default='legacy', choices=[('legacy', '旧流程'), ('ecr', 'ECR'), ('eco', 'ECO')])
     publisher = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
+    stage_approvers = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+')
     published_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
     published_at = models.DateTimeField(null=True, blank=True)
     publication_request_id = models.UUIDField(null=True, blank=True)
@@ -69,6 +71,21 @@ class ChangeRequest(models.Model):
         ]
 
 
+class EcoFillerEvent(models.Model):
+    eco = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name='filler_events')
+    kind = models.CharField(max_length=8, choices=[('baseline', '历史基线'), ('create', '创建'), ('transfer', '交接')])
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT, related_name='+')
+    previous_filler = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT, related_name='+')
+    filler = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+')
+    request_id = models.UUIDField(null=True)
+    payload = models.JSONField(default=dict)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'eco_filler_event'
+        constraints = [models.UniqueConstraint(fields=['eco', 'request_id'], name='eco_filler_unique_request')]
+
+
 class ReviewRound(models.Model):
     change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="review_rounds")
     number = models.PositiveIntegerField()
@@ -101,6 +118,7 @@ class ReviewRecord(models.Model):
     round = models.ForeignKey(ReviewRound, null=True, blank=True, on_delete=models.CASCADE, related_name="records")
     reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     assigned = models.BooleanField(default=True)
+    approval_required = models.BooleanField(default=False)
     approved_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -121,7 +139,7 @@ class ActionTask(models.Model):
     class Meta:
         db_table = 'action_task'
         constraints = [
-            models.UniqueConstraint(fields=['round', 'action_key'], name='task_round_action'),
+            models.UniqueConstraint(fields=['round', 'action_key', 'owner'], name='task_round_action_owner'),
             models.CheckConstraint(condition=models.Q(action_key__in=ECR_ACTION_IDS + ECO_ACTION_IDS), name='task_stage_key'),
             models.CheckConstraint(condition=models.Q(status__in=['', 'completed', 'not_applicable', 'implementation_stage']), name='task_business_status'),
             models.CheckConstraint(condition=models.Q(version__gt=0), name='task_positive_version'),
@@ -320,6 +338,7 @@ class QuestionResponse(models.Model):
 
 
 class EcrActionResponse(models.Model):
+    owners = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+')
     change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="ecr_responses")
     action_key = models.CharField(max_length=7)
     owner = models.CharField(max_length=255, blank=True)
@@ -339,6 +358,7 @@ class EcrActionResponse(models.Model):
 
 
 class EcoActionResponse(models.Model):
+    owners = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+')
     change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="eco_responses")
     action_key = models.CharField(max_length=7)
     owner = models.CharField(max_length=255, blank=True)

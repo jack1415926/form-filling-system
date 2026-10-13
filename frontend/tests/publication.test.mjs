@@ -33,8 +33,8 @@ test('creation response identifies an independent ECO and cannot confirm a diffe
 test('unknown publish or creation is released only by a verified terminal result; late reads retain newer state', () => {
   assert.equal(publicationSettled(data, { kind: 'publish', request_id: request, expected_round: 1 }), false)
   assert.equal(publicationSettled(published, { kind: 'publish', request_id: request, expected_round: 1 }), true)
-  assert.equal(publicationSettled(published, { kind: 'create', request_id: request }), false)
-  assert.equal(publicationSettled({ ...published, eco_id: 20 }, { kind: 'create', request_id: request }), true)
+  assert.equal(publicationSettled(published, { kind: 'create', request_id: request, filler_id: 1 }), false)
+  assert.equal(publicationSettled({ ...published, eco_id: 20, eco_creation_receipt: { actor_id: 2, request_id: request, filler_id: 1 } }, { kind: 'create', request_id: request, filler_id: 1 }), true)
   const newer = { ...published.change, updated_at: '2026-10-13T00:01:00Z' }
   assert.equal(newestResponse(newer, change), newer)
 })

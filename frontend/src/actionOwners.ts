@@ -1,6 +1,19 @@
-import { ApiError, type ActionOwner, type EcrData, type EcoData } from './api.ts'
+import { ApiError, type ActionOwner, type EcrData, type EcoData, type PublishedEcrResult } from './api.ts'
 
 export const actionOwnerLabel = (owner: ActionOwner | null) => owner ? `${owner.display_name}（${owner.username}）${owner.is_active ? '' : ' · 已停用'}` : '尚未关联用户'
+
+export function checkedPublishedResults(value: unknown): PublishedEcrResult[] {
+  const rows = value as PublishedEcrResult[] | null
+  const positive = (id: unknown) => Number.isSafeInteger(id) && Number(id) > 0
+  if (!Array.isArray(rows) || new Set(rows.map(row => row?.id)).size !== rows.length || new Set(rows.map(row => row?.owner?.id)).size !== rows.length
+    || !rows.every(row => row && positive(row.id) && positive(row.round) && row.owner && positive(row.owner.id)
+      && typeof row.owner.username === 'string' && typeof row.owner.display_name === 'string' && typeof row.owner.is_active === 'boolean'
+      && typeof row.result === 'string' && !!row.result.trim() && ['completed', 'not_applicable'].includes(row.status)
+      && typeof row.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.date) && Number.isFinite(Date.parse(row.date))
+      && typeof row.confirmed_at === 'string' && Number.isFinite(Date.parse(row.confirmed_at))))
+    throw new ApiError(200, '来源ECR逐人确认结果不完整，请重新读取。')
+  return rows
+}
 
 export function checkedActionData(value: unknown, prefix: 'ecr'): EcrData
 export function checkedActionData(value: unknown, prefix: 'eco'): EcoData
@@ -18,6 +31,11 @@ export function checkedActionData(value: unknown, prefix: 'ecr' | 'eco'): EcrDat
         && row.owner_user && row.owner_user.id === row.owner_user_id && typeof row.owner_user.username === 'string'
         && typeof row.owner_user.display_name === 'string' && typeof row.owner_user.is_active === 'boolean'))) {
     throw new ApiError(200, '行动响应不完整，保存结果未确认；填写内容仍保留，请刷新或重试。')
+  }
+  if (prefix === 'ecr') {
+    const ecr = data as EcrData
+    if (ecr.source_ecr_id !== undefined && (!Number.isSafeInteger(ecr.source_ecr_id) || ecr.source_ecr_id <= 0)) throw new ApiError(200, '来源ECR编号响应不完整。')
+    for (const row of ecr.actions) if (ecr.source_ecr_id !== undefined || row.task_results !== undefined) checkedPublishedResults(row.task_results)
   }
   return data
 }

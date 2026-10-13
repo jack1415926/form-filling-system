@@ -13,7 +13,7 @@ from .ecr import ECR_ACTIONS
 from .eco import ECO_ACTIONS
 from .models import ActionTask, ChangeRequest, EcrActionResponse, EcoActionResponse, ReviewRecord, ReviewRound, TaskOperation
 from .permissions import ExpectedAccountPermission
-from .review_access import can_read_round, eligible, is_publication_reader
+from .review_access import can_read_round, eligible, is_publication_reader, can_read_body, editable_change
 from .review_issues import StrictValues, blockers, canonical, conflict
 from .serializers import ChangeRequestSerializer
 
@@ -26,7 +26,8 @@ def approve_if_complete(record):
     if record.stage not in ['ecr', 'eco'] or record.status != 'pending':
         return
     round = record.review_rounds.get(number=record.current_review_round)
-    if round.tasks.filter(confirmed_at__isnull=True).exists() or record.review_issues.exclude(state='resolved').exists():
+    if (round.tasks.filter(confirmed_at__isnull=True).exists() or record.review_issues.exclude(state='resolved').exists()
+            or round.records.filter(approval_required=True, approved_at__isnull=True).exists()):
         return
     round.state = 'approved'; round.approved_at = timezone.now()
     round.save(update_fields=['state', 'approved_at'])
@@ -53,16 +54,21 @@ def stage_data(record, actor):
     visible_rounds = [row.pk for row in record.review_rounds.all() if can_read_round(actor, row)]
     tasks = [task_data(task, actor, record) for task in ActionTask.objects.filter(round_id__in=visible_rounds).select_related('round', 'owner').prefetch_related('operations').order_by('round__number', 'action_key')]
     # Revision body is private. Old task snapshots remain available to participants.
-    body_visible = record.applicant_id == actor.pk or is_publication_reader(actor, record) or record.status in ['pending', 'approved', 'published'] and round is not None and eligible(actor, round)
+    body_visible = can_read_body(actor, record)
     actions = []
     if body_visible:
         for definition in definitions:
             row = responses.get(definition['id'])
+            owners = list(row.owners.order_by('pk')) if row else []
+            if not owners and row and row.owner_user:
+                owners = [row.owner_user]
             actions.append({**definition, 'question_answer': answers.get(definition['number'], ''),
                 'extra_required': bool(row and row.extra_required), 'required': answers.get(definition['number']) == 'Y' or bool(row and row.extra_required),
                 'owner_user_id': row.owner_user_id if row else None,
-                'owner_name': (row.owner_user.get_full_name() or row.owner_user.username) if row and row.owner_user else '',
-                'owner_active': bool(row and row.owner_user and row.owner_user.is_active)})
+                'owner_user_ids': [u.pk for u in owners],
+                'owner_users': [{'id': u.pk, 'display_name': u.get_full_name() or u.username, 'is_active': u.is_active} for u in owners],
+                'owner_name': '、'.join(u.get_full_name() or u.username for u in owners),
+                'owner_active': bool(owners) and all(u.is_active for u in owners)})
     return {'actor_id': actor.pk, 'stage': record.stage, 'change': ChangeRequestSerializer(record).data if body_visible else None,
             'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'status': record.status,
             'current_round': record.current_review_round, 'actions': actions, 'tasks': tasks,
@@ -77,7 +83,7 @@ class StageDetail(APIView):
     def get(self, request, pk):
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, stage__in=['ecr', 'eco'])
-            if record.applicant_id != request.user.pk:
+            if not can_read_body(request.user, record):
                 round = record.review_rounds.filter(number=record.current_review_round).first()
                 if round is None or not can_read_round(request.user, round):
                     return Response({'detail': '申请不存在或没有权限。'}, status=404)
@@ -96,7 +102,8 @@ class StageSubmission(APIView):
         serializer = StageSubmissionValues(data=request.data); serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, stage__in=['ecr', 'eco'], applicant=request.user)
+            record = editable_change(request, pk)
+            if record.stage not in ['ecr', 'eco']: conflict('仅ECR／ECO支持阶段提交。')
             repeated = record.review_rounds.filter(request_id=values['request_id']).first()
             if repeated:
                 if repeated.submission_payload != canonical(values):
@@ -115,20 +122,23 @@ class StageSubmission(APIView):
             if any(not row['owner_active'] for row in required): errors['owners'] = '所有本轮行动都须指定有效负责人。'
             if not required and not values['acknowledge_no_tasks']: errors['tasks'] = '请明确确认本阶段无行动需处理。'
             # Keep account checks under row locks until the round has been created.
-            ids = {row['owner_user_id'] for row in required} | {record.publisher_id}
+            approvers = set(record.stage_approvers.values_list('pk', flat=True))
+            if not approvers: errors['stage_approver_ids'] = '请至少选择一位有效批准人。'
+            ids = {pk for row in required for pk in row['owner_user_ids']} | approvers | {record.publisher_id}
             active = set(get_user_model().objects.select_for_update().filter(pk__in=[pk for pk in ids if pk], is_active=True).values_list('pk', flat=True))
             if record.publisher_id not in active: errors['publisher_id'] = '请选择有效发布人。'
-            if any(row['owner_user_id'] not in active for row in required): errors['owners'] = '负责人账号已失效，请重新选择。'
+            if any(pk not in active for row in required for pk in row['owner_user_ids']): errors['owners'] = '负责人账号已失效，请重新选择。'
+            if not approvers.issubset(active): errors['stage_approver_ids'] = '批准人账号已失效，请重新选择。'
             if errors: raise serializers.ValidationError(errors)
             now = timezone.now()
             round = ReviewRound.objects.create(change=record, number=record.current_review_round + 1, review_mode='designated',
                 request_id=values['request_id'], submission_payload=canonical(values), title=record.title, ecr_no=record.source_ecr.ecr_no if record.stage == 'eco' else record.ecr_no, eco_no=record.eco_no if record.stage == 'eco' else '', submitted_at=now)
-            participants = {row['owner_user_id'] for row in required}
+            participants = {pk for row in required for pk in row['owner_user_ids']} | approvers
             # Unresolved original authors retain opinion-only responsibility after reassignment.
             participants.update(record.review_issues.exclude(state='resolved').values_list('author_id', flat=True))
-            ReviewRecord.objects.bulk_create([ReviewRecord(change=record, round=round, reviewer_id=pk) for pk in participants])
-            ActionTask.objects.bulk_create([ActionTask(round=round, action_key=row['id'], owner_id=row['owner_user_id'],
-                result=rows[row['id']].result, status=rows[row['id']].status, date=rows[row['id']].date) for row in required])
+            ReviewRecord.objects.bulk_create([ReviewRecord(change=record, round=round, reviewer_id=pk, approval_required=pk in approvers) for pk in participants])
+            ActionTask.objects.bulk_create([ActionTask(round=round, action_key=row['id'], owner_id=owner_id,
+                result=rows[row['id']].result, status=rows[row['id']].status, date=rows[row['id']].date) for row in required for owner_id in row['owner_user_ids']])
             record.status = 'pending'; record.current_review_round = round.number; record.review_mode = 'designated'
             record.submitted_at = record.updated_at = now
             record.save(update_fields=['status', 'current_review_round', 'review_mode', 'submitted_at', 'updated_at'])
@@ -180,7 +190,8 @@ class TaskDetail(APIView):
                 for field in ['result', 'status', 'date']:
                     if field in values: setattr(task, field, values[field])
                 _, response_model, _ = stage_parts(record)
-                response_model.objects.filter(change=record, action_key=task.action_key).update(result=task.result, status=task.status, date=task.date)
+                if not task.round.tasks.filter(action_key=task.action_key).exclude(pk=task.pk).exists():
+                    response_model.objects.filter(change=record, action_key=task.action_key).update(result=task.result, status=task.status, date=task.date)
             task.version += 1; task.save()
             TaskOperation.objects.create(task=task, author=request.user, request_id=values['request_id'], kind=kind, payload=canonical(values))
             record.updated_at = timezone.now(); record.save(update_fields=['updated_at'])

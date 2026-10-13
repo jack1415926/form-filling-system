@@ -6,7 +6,7 @@ import { api, type ChangeRequest } from './api'
 import useAutosave from './useAutosave'
 import type { SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
-import { significantFields, significantPayload, subResult, conclusionHint, needsConclusionReview, type SignificantData, type ChartRow, type SubRow, type Option } from './significantChangeDraft'
+import { significantFields, significantPayload, subResult, conclusionHint, needsConclusionReview, canOpenSubchart, type SignificantData, type ChartRow, type SubRow, type Option } from './significantChangeDraft'
 import type { Fields } from './autosave'
 
 type Props = {
@@ -38,12 +38,14 @@ function AssessmentForm({ data, record, leaving, paused, saveRef, onDirty, onBus
       return significantFields(latest)
     },
   })
+  const openChartId = chartId && canOpenSubchart(save.values[`chart_${chartId}.applicability`]) ? chartId : null
   useImperativeHandle(saveRef, () => ({ save: save.manualSave }))
-  useEffect(() => { onEditorOpen(!!chartId); return () => onEditorOpen(false) }, [chartId, onEditorOpen])
+  useEffect(() => { onEditorOpen(!!openChartId); return () => onEditorOpen(false) }, [openChartId, onEditorOpen])
   const disabled = locked || leaving || save.manual
   const busy = save.pending || save.manual || leaving
   const update = (patch: Fields) => {
     if (needsConclusionReview(save.values, patch)) setReview(true)
+    if (chartId && `chart_${chartId}.applicability` in patch && !canOpenSubchart(patch[`chart_${chartId}.applicability`])) setChartId(null)
     save.update(patch)
   }
   const value = (key: string) => save.values[key] ?? ''
@@ -56,7 +58,7 @@ function AssessmentForm({ data, record, leaving, paused, saveRef, onDirty, onBus
     const hintId = `${idPrefix}chart-${row.id}-result-hint`
     return <div>{select(`chart_${row.id}.result`, idPrefix ? `子表 ${row.id}人工结论` : `Chart ${row.id}人工结论`, row.result_options, true, idPrefix, hintId)}<p id={hintId} className="assessment-result-hint">{conclusionHint(row, value(`chart_${row.id}.applicability`))}</p></div>
   }
-  const chart = data.charts.find((row) => row.id === chartId)
+  const chart = data.charts.find((row) => row.id === openChartId)
   const saveButton = <Button type="primary" loading={save.manual} disabled={disabled || !save.dirty} onClick={save.clickSave}>保存评估</Button>
   const reviewMessage = review && <Alert type="warning" title="回答已调整，请核对组结论及最终结论" className="form-alert" />
   const error = save.error && <Alert type="error" showIcon title="保存失败，填写内容仍保留" description={save.error.message} className="form-alert" />
@@ -73,7 +75,7 @@ function AssessmentForm({ data, record, leaving, paused, saveRef, onDirty, onBus
         { title: '评估内容', width: 350, render: (_, row) => <div className="question-text">{row.text}{row.id === '0' && <p className="question-hint">参考清单0.1～0.4待业务提供。</p>}</div> },
         { title: '适用／不适用', width: 140, render: (_, row) => select(`chart_${row.id}.applicability`, `Chart ${row.id}适用性`, applicabilityOptions, false) },
         { title: '原因', width: 220, render: (_, row) => reason(`chart_${row.id}.reason`, `Chart ${row.id}原因`) },
-        { title: '下一步（原模板提示）', width: 250, render: (_, row) => <div className="question-text">{row.next_steps[value(`chart_${row.id}.applicability`)] || '—'}{row.id === 'B' && value('chart_B.applicability') === 'N' && <p className="question-hint">原模板提示，分支待业务确认；仍可继续填写C～E。</p>}{row.id !== '0' && <p><Button disabled={leaving || save.manual} onClick={() => setChartId(row.id)}>打开子表 {row.id}</Button></p>}</div> },
+        { title: '下一步（原模板提示）', width: 250, render: (_, row) => <div className="question-text">{row.next_steps[value(`chart_${row.id}.applicability`)] || '—'}{row.id === 'B' && value('chart_B.applicability') === 'N' && <p className="question-hint">原模板提示，分支待业务确认；仍可继续填写C～E。</p>}{row.id !== '0' && <p><Button disabled={leaving || save.manual || !canOpenSubchart(value(`chart_${row.id}.applicability`))} onClick={() => { if (canOpenSubchart(value(`chart_${row.id}.applicability`))) setChartId(row.id) }}>打开子表 {row.id}</Button></p>}</div> },
         { title: '子表评估结论（人工）', width: 285, render: (_, row) => row.id === '0' ? '—' : conclusion(row) },
       ]} />
       <div className="assessment-conclusion"><h3>F · {data.f_text}</h3>{select('assessment.f_assessment', 'F项评估', data.f_options)}<h3>Conclusion 结论（人工）</h3>{select('assessment.final_conclusion', '最终人工结论', data.final_options)}</div>

@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from .models import ChangeRequest
 from .publication import BASE_FIELDS
-from .review_access import can_read_body, can_read_round
+from .review_access import can_read_body, can_read_round, is_ecr_coordinator
 
 
 def stage_summary(record, stage, actor, source_brief=False):
@@ -43,7 +43,7 @@ class StageNavigation(APIView):
             eco = record if record.stage == 'eco' else ChangeRequest.objects.filter(source_ecr=source).first()
             ecr_summary = stage_summary(source, 'ecr', request.user, source_brief=record.stage == 'eco' and body)
             eco_summary = stage_summary(eco, 'eco', request.user)
-            if eco is None and record.applicant_id != request.user.pk:
+            if eco is None and source.applicant_id != request.user.pk and not is_ecr_coordinator(request.user, source):
                 eco_summary['status'] = 'unavailable'
             return Response({'actor_id': request.user.pk, 'current_change_id': record.pk,
                              'stages': [ecr_summary, eco_summary]})

@@ -1,4 +1,4 @@
-from .review_access import readable_change
+from .review_access import readable_change, editable_change
 import json
 
 from django.contrib.auth import authenticate, login, logout
@@ -69,6 +69,10 @@ def me_view(request):
 class ChangeList(generics.ListCreateAPIView):
     serializer_class = ChangeRequestSerializer
 
+    def create(self, request, *args, **kwargs):
+        with transaction.atomic():
+            return super().create(request, *args, **kwargs)
+
     def get_queryset(self):
         return ChangeRequest.objects.filter(applicant=self.request.user)
 
@@ -90,7 +94,7 @@ class ChangeDetail(generics.RetrieveUpdateAPIView):
 
     def patch(self, request, *args, **kwargs):
         with transaction.atomic():
-            record = get_object_or_404(self.get_queryset().select_for_update(), pk=kwargs["pk"])
+            record = editable_change(request, kwargs["pk"])
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改表单。"}, status=status.HTTP_409_CONFLICT)
             serializer = self.get_serializer(record, data=request.data, partial=True)
@@ -100,7 +104,7 @@ class ChangeDetail(generics.RetrieveUpdateAPIView):
 
     def delete(self, request, *args, **kwargs):
         with transaction.atomic():
-            record = get_object_or_404(self.get_queryset().select_for_update(), pk=kwargs["pk"])
+            record = editable_change(request, kwargs["pk"])
             if record.stage == 'eco':
                 return Response({'detail': '关联ECO不能删除，请在草稿中修订。'}, status=409)
             if record.status != ChangeRequest.Status.DRAFT:
@@ -122,7 +126,7 @@ class MaterialList(APIView):
 
     def write(self, request, pk, material_pk=None):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = editable_change(request, pk)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改物料。"}, status=status.HTTP_409_CONFLICT)
             material = get_object_or_404(MaterialChange, pk=material_pk, change=record) if material_pk is not None else None
@@ -185,7 +189,7 @@ class QuestionList(APIView):
 
     def patch(self, request, pk):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = editable_change(request, pk)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改问题回答。"}, status=status.HTTP_409_CONFLICT)
             serializer = QuestionPatchSerializer(data=request.data)
@@ -219,9 +223,20 @@ class EcrActionList(APIView):
     def data(record):
         answers = dict(record.question_responses.values_list("number", "answer"))
         responses = {row.action_key: row for row in record.ecr_responses.select_related('owner_user').all()}
+        results = {}
+        if record.stage == 'ecr' and record.status == 'published':
+            round = record.review_rounds.filter(number=record.current_review_round).first()
+            if round:
+                for task in round.tasks.filter(confirmed_at__isnull=False).select_related('owner').order_by('action_key', 'owner_id'):
+                    user = task.owner
+                    results.setdefault(task.action_key, []).append({'id': task.pk, 'round': round.number,
+                        'owner': {'id': user.pk, 'username': user.username, 'display_name': user.get_full_name() or user.username, 'is_active': user.is_active},
+                        'result': task.result, 'status': task.status, 'date': task.date.isoformat() if task.date else None,
+                        'confirmed_at': task.confirmed_at.isoformat()})
         return {"updated_at": record.updated_at.isoformat(), "actions": [
             {**definition, "question_answer": answers.get(definition["number"], ""),
-             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "extra_required": False, "result": "", "status": "", "date": None})}
+             "task_results": results.get(definition["id"], []),
+             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "owner_user_ids": [], "owner_users": [], "extra_required": False, "result": "", "status": "", "date": None})}
             for definition in ECR_ACTIONS
         ]}
 
@@ -238,14 +253,14 @@ class EcrActionDetail(APIView):
 
     def patch(self, request, pk, action_key):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = editable_change(request, pk)
             if record.stage == 'eco':
                 return Response({'detail': '来源ECR评估只读。'}, status=409)
             if action_key not in ECR_ACTION_IDS:
                 return Response({"detail": "行动不存在。"}, status=404)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改 ECR 评估。"}, status=409)
-            if record.stage == 'ecr' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'extra_required'}):
+            if record.stage == 'ecr' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'owner_user_ids', 'extra_required'}):
                 return Response({'detail': '发起人仅可分配负责人和补充任务；结果由负责人在处理中填写。'}, status=400)
             if isinstance(request.data, dict) and 'extra_required' in request.data and type(request.data['extra_required']) is not bool:
                 return Response({'detail': '补充任务标记必须为布尔值。'}, status=400)
@@ -254,13 +269,12 @@ class EcrActionDetail(APIView):
             serializer = EcrActionSerializer(instance, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             fields = serializer.validated_data
-            if any(getattr(instance, key) != value for key, value in fields.items()):
-                for key, value in fields.items():
-                    setattr(instance, key, value)
-                if not (instance.owner or instance.owner_user_id or instance.extra_required or instance.result or instance.status or instance.date):
-                    instance.delete()
-                else:
+            if any((set(instance.owners.values_list('pk', flat=True)) if instance.pk else set()) != {user.pk for user in value} if key == 'owners' else getattr(instance, key) != value for key, value in fields.items()):
+                if not instance.pk:
                     instance.save()
+                serializer.save()
+                if not (instance.owner or instance.owner_user_id or instance.owners.exists() or instance.extra_required or instance.result or instance.status or instance.date):
+                    instance.delete()
                 record.updated_at = timezone.now()
                 record.save(update_fields=["updated_at"])
             return Response(EcrActionList.data(record))
@@ -276,7 +290,7 @@ class EcoActionList(APIView):
         responses = {row.action_key: row for row in record.eco_responses.select_related('owner_user').all()}
         return {"updated_at": record.updated_at.isoformat(), "actions": [
             {**definition, "question_answer": answers.get(definition["number"], ""),
-             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "extra_required": False, "result": "", "status": "", "date": None})}
+             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "owner_user_ids": [], "owner_users": [], "extra_required": False, "result": "", "status": "", "date": None})}
             for definition in ECO_ACTIONS
         ]}
 
@@ -291,10 +305,10 @@ class EcoActionDetail(APIView):
 
     def patch(self, request, pk, action_key):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = editable_change(request, pk)
             if record.stage == 'ecr':
                 return Response({'detail': 'ECO阶段尚未启动。'}, status=409)
-            if record.stage == 'eco' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'extra_required'}):
+            if record.stage == 'eco' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'owner_user_ids', 'extra_required'}):
                 return Response({'detail': '草稿／退回时仅可分配ECO负责人及补充任务，结果由提交后的负责人填写。'}, status=400)
             if isinstance(request.data, dict) and 'extra_required' in request.data and (record.stage == 'legacy' or type(request.data['extra_required']) is not bool):
                 return Response({'detail': '补充任务标记必须为布尔值。'}, status=400)
@@ -307,13 +321,12 @@ class EcoActionDetail(APIView):
             serializer = EcoActionSerializer(instance, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             fields = serializer.validated_data
-            if any(getattr(instance, key) != value for key, value in fields.items()):
-                for key, value in fields.items():
-                    setattr(instance, key, value)
-                if not (instance.owner or instance.owner_user_id or instance.extra_required or instance.result or instance.status or instance.date):
-                    instance.delete()
-                else:
+            if any((set(instance.owners.values_list('pk', flat=True)) if instance.pk else set()) != {user.pk for user in value} if key == 'owners' else getattr(instance, key) != value for key, value in fields.items()):
+                if not instance.pk:
                     instance.save()
+                serializer.save()
+                if not (instance.owner or instance.owner_user_id or instance.owners.exists() or instance.extra_required or instance.result or instance.status or instance.date):
+                    instance.delete()
                 record.updated_at = timezone.now()
                 record.save(update_fields=["updated_at"])
             return Response(EcoActionList.data(record))

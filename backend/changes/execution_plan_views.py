@@ -1,4 +1,4 @@
-from .review_access import readable_change
+from .review_access import readable_change, editable_change
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -76,7 +76,7 @@ class ExecutionPlanDetail(APIView):
 
     def patch(self, request, pk):
         with transaction.atomic():
-            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, applicant=request.user)
+            record = editable_change(request, pk)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改执行计划。"}, status=409)
             payload = PlanPatchSerializer(data=request.data)

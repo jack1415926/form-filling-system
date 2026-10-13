@@ -1,6 +1,6 @@
 # 安装、启动、更新与检查
 
-更新日期：2026-10-13。技术基线为Node.js 24、Python 3.14、MySQL 8.4、PowerShell 7；依赖以backend/requirements.txt和frontend/package-lock.json为准。当前迁移终点0021。功能和验收状态见[README](../README.md)，历史验证见[索引](testing/README.md)。
+更新日期：2026-10-13。技术基线为Node.js 24、Python 3.14、MySQL 8.4、PowerShell 7；依赖以backend/requirements.txt和frontend/package-lock.json为准。当前迁移终点0023。功能和验收状态见[README](../README.md)，历史验证见[索引](testing/README.md)。
 
 ## 首次安装
 
@@ -72,7 +72,7 @@ pwsh -NoProfile -File .\scriptsackend.ps1 showmigrations changes
 pwsh -NoProfile -File .\scriptsackend.ps1 check --database default
 ```
 
-确认迁移至0021后重启前后端。0019已有新阶段／任务、0020已有发布／来源、0021已有ECO任务／补充／发布时，逆迁移拒绝丢失证据；不要删除数据绕过守卫。备份是否完成和是否做过恢复演练是不同事实。
+确认迁移至0023后重启前后端。0019已有新阶段／任务、0020已有发布／来源、0021已有ECO任务／补充／发布、0022已有多人负责人／任务或指定批准记录、0023已有真实ECO创建或交接记录时，逆迁移拒绝丢失证据；不要删除数据绕过守卫。备份是否完成和是否做过恢复演练是不同事实。
 
 `.venv`、`.local`、数据库、账号／密码、样例、原Excel及截图不随Git同步。项目移动后解释器启动失败，先核对`.venv/pyvenv.cfg`和安装Python位置，再重建虚拟环境，不删除配置或数据库。历史账号文件和本机备份路径只作为对应设备记录，账号文件整合尚未实施。
 
