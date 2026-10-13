@@ -16,7 +16,7 @@ test('approval permissions and legacy public progress remain readable without tr
  assert.match(approvalBlockReason(one,actor.id,0),/你已同意批准/)
  assert.equal(approvalBlockReason(one,4,0),null)
  assert.match(approvalProgress(one.round),/还需 1 名/)
- assert.match(approvalProgress({...one.round,state:'approved',approvals:[...one.round.approvals,{...actor,id:4,approved_at:round.submitted_at}]}),/2\/2.*整份申请审核已通过/)
+ assert.match(approvalProgress({...one.round,state:'approved',approvals:[...one.round.approvals,{...actor,id:4,approved_at:round.submitted_at}]}),/2\/2.*本流程审核已通过/)
  assert.match(approvalBlockReason({...data,can_approve:false,unresolved_count:1},actor.id,0),/未解决意见/)
  assert.equal(approvalBlockReason({...data,issues:[{state:'resolved'}]},actor.id,0),null)
  assert.match(approvalProgress({...round,state:'returned'}),/重新计算/)

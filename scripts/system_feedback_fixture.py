@@ -11,7 +11,7 @@ from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
 from django.db import connection, transaction
 from django.test import Client
-from changes.models import ChangeRequest, SystemFeedback
+from changes.models import ChangeRequest, QuestionResponse, SystemFeedback
 
 folder = Path('../.local/system-feedback-browser')
 folder.mkdir(exist_ok=True)
@@ -41,7 +41,6 @@ if action == 'prepare':
         for kind in ['owner', 'reviewer', 'admin', 'other']:
             password = secrets.token_urlsafe(16)
             user = User.objects.create_user(username=f'sys_feedback_{kind}_{suffix}', password=password)
-            if kind == 'reviewer': user.groups.add(Group.objects.get(name='审核员'))
             if kind == 'admin': user.groups.add(Group.objects.get(name='反馈管理员'))
             accounts.append({'id': user.pk, 'username': user.username, 'password': password, 'kind': kind})
         owner, reviewer = accounts[:2]
@@ -52,8 +51,13 @@ if action == 'prepare':
             response = client.post('/api/changes/', json.dumps({'title': '反馈回归临时申请'+str(index), 'ecr_no': f'SF-{suffix}-{index}'}), content_type='application/json')
             assert response.status_code == 201
             records.append(response.json()['id'])
-        response = client.post(f'/api/changes/{records[1]}/submission/', json.dumps({'review_mode': 'designated', 'reviewer_ids': [reviewer['id']], 'expected_round': 0, 'request_id': str(uuid.uuid4())}), content_type='application/json')
-        assert response.status_code == 200
+        submitted = ChangeRequest.objects.get(pk=records[1])
+        submitted.publisher_id = reviewer['id']
+        submitted.save(update_fields=['publisher'])
+        submitted.stage_approvers.set([reviewer['id']])
+        QuestionResponse.objects.bulk_create([QuestionResponse(change=submitted, number=number, answer='N') for number in range(1, 28)])
+        response = client.post(f'/api/changes/{records[1]}/stage-submission/', json.dumps({'request_id': str(uuid.uuid4()), 'expected_round': 0, 'acknowledge_no_tasks': True}), content_type='application/json')
+        assert response.status_code == 200, response.content
         client.logout()
         client.force_login(User.objects.get(pk=accounts[2]['id']))
         response = client.post('/api/changes/', json.dumps({'title': '管理员自己的填写草稿', 'ecr_no': f'SF-{suffix}-admin'}), content_type='application/json')
