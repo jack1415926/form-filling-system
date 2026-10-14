@@ -5,6 +5,8 @@ export type Overview = {
   ccb_owner: string; change_owner: string; planned_eco_date: string | null; change_reason: string
 }
 export type ChangeRequest = Overview & {
+  // Local cache marker: review access can be revoked without discarding protected input.
+  body_access?: boolean
   applicant_name?: string
   stage_approver_ids?: number[]
   stage?: 'legacy' | 'ecr' | 'eco'; publisher_id?: number | null

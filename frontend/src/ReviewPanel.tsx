@@ -7,7 +7,7 @@ import { newestResponse } from './latestResponse'
 import { saveResultUnconfirmed } from './questionDraft'
 import { requestFeedbackDrawer, registerReviewDrawer } from './systemFeedback'
 import { modeLabel } from './submission'
-import { checkedReview, actionConfirmed, actionCanRetry, approvalProgress, approvalBlockReason, editReply, type ReplyDraft, reviewPath, reviewStateLabels as labels, issueTabs, issueStateLabels, type IssueInput, type ReviewAction, type ReviewData } from './review'
+import { checkedReview, reviewChangeSnapshot, actionConfirmed, actionCanRetry, approvalProgress, approvalBlockReason, editReply, type ReplyDraft, reviewPath, reviewStateLabels as labels, issueTabs, issueStateLabels, type IssueInput, type ReviewAction, type ReviewData } from './review'
 
 type Props = { compact?: boolean; initialOpen?: boolean; changeId: number; number: number; leaving?: boolean; onBack?: () => void; onReauthenticate: () => void; onBusy?: (value: boolean) => void; onDirty?: (value: boolean) => void; renderForm?: (record: ChangeRequest) => ReactNode }
 
@@ -39,7 +39,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
     if (!active.current || actorUser(client)?.id !== actor.id) return incoming
     const latest = newestResponse(client.getQueryData<ReviewData>(key), incoming)
     client.setQueryData(key, latest)
-    if (latest.form) client.setQueryData<ChangeRequest>(['change', actor.id, changeId], (current) => newestResponse(current, latest.form!))
+    client.setQueryData<ChangeRequest>(['change', actor.id, changeId], current => reviewChangeSnapshot(current, latest))
     for (const resource of ['review-list', 'changes', 'submission', 'review-inbox', 'stage-workflow', 'stage-navigation', 'publication']) void client.invalidateQueries({ queryKey: [resource, actor.id] })
     return latest
   }

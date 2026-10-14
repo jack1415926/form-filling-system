@@ -2,12 +2,34 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { QueryClient } from '@tanstack/react-query'
 import { canEdit, actorUser } from '../src/workflow.ts'
-import { checkedReview, actionConfirmed, actionCanRetry, approvalProgress, approvalBlockReason, editReply, reviewPath } from '../src/review.ts'
+import { checkedReview, reviewChangeSnapshot, actionConfirmed, actionCanRetry, approvalProgress, approvalBlockReason, editReply, reviewPath } from '../src/review.ts'
 
 const actor={id:3,username:'reviewer',display_name:'Reviewer',role:'reviewer'}
 const round={number:1,title:'Submitted title',ecr_no:'ECR-1',eco_no:'ECO-1',review_mode:'public',state:'pending',submitted_at:'2026-10-05T01:00:00Z',approved_at:null,returned_at:null,returned_by:null,return_reason:'',reviewers:[],approvals:[]}
 const data={change_id:1,updated_at:'2026-10-05T01:00:00Z',current_round:1,round,is_current:true,can_view_form:false,can_approve:true,can_return:true,can_feedback:true,form:null,history:[round],feedback:[],issues:[],unresolved_count:0,issue_blockers:[],confirmed_requests:[]}
 const change={id:1,applicant:2,current_review_round:1,title:'Revised',ecr_no:'ECR-1',eco_no:'ECO-1',affected_products:'',affected_region:'',initiating_factory:'',affected_factories:'',ccb_owner:'',change_owner:'',change_reason:'',planned_eco_date:null,status:'returned',review_mode:'public',submitted_at:'2026-10-05T01:00:00Z',created_at:'2026-10-05T00:00:00Z',updated_at:'2026-10-05T01:01:00Z'}
+
+test('non-owner return synchronizes detail status and revokes body without removing cached input context',()=>{
+ const cached={...change,status:'pending',updated_at:'2026-10-05T01:00:00Z'}
+ const returned={...data,updated_at:change.updated_at,round:{...round,state:'returned'}}
+ const client=new QueryClient();client.setQueryData(['change',actor.id,1],cached)
+ client.setQueryData(['change',actor.id,1],current=>reviewChangeSnapshot(current,returned))
+ const result=client.getQueryData(['change',actor.id,1])
+ assert.equal(result.status,'returned');assert.equal(result.body_access,false)
+ assert.equal(result.title,cached.title);assert.equal(cached.status,'pending')
+ assert.equal(result.current_review_round,1)
+ client.clear()
+})
+
+test('old rounds and late review responses cannot regress a newer detail or restore revoked body access',()=>{
+ const returned={...change,body_access:false}
+ assert.equal(reviewChangeSnapshot(returned,{...data,form:{...change,status:'pending',updated_at:'2026-10-05T01:00:00Z'}}),returned)
+ assert.equal(reviewChangeSnapshot(returned,{...data,is_current:false,round:{...round,state:'returned'},updated_at:'2026-10-05T01:03:00Z'}),returned)
+ assert.equal(reviewChangeSnapshot({...returned,current_review_round:2},{...data,round:{...round,state:'returned'},updated_at:'2026-10-05T01:03:00Z'}).current_review_round,2)
+ const restored=reviewChangeSnapshot(returned,{...data,can_view_form:true,form:{...change,status:'pending',current_review_round:2,updated_at:'2026-10-05T01:04:00Z'}})
+ assert.equal(restored.status,'pending');assert.equal(restored.body_access,true)
+ assert.equal(restored.current_review_round,2)
+})
 
 test('approval permissions and legacy public progress remain readable without treating individual decisions as whole approval',()=>{
  assert.equal(approvalBlockReason(data,actor.id,0),null)

@@ -136,6 +136,9 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
   const [confirming, setConfirming] = useState(false), [fillerBusy, setFillerBusy] = useState(false), [publicationBusy, setPublicationBusy] = useState(false)
   const saveRef = useRef<SaveHandle>(null), { modal } = AntApp.useApp(), client = useQueryClient()
   const record = props.record, stage = record.stage === 'eco' ? 'eco' : 'ecr', label = stage.toUpperCase()
+  const [authorizedRecord, setAuthorizedRecord] = useState(record)
+  if (record.body_access !== false && authorizedRecord !== record) setAuthorizedRecord(record)
+  const preserveInput = dirty || busy || editorOpen
   const blocked = busy || issueBusy || publicationBusy || fillerBusy || editorOpen || props.leaving || confirming
   const { onLeaveMessage } = props
   useEffect(() => { onLeaveMessage(tab === 'submission' ? submissionChoiceWarning : discardSavedWarning); return () => onLeaveMessage(discardSavedWarning) }, [tab, onLeaveMessage])
@@ -146,7 +149,7 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [dirty, busy, issueDirty, issueBusy, publicationBusy, fillerBusy])
-  const editorProps = { ...props, leaving: props.leaving || issueBusy || publicationBusy || fillerBusy, saveRef, paused: confirming,
+  const editorProps = { ...props, record: record.body_access === false && preserveInput ? authorizedRecord : record, leaving: props.leaving || issueBusy || publicationBusy || fillerBusy, saveRef, paused: confirming,
     onDirty: (value: boolean) => { setDirty(value); props.onDirty(value || issueDirty) },
     onBusy: (value: boolean) => { setBusy(value); props.onBusy(value || issueBusy || publicationBusy || fillerBusy) },
   }
@@ -167,8 +170,8 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
   const next: Record<string, string> = { overview: 'materials', materials: 'questions', questions: 'summary', ecr: 'summary', eco: 'summary', emc: 'execution-plan', 'execution-plan': 'significant-change', 'significant-change': 'summary' }
   const previous: Record<string, string> = { materials: 'overview', questions: 'materials', ecr: 'summary', eco: 'summary', emc: 'summary', 'execution-plan': 'emc', 'significant-change': 'execution-plan' }
   const navigation = { onPrevious: () => switchTab(previous[tab] ?? 'summary'), onNext: () => switchTab(next[tab] ?? 'summary') }
-  const items = processMenu(stage, props.reviewOnly).map(item => ({ ...item, disabled: blocked }))
-  const content = tab === 'summary' ? <>
+  const items = processMenu(stage, props.reviewOnly).map(item => ({ ...item, disabled: blocked || record.body_access === false && item.key !== 'history' }))
+  const content = record.body_access === false && !preserveInput ? <Alert type="info" title="本流程已退回，当前正文权限已收回。" description="可继续查看本轮意见与历史；修订中的正文不再开放。" /> : tab === 'summary' ? <>
       <StageNavigation record={record} leaving={blocked || dirty || issueDirty} onOpenChange={props.onOpenChange} />
       <section className="panel process-summary"><h2>{label}流程总览</h2><Descriptions column={2} items={[
         { key: 'owner', label: stage === 'eco' ? '当前填写人' : '发起人', children: record.applicant_name || `账号 #${record.applicant}` },
@@ -187,9 +190,10 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
       : tab === 'submission' ? <SubmissionEditor {...editorProps} reviewDraftDirty={issueDirty} onPrevious={() => switchTab('summary')} />
       : <Alert type="info" title={record.current_review_round ? props.reviewOnly ? '本流程审核与意见请使用上方审核面板。' : '本流程的轮次、意见回应及原提出者复核见下方。' : '本流程尚未提交，没有审核轮次或正式意见。'} />
   return <>
+    {record.body_access === false && preserveInput && <Alert type="warning" className="form-alert" title="正文权限已收回，未保存输入和未确认操作暂时保留。" description="请先核对原操作结果或复制需要保留的输入；离开仍需确认，修订中的正文不会重新开放。" />}
     <div className="process-heading"><div><span className="eyebrow">独立{label}流程</span><h1>{(stage === 'eco' ? record.eco_no : record.ecr_no) || '编号待填写'} · {record.title || '未命名工程变更'} <Tag color={stateColors[record.status]}>{processStates[record.status]}</Tag></h1>{stage === 'eco' && <p className="muted">来源ECR：{record.source_ecr_no} · 已发布结果只读，本ECO独立填写、审核及发布。</p>}</div>{!props.reviewOnly && <Button disabled={blocked} onClick={props.onBack}>{backLabel(client)}</Button>}</div>
     <div className="process-layout"><aside className="panel process-sidebar"><Menu selectedKeys={[tab]} mode="inline" items={items} onClick={({ key }) => switchTab(key)} /></aside><section className="process-body">{content}
-      {!props.reviewOnly && !!record.current_review_round && <div style={{ display: ['summary', 'history'].includes(tab) ? undefined : 'none' }}><ReviewPanel compact={tab !== 'history'} initialOpen={props.initialReviewOpen} key={`${record.id}:${record.current_review_round}`} changeId={record.id} number={record.current_review_round} leaving={props.leaving || busy || confirming || publicationBusy || fillerBusy} onReauthenticate={props.onReauthenticate} onBusy={value => { setIssueBusy(value); props.onBusy(value || busy || publicationBusy || fillerBusy) }} onDirty={value => { setIssueDirty(value); props.onDirty(value || dirty) }} /></div>}
+      {!props.reviewOnly && !!record.current_review_round && <div style={{ display: ['summary', 'history'].includes(tab) || record.body_access === false && !preserveInput ? undefined : 'none' }}><ReviewPanel compact={tab !== 'history' && record.body_access !== false} initialOpen={props.initialReviewOpen} key={`${record.id}:${record.current_review_round}`} changeId={record.id} number={record.current_review_round} leaving={props.leaving || busy || confirming || publicationBusy || fillerBusy} onReauthenticate={props.onReauthenticate} onBusy={value => { setIssueBusy(value); props.onBusy(value || busy || publicationBusy || fillerBusy) }} onDirty={value => { setIssueDirty(value); props.onDirty(value || dirty) }} /></div>}
     </section></div>
   </>
 }

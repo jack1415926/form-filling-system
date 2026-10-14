@@ -1,5 +1,6 @@
 import { ApiError, type ChangeRequest } from './api.ts'
 import { checkedChange, type Reviewer } from './submission.ts'
+import { newestResponse } from './latestResponse.ts'
 
 export type RoundInfo = {
   stage?: 'legacy' | 'ecr' | 'eco'
@@ -17,6 +18,12 @@ export function editReply(current: ReplyDraft | undefined, text: string, version
   return { text, version: current?.text ? current.version : version }
 }
 export type ReviewData = { can_add_issue?: boolean; change_id: number; updated_at: string; current_round: number; round: RoundInfo; is_current: boolean; can_view_form: boolean; can_approve: boolean; can_return: boolean; can_feedback: boolean; form: ChangeRequest | null; history: RoundInfo[]; feedback: Feedback[]; issues: ReviewIssue[]; unresolved_count: number; issue_blockers: string[]; confirmed_requests: string[] }
+export function reviewChangeSnapshot(current: ChangeRequest | undefined, data: ReviewData): ChangeRequest | undefined {
+  if (data.form) return newestResponse(current, { ...data.form, body_access: true })
+  if (!current || !data.is_current || data.current_round !== current.current_review_round
+    || data.round.state !== 'returned' || data.can_view_form) return current
+  return newestResponse(current, { ...current, status: 'returned', body_access: false, updated_at: data.updated_at })
+}
 export type ReviewAction = { kind: 'approve' | 'return' | 'respond' | 'resolve'; request_id: string; issues?: IssueInput[]; issue_id?: number; version?: number; text?: string }
 export const issueTabs = { overview: '概述', materials: '物料明细', questions: '问题评估', ecr: 'ECR 评估', eco: 'ECO 执行', emc: 'EMC 参考', 'execution-plan': '执行计划', 'significant-change': '实质性变更评估' }
 export const issueStateLabels = { awaiting_reply: '待回应', awaiting_review: '待复核', resolved: '已解决' }

@@ -7,6 +7,33 @@ from .test_publication import PublicationFixture
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
 class EngineeringChangesTests(PublicationFixture, TestCase):
+    def test_eco_list_uses_its_own_changed_title_and_preserves_source_title(self):
+        self.approve(); self.publish(); eco = self.create_eco()
+        changed = self.client.patch(f'/api/changes/{eco.pk}/', {'title': 'Independent ECO title'}, format='json')
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(self.listing('eco')[0]['title'], 'Independent ECO title')
+        self.assertEqual(self.listing('ecr')[0]['title'], self.source.title)
+        self.assertEqual(self.listing('all')[0]['title'], self.source.title)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.title, 'Baseline')
+
+    def test_non_owner_return_revokes_body_but_retains_authorized_history(self):
+        self.source.stage_approvers.set([self.a])
+        self.client.patch(self.path + 'ecr-actions/ecr_001/', {'owner_user_ids': [self.b.pk], 'extra_required': True}, format='json')
+        submitted = self.client.post(self.path + 'stage-submission/', {'request_id': str(uuid4()), 'expected_round': 0}, format='json')
+        self.assertEqual(submitted.status_code, 200, submitted.data)
+        self.client.force_authenticate(self.b)
+        self.assertEqual(self.client.get(self.path).data['status'], 'pending')
+        result = self.client.post(self.path + 'review-rounds/1/return/', {'request_id': str(uuid4()), 'issues': [{'tab': 'overview', 'text': 'Please revise'}]}, format='json')
+        self.assertEqual(result.status_code, 200, result.data)
+        self.assertEqual(result.data['round']['state'], 'returned')
+        self.assertIsNone(result.data['form'])
+        self.assertFalse(result.data['can_view_form'])
+        self.assertEqual(self.client.get(self.path).status_code, 404)
+        history = self.client.get(self.path + 'review-rounds/1/')
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(history.data['round']['state'], 'returned')
+
     def listing(self, workflow='all', state='all'):
         response = self.client.get('/api/engineering-changes/', {'workflow': workflow, 'state': state})
         self.assertEqual(response.status_code, 200, response.data)

@@ -54,7 +54,7 @@ class EngineeringChanges(APIView):
                 if not matching or state != 'all' and not any(item['status'] == state for item in matching):
                     continue
                 result.append({
-                    'id': source_id, 'title': source.title,
+                    'id': source_id, 'title': eco.title if workflow == 'eco' and eco_visible else source.title,
                     'ecr': ecr_summary, 'eco': eco_summary,
                     'can_create_eco': is_ecr_coordinator(actor, source) and eco is None,
                     'can_delete_ecr': ecr_visible and source.applicant_id == actor.pk and source.status == 'draft',
