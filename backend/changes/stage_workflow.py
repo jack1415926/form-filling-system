@@ -151,6 +151,9 @@ class StageSubmission(APIView):
             record.status = 'pending'; record.current_review_round = round.number; record.review_mode = 'designated'
             record.submitted_at = record.updated_at = now
             record.save(update_fields=['status', 'current_review_round', 'review_mode', 'submitted_at', 'updated_at'])
+            from .round_snapshots import capture_form
+            round.form_snapshot = capture_form(record, round, request.user)
+            round.save(update_fields=['form_snapshot'])
             approve_if_complete(record)
             return Response(stage_data(record, request.user))
 

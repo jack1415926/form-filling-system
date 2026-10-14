@@ -22,6 +22,7 @@ from changes.execution_plan_views import ExecutionPlanDetail
 from changes.significant_change_views import SignificantChangeDetail
 from changes.submission_views import ReviewerList, ActionOwnerList
 from changes.review_views import ReviewList, ReviewDetail
+from changes.round_snapshots import RoundFormSnapshot
 from changes.stage_workflow import StageDetail, StageSubmission, TaskDetail
 from changes.publication import PublicationList, AllPublicationList, PublicationDetail, CreateEco
 from changes.eco_filler import EcoFillerDetail, EcoFillerReceipt, EcoFillerInbox, EcoFillerMarkRead
@@ -67,6 +68,7 @@ urlpatterns = [
     path('api/review/', ReviewList.as_view()),
     path('api/review/inbox/', ReviewInbox.as_view()),
     path('api/review/inbox/read/', MarkInboxRead.as_view()),
+    path('api/changes/<int:pk>/review-rounds/<int:number>/form-snapshot/', RoundFormSnapshot.as_view()),
     path('api/changes/<int:pk>/review-rounds/<int:number>/', ReviewDetail.as_view()),
     path('api/changes/<int:pk>/review-rounds/<int:number>/<str:action>/', ReviewDetail.as_view()),
     path('api/changes/<int:pk>/emc/', EmcDetail.as_view()),

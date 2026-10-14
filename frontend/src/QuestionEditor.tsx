@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Input, Select, Spin, Table } from 'antd'
 import { api, type ChangeRequest, type Question, type QuestionAnswer, type QuestionData } from './api'
 import useAutosave from './useAutosave'
-import { questionFields, questionPayload } from './autosaveFields'
+import { questionFields, questionAnswerFields, questionPayload } from './autosaveFields'
 import type { SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
 
@@ -40,8 +40,9 @@ function QuestionForm({ data, record, onDirty, onBusy, onPrevious, onNext, saveR
   const update = (number: number, fields: Partial<Pick<Question, 'answer' | 'remark'>>) => save.update(Object.fromEntries(Object.entries(fields).map(([key, value]) => [`${number}.${key}`, value])))
   const groups = [...new Set(rows.map((row) => row.function))]
   return <div {...save.composition}>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>问题评估</h1><p className="muted">未回答与否分别保存；缺少条件性理由时会提示，仍可保存草稿。</p></div><div className="form-actions"><Button type="primary" loading={save.manual} disabled={locked || save.manual || leaving || !dirty} onClick={save.clickSave}>保存草稿</Button></div></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>问题评估</h1><p className="muted">未回答与否分别保存；缺少条件性理由时会提示，仍可保存草稿。批量选择只修改回答，保留备注，之后可逐题调整。</p></div><div className="form-actions">{!locked && <><Button disabled={disabled || paused} onClick={() => save.update(questionAnswerFields(data, 'Y'))}>全部选是</Button><Button disabled={disabled || paused} onClick={() => save.update(questionAnswerFields(data, 'N'))}>全部选否</Button></>}<Button type="primary" loading={save.manual} disabled={locked || save.manual || leaving || !dirty} onClick={save.clickSave}>保存草稿</Button></div></div>
     {locked && <Alert type="info" title="申请已锁定，问题评估仅供查看。" className="form-alert" />}
+    {record.stage === 'eco' && <p className="muted">本ECO初始内容继承已发布ECR；这里的调整仅作用于本ECO，不会修改来源ECR。</p>}
     {groups.map((group) => <section className="panel list-panel question-section" key={group}>
       <div className="section-heading"><h2>{group}</h2></div>
       <Table<Question> rowKey="number" pagination={false} scroll={{ x: 880 }} dataSource={rows.filter((row) => row.function === group)} columns={[

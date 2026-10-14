@@ -110,6 +110,7 @@ class ReviewRound(models.Model):
     returned_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT)
     return_reason = models.TextField(blank=True)
     submission_payload = models.JSONField(default=dict)
+    form_snapshot = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = "review_round"
