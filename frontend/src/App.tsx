@@ -21,6 +21,7 @@ import PublicationPanel from './PublicationPanel'
 import EcoFillerPanel from './EcoFillerPanel'
 import StageNavigation, { SourceOverview } from './StageNavigation'
 import EngineeringChanges from './EngineeringChanges'
+import EcoFillerInbox from './EcoFillerInbox'
 import InactiveEcoSheet from './InactiveEcoSheet'
 import { processMenu, processStates, type ProcessFilter } from './engineeringChangeData'
 import { submissionChoiceWarning } from './submission'
@@ -348,6 +349,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
       {sessionError && <Alert type="error" showIcon title="登录信息刷新失败，当前填写内容仍保留" description={sessionError.message} className="form-alert" action={<Button loading={sessionFetching} disabled={saving || exit.isPending} onClick={retrySession}>重试</Button>} />}
       {exit.error && <Alert type="error" title={exit.error.message} className="form-alert" />}
       <nav className="workspace-navigation"><Button type={section === 'home' ? 'primary' : 'default'} disabled={saving || listBusy || confirming} onClick={() => changeSection('home')}>工作台</Button><Button type={section === 'mine' ? 'primary' : 'default'} disabled={saving || listBusy || confirming} onClick={() => changeSection('mine')}>工程变更</Button><Button type={section === 'review' ? 'primary' : 'default'} disabled={saving || listBusy || confirming || !reviewAllowed} onClick={() => changeSection('review')}>待我处理</Button></nav>
+      <EcoFillerInbox user={user} blocked={saving || listBusy || confirming || reauthenticate} onOpen={id => navigate(() => { setDirty(false); setSaving(false); setInboxTargetId(null); setReviewTarget(null); setSection('mine'); setProcessFilter('eco'); setSelectedId(id) })} />
       {section === 'home' ? <>
         <div className="page-heading"><div><span className="eyebrow">工作台</span><h1>{user.display_name}，欢迎回来</h1><p className="muted">在这里发起自己的变更申请{reviewAllowed ? '，也可以处理交给你的审核事项。' : '。'}</p></div></div>
         <div className="workspace-cards"><button className="workspace-card panel" disabled={listBusy} onClick={() => changeSection('mine')}><span className="workspace-card-icon">＋</span><h2>工程变更</h2><p className="muted">发起ECR，关联查看独立ECO，或继续填写有权处理的流程。</p><span className="workspace-card-link">进入工程变更 →</span></button>

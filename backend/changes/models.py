@@ -86,6 +86,15 @@ class EcoFillerEvent(models.Model):
         constraints = [models.UniqueConstraint(fields=['eco', 'request_id'], name='eco_filler_unique_request')]
 
 
+class EcoFillerInboxRead(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    event = models.ForeignKey(EcoFillerEvent, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'eco_filler_inbox_read'
+        constraints = [models.UniqueConstraint(fields=['user', 'event'], name='eco_filler_read_user_event')]
+
+
 class ReviewRound(models.Model):
     change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="review_rounds")
     number = models.PositiveIntegerField()

@@ -1,6 +1,6 @@
 # 安装、启动、更新与检查
 
-更新日期：2026-10-13。技术基线为Node.js 24、Python 3.14、MySQL 8.4、PowerShell 7；依赖以backend/requirements.txt和frontend/package-lock.json为准。当前迁移终点0024。功能和验收状态见[README](../README.md)，历史验证见[索引](testing/README.md)。
+更新日期：2026-10-14。技术基线为Node.js 24、Python 3.14、MySQL 8.4、PowerShell 7；依赖以backend/requirements.txt和frontend/package-lock.json为准。当前迁移终点0025。功能和验收状态见[README](../README.md)，历史验证见[索引](testing/README.md)。
 
 ## 首次安装
 
@@ -71,13 +71,13 @@ pwsh -NoProfile -File .\scripts/backend.ps1 showmigrations changes
 pwsh -NoProfile -File .\scripts/backend.ps1 check --database default
 ```
 
-确认迁移至0024后重启前后端。0019已有新阶段／任务、0020已有发布／来源、0021已有ECO任务／补充／发布、0022已有多人负责人／任务或指定批准记录、0023已有真实ECO创建或交接记录时，逆迁移拒绝丢失证据；不要删除数据绕过守卫。备份是否完成和是否做过恢复演练是不同事实。
+确认迁移至0025后重启前后端。0019已有新阶段／任务、0020已有发布／来源、0021已有ECO任务／补充／发布、0022已有多人负责人／任务或指定批准记录、0023已有真实ECO创建或交接记录时，逆迁移拒绝丢失证据；不要删除数据绕过守卫。备份是否完成和是否做过恢复演练是不同事实。
 
 `.venv`、`.local`、数据库、账号／密码、样例、原Excel及截图不随Git同步。项目移动后解释器启动失败，先核对`.venv/pyvenv.cfg`和安装Python位置，再重建虚拟环境，不删除配置或数据库。本机测试凭据统一在`.local/accounts.json`，按真实账号ID去重，不记录role；不随Git同步，其他设备自行配置。旧账号配置及停用脚本已删除。
 
 ## 清理其他设备的旧单流程
 
-其他设备单独升级到0024；如仍有stage=legacy旧申请，可在停止写入后通过Django shell删除这些申请及旧审核员／填写员组。仅按stage=legacy筛选，不能按日期或状态删除当前ECR／ECO。当前不提供额外清理命令，也不保留停用测试／脚本归档。本次两个清理备份目录已删除；早期其他备份属于各批历史证据，不代表本批备份仍存在。
+其他设备单独升级到0025；如仍有stage=legacy旧申请，可在停止写入后通过Django shell删除这些申请及旧审核员／填写员组。仅按stage=legacy筛选，不能按日期或状态删除当前ECR／ECO。当前不提供额外清理命令，也不保留停用测试／脚本归档。本次两个清理备份目录已删除；早期其他备份属于各批历史证据，不代表本批备份仍存在。
 
 ## 检查与排障
 

@@ -8,7 +8,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ChangeRequest, EcoFillerEvent
+from .models import ChangeRequest, EcoFillerEvent, EcoFillerInboxRead
 from .review_access import can_read_body, is_eco_coordinator, readable_change
 from .review_issues import StrictValues, canonical, conflict
 
@@ -79,3 +79,34 @@ class EcoFillerReceipt(APIView):
     def get(self, request, pk, request_id):
         event = get_object_or_404(EcoFillerEvent, eco_id=pk, request_id=request_id, actor=request.user)
         return Response(receipt(event))
+
+
+class EcoFillerInbox(APIView):
+    def get(self, request):
+        with transaction.atomic():
+            records = list(ChangeRequest.objects.select_for_update().filter(stage='eco', applicant=request.user).order_by('pk'))
+            reads = set(EcoFillerInboxRead.objects.filter(user=request.user).values_list('event_id', flat=True))
+            items = []
+            for record in records:
+                event = record.filler_events.select_related('actor').order_by('-pk').first()
+                if not event or event.kind not in ['create', 'transfer'] or event.filler_id != request.user.pk or event.actor_id == request.user.pk or event.pk in reads:
+                    continue
+                items.append({'event_id': event.pk, 'change_id': record.pk, 'title': record.title,
+                    'eco_no': record.eco_no, 'source_ecr_no': record.source_ecr.ecr_no,
+                    'kind': event.kind, 'actor_name': event.actor.get_full_name() or event.actor.username,
+                    'status': record.status})
+            return Response({'actor_id': request.user.pk, 'unread_count': len(items), 'items': items})
+
+
+class EcoFillerMarkRead(APIView):
+    def post(self, request):
+        if not isinstance(request.data, dict) or set(request.data) != {'event_id'} or type(request.data['event_id']) is not int or request.data['event_id'] < 1:
+            raise serializers.ValidationError('填写提醒编号无效。')
+        with transaction.atomic():
+            event = get_object_or_404(EcoFillerEvent, pk=request.data['event_id'])
+            record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=event.eco_id, stage='eco', applicant=request.user)
+            latest = record.filler_events.order_by('-pk').first()
+            if latest.pk != event.pk or event.filler_id != request.user.pk or event.kind not in ['create', 'transfer'] or event.actor_id == request.user.pk:
+                conflict('填写人或消息已变化，请刷新提醒。')
+            EcoFillerInboxRead.objects.get_or_create(user=request.user, event=event)
+        return Response({'read': True})

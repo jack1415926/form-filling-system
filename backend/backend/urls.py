@@ -24,7 +24,7 @@ from changes.submission_views import ReviewerList, ActionOwnerList
 from changes.review_views import ReviewList, ReviewDetail
 from changes.stage_workflow import StageDetail, StageSubmission, TaskDetail
 from changes.publication import PublicationList, AllPublicationList, PublicationDetail, CreateEco
-from changes.eco_filler import EcoFillerDetail, EcoFillerReceipt
+from changes.eco_filler import EcoFillerDetail, EcoFillerReceipt, EcoFillerInbox, EcoFillerMarkRead
 from changes.stage_navigation import StageNavigation, SourceEcr
 from changes.engineering_changes import EngineeringChanges
 from changes.review_inbox import ReviewInbox, MarkInboxRead
@@ -32,6 +32,8 @@ from changes.system_feedback_views import FeedbackList, FeedbackDetail, Feedback
 from changes.system_feedback_views import FeedbackFollowup, FollowupRequest, FeedbackInbox, FeedbackMarkRead
 
 urlpatterns = [
+    path('api/eco-filler/inbox/', EcoFillerInbox.as_view()),
+    path('api/eco-filler/inbox/read/', EcoFillerMarkRead.as_view()),
     path('api/engineering-changes/', EngineeringChanges.as_view()),
     path('api/publications/', AllPublicationList.as_view()),
     path('api/changes/<int:pk>/stage-navigation/', StageNavigation.as_view()),
