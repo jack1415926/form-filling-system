@@ -171,7 +171,7 @@ review_round冻结本轮标题、编号、时间和终态；action_task保存逐
 
 ## 正式审核修改意见（0014，已实现）
 
-独立系统反馈（0015）使用system_feedback及system_feedback_event，不属于Excel字段，不关联申请或审核轮次；反馈类型、文字、状态、公开处理记录及UUID／版本为系统新增字段。review_feedback仅保留历史表结构，旧单流程留言已随申请清理。0016另新增review_inbox_read，保存用户、轮次、消息批签名及已读时间，按用户／轮次唯一；不属于Excel字段，也不改变业务待办。当前字段与类型以models.py及迁移为准；[数据库ER图](design/DATABASE-ER-FULL.md)是0021历史快照。
+独立系统反馈（0015）使用system_feedback及system_feedback_event，不属于Excel字段，不关联申请或审核轮次；反馈类型、文字、状态、公开处理记录及UUID／版本为系统新增字段。review_feedback旧普通留言表及读取／展示兼容已在0027移除，现行正式意见仍使用review_issue及review_issue_event。0016另新增review_inbox_read，保存用户、轮次、消息批签名及已读时间，按用户／轮次唯一；不属于Excel字段，也不改变业务待办。当前字段与类型以models.py及迁移为准；[数据库ER文档及完整字段源](design/DATABASE-ER-FULL.md)已于2026-10-16按本机0027结构更新，旧图片仍为历史快照。
 
 系统新增内容，不属于Excel原字段。每条意见保存所属网页页签、可选题号／行动号／物料文字定位、具体问题、原提出者和来源轮次；定位不绑定可被删除的物料记录。review_issue保存状态和版本，review_issue_event追加回应、确认解决及继续修改过程。未解决项跨轮保留，重提冻结当前行动分配与批准人，原提出者确认解决后才允许正常批准。旧单流程普通留言业务已停用；独立系统反馈已由0015批次接入，与正式审核意见分别保存。[审核意见交付与验证](testing/REVIEW-ISSUES-2026-10-05.md)。
 

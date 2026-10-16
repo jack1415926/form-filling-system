@@ -1,6 +1,27 @@
-# 项目代码与数据流指南
+# 表单填报系统技术文档：架构、数据与处理流程
 
-更新日期：2026-10-13。功能与验证状态只维护在[README](../README.md)，业务规则见[MVP](MVP.md)，安装／启动／迁移见[开发说明](DEVELOPMENT.md)，原Excel坐标见[字段映射](FIELD_MAP.md)。本文保留接手代码需要的地图与机制。
+更新日期：2026-10-16。本文作为技术审阅入口，覆盖系统架构、代码模块、数据结构、保存链路和历史权限；当前代码与本机已应用迁移均为0027，无待应用迁移；0027移除旧普通留言表review_feedback。功能与验证状态见[README](../README.md)，业务规则见[MVP](MVP.md)，安装／启动／迁移见[开发说明](DEVELOPMENT.md)，原Excel坐标见[字段映射](FIELD_MAP.md)。
+
+## 系统架构
+
+系统将设计变更Excel工作表转换为网页，业务流程为ECR评估、批准与发布，再基于已发布ECR创建独立ECO执行流程。ECR和ECO各有自己的填写人、编号、任务、审核轮次及发布证据。
+
+| 层次 | 技术与职责 |
+| --- | --- |
+| 页面 | React、TypeScript、Ant Design；TanStack Query管理读取缓存，输入和保存队列分别管理 |
+| 前端服务 | Vite开发服务及构建；公司内网演示经前端代理访问/api |
+| 业务接口 | Django REST Framework；Session认证、CSRF校验、账号／申请／轮次／任务授权 |
+| 数据库 | MySQL 8.4、utf8mb4、InnoDB；事务、外键、唯一约束和检查约束共同维护数据一致性 |
+| 运行与更新 | Python虚拟环境、Node.js和PowerShell启动脚本；数据库结构通过Django迁移管理 |
+
+```mermaid
+flowchart LR
+    U[浏览器] --> F[React界面 / Vite]
+    F -->|/api代理| A[Django REST接口]
+    A -->|事务与约束| D[(MySQL)]
+```
+
+公司内网当前用于演示与审阅：只开放前端入口，后端和数据库保持本机监听；不是正式生产部署。账号、密钥、数据库和备份使用本机配置，不通过Git同步。当前访问地址和验证边界见[内网访问记录](COMPANY-LAN.md)。
 
 ## 代码地图：想改什么，先找哪里
 
@@ -8,11 +29,13 @@
 | --- | --- | --- |
 | 登录、工作台与页签 | App.tsx、api.ts | views.py、permissions.py、signals.py |
 | 基础概述与物料／处置 | App.tsx、MaterialEditor.tsx、DispositionFields.tsx | views.py、serializers.py、dispositions.py |
-| 27题 | QuestionEditor.tsx、questionDraft.ts | questions.py、views.py |
-| ECR／ECO任务 | StageWorkflow.tsx、ecrStage.ts；EcrEditor只读展示ECO来源 | stage_workflow.py、ecr.py／eco.py及两份行动JSON |
+| 27题及批量回答 | QuestionEditor.tsx、autosaveFields.ts、questionDraft.ts | questions.py、views.py |
+| ECR／ECO任务 | StageWorkflow.tsx、ecrStage.ts；ECO内EcrEditor只读展示来源ECR | stage_workflow.py、ecr.py／eco.py及两份行动JSON |
 | 发布与事务复制 | PublicationPanel.tsx、publication.ts | publication.py |
+| 整项永久删除 | EngineeringChanges、DeleteEngineeringChangeDialog、App.tsx | ChangeDetail.delete；先删关联ECO、再删ECR，保留事务和来源保护关系 |
 | 六阶段及来源摘要 | StageNavigation.tsx、stageNavigationData.ts | stage_navigation.py |
 | 正式意见与历史 | ReviewPanel.tsx、review.ts、ReviewWorkbench.tsx | review_access.py、review_views.py、review_issues.py |
+| 完整轮次快照 | RoundSnapshotForm.tsx、roundSnapshots.ts；独立只读缓存 | round_snapshots.py、ReviewRound.form_snapshot及0026迁移 |
 | 消息与已读 | ReviewInbox.tsx、reviewInboxData.ts | review_inbox.py |
 | EMC、计划、实质性评估 | EmcEditor、ExecutionPlanEditor、SignificantChangeEditor及对应草稿模块 | emc_views、execution_plan_views、significant_change_views及固定定义 |
 | 独立系统反馈 | SystemFeedbackPanel.tsx、systemFeedback.ts | system_feedback_views.py |
@@ -27,12 +50,12 @@
 | ECO交接 | eco_filler_event记录创建、历史基线及填写人交接；行动负责人及批准人集合另有三张关联表 |
 | 申请与基础 | change_request保存阶段、来源、编号和发布证据；material_change／material_disposition按物料与位置独立保存；question_response保存27题 |
 | 行动与轮次 | ecr_action_response／eco_action_response保存当前值；review_round冻结轮次；review_record保存参与关系；action_task按轮保存负责人／结果／确认；task_operation保存原请求回执 |
-| 意见与提醒 | review_issue／review_issue_event保留原提出者、回应与解决过程；review_feedback仅保留历史结构，旧单流程申请及留言数据已清理；review_inbox_read按账号／轮次保存消息签名 |
+| 意见与提醒 | review_issue／review_issue_event保留原提出者、回应与解决过程；旧普通留言表review_feedback已在0027移除；review_inbox_read按账号／轮次保存消息签名 |
 | 评估 | execution_plan_response保存11条计划；significant_assessment／significant_chart_response／significant_question_response分开保存人工总论、组论和逐题填写 |
 | EMC | emc_reference及row／test／cell四表保存本单定义和交叉格，复合外键防止跨参考关联 |
 | 系统反馈 | system_feedback／system_feedback_event／system_feedback_read保存独立双向沟通和入站已读版本 |
 
-当前0024为26个业务模型及3张人员关联表；[字段与关系快照](design/DATABASE-ER-FULL.md)仍是0021结构，不包含0022多人关联及0023交接记录。用户、会话、组、权限、迁移记录是系统表。八张Excel不等于八张数据库表，也不等于八个网页页签：概述／物料拆开，实质性主表／子表合为分组抽屉。
+2026-10-16只读核验：当前0027为26个业务模型及3张人员关联表，共29张业务表、230个实际字段，58条外键约束涉及60个外键列；0025增加ECO填写权限提醒的已读表，0026在review_round增加完整表单JSON快照。[完整字段与关系](design/DATABASE-ER-FULL.md)及其Mermaid源已更新到0027，包含多人关联、交接、提醒及完整快照；旧图片仍为历史结构；当前结构以models.py和迁移文件为准。用户、会话、组、权限、迁移记录是系统表。八张Excel不等于八张数据库表，也不等于八个网页页签：概述／物料拆开，实质性主表／子表合为分组抽屉。
 
 ## 一次保存怎样到达数据库
 
@@ -51,7 +74,11 @@ API总期限30秒覆盖CSRF、请求和响应正文；写超时是结果未确�
 
 ## 阶段与历史
 
-两阶段各自的填写表、编号、发布人和轮次独立。提交冻结任务，确认／意见解决决定批准，发布另有明确动作；ECO基于已发布ECR事务复制基础，结果只读引用。基础表没有完整逐轮快照，action_task和意见事件保存逐轮证据。退回表格显示当前分配，旧负责人和确认只在历史中解释。
+两阶段各自的填写表、编号、发布人和轮次独立。提交冻结正文快照与任务分配，确认／意见解决决定批准，发布另有明确动作；ECO基于已发布ECR事务复制基础（含27题答案和备注），来源结果只读引用。ECO后续修改不回写来源ECR；批量全是／全否仅在显式点击后修改当前记录，保留备注。
+
+0026起，新提交在同一事务和父申请锁内保存概述、各子表内容／定义及行动分配的版本化JSON；action_task和意见事件继续保存对应轮次的逐人结果与审核过程。重复请求不重写快照，新轮另存。批准／退回记录使用同一只读历史界面，快照缓存与当前正文分离，不能自动保存或读取正在修订的新正文。
+
+完整快照只向目标轮次参与者及已有正文职责的发起人、发布人、协调人员开放；新轮指派本身不能获得未参与旧轮的全文权限。旧轮没有快照时明确显示缺失，不用当前正文补造历史。已有完整快照时，逆迁移拒绝删除这些证据。
 
 导航不授予相邻阶段正文权限。仅ECO参与者的来源入口只读概述和行动结果；完整ECR历史仍受原权限控制。完整流程见[阶段图](design/STAGES-CURRENT.md)。
 

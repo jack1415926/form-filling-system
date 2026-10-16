@@ -58,7 +58,7 @@ class EngineeringChangesTests(PublicationFixture, TestCase):
         self.assertEqual(group['ecr']['status'], 'published')
         self.assertEqual(group['eco']['id'], eco.pk)
         self.assertEqual(group['eco']['status'], 'draft')
-        self.assertFalse(group['can_create_eco']); self.assertFalse(group['can_delete_ecr'])
+        self.assertFalse(group['can_create_eco']); self.assertTrue(group['can_delete_ecr'])
         self.assertEqual([row['id'] for row in self.listing('ecr', 'draft')], [other.pk])
         self.assertEqual([row['id'] for row in self.listing('eco', 'draft')], [self.source.pk])
         self.assertEqual(self.listing('eco', 'published'), [])

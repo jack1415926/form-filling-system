@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ChangeRequest, ReviewRound, ReviewRecord, ReviewFeedback, ActionTask
+from .models import ChangeRequest, ReviewRound, ReviewRecord, ActionTask
 from .permissions import ExpectedAccountPermission
 from .review_access import is_owner, eligible, can_read_round, reviewer_rounds, is_publication_reader, is_eco_coordinator
 from .serializers import ChangeRequestSerializer
@@ -47,20 +47,17 @@ def review_data(record, round, user):
     opinion_owner = record.review_issues.filter(author=user).exclude(state='resolved').exists()
     may_view = current and (owner or is_publication_reader(user, record) or is_eco_coordinator(user, record) or record.status in ['pending', 'approved', 'published'] and allowed)
     rounds = [row for row in record.review_rounds.order_by('number') if can_read_round(user, row)]
-    notes = ReviewFeedback.objects.filter(round__in=rounds).select_related('author', 'round').order_by('created_at', 'id')
     return {'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'current_round': record.current_review_round,
             'round': round_data(round), 'is_current': current, 'can_view_form': may_view,
             'can_approve': (approver and tasks_complete) and may_review and not record.review_issues.exclude(state='resolved').exists() and not round.records.filter(reviewer=user, approved_at__isnull=False).exists(),
             'can_return': may_review and (task_owner or opinion_owner or approver),
-            'can_add_issue': task_owner or approver, 'can_feedback': False,
+            'can_add_issue': task_owner or approver,
             'issues': issue_data(record, round, user, owner, allowed, current),
             'unresolved_count': record.review_issues.exclude(state='resolved').count() if current else 0,
             'issue_blockers': blockers(record) if current else [],
             'confirmed_requests': [str(value) for value in record.issue_events.filter(author=user, round=round).values_list('request_id', flat=True).distinct()],
             'form': ChangeRequestSerializer(record).data if may_view else None,
-            'history': [round_data(row) for row in rounds],
-            'feedback': [{'id': note.pk, 'round_number': note.round.number, 'author': person(note.author),
-                          'text': note.text, 'request_id': str(note.request_id), 'created_at': note.created_at.isoformat()} for note in notes]}
+            'history': [round_data(row) for row in rounds]}
 
 
 class ReviewList(APIView):
@@ -86,24 +83,6 @@ class ReviewList(APIView):
         return Response([{'change_id': row.change_id, **round_data(row)} for row in rows.select_related('change', 'returned_by').distinct().order_by('-submitted_at', '-pk')])
 
 
-class TextValues(serializers.Serializer):
-    text = serializers.CharField(max_length=10000, allow_blank=False)
-    request_id = serializers.UUIDField(required=False)
-
-    def to_internal_value(self, data):
-        if not isinstance(data, dict):
-            raise serializers.ValidationError({'detail': '请求内容必须是对象。'})
-        allowed = {'text', 'request_id'} if self.context.get('feedback') else {'text'}
-        forbidden = set(data) - allowed
-        if forbidden:
-            raise serializers.ValidationError({key: '此字段不允许修改。' for key in forbidden})
-        if not isinstance(data.get('text'), str):
-            raise serializers.ValidationError({'text': '必须是非空文字。'})
-        if self.context.get('feedback') and not data.get('request_id'):
-            raise serializers.ValidationError({'request_id': '反馈必须携带重试标识。'})
-        return super().to_internal_value(data)
-
-
 class ReviewDetail(APIView):
     permission_classes = [IsAuthenticated, ExpectedAccountPermission]
     http_method_names = ['get', 'post', 'head', 'options']
@@ -123,10 +102,8 @@ class ReviewDetail(APIView):
             return Response(review_data(record, round, request.user))
 
     def post(self, request, pk, number, action=None):
-        if action not in ['approve', 'return', 'feedback', 'respond', 'resolve']:
+        if action not in ['approve', 'return', 'respond', 'resolve']:
             raise NotFound()
-        if action == 'feedback':
-            return Response({'detail': '普通留言已停止新增，历史留言只读保留。'}, status=409)
         serializer = (ApproveValues if action == 'approve' else ReturnValues if action == 'return' else IssueActionValues)(data=request.data)
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data

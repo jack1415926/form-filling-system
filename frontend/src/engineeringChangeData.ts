@@ -18,7 +18,7 @@ export function checkedEngineering(value: unknown, actor: number): EngineeringDa
     checkedNavigation({ actor_id: actor, current_change_id: row.id, stages: [row.ecr, row.eco] }, row.id, actor)
     if (row.ecr.id !== row.id || !row.ecr.can_open && !row.eco.can_open
       || row.can_create_eco && (!row.ecr.can_open || row.ecr.status !== 'published' || row.eco.status !== 'not_created')
-      || row.can_delete_ecr && (!row.ecr.can_open || row.ecr.status !== 'draft')) return invalid()
+      || row.can_delete_ecr && !row.ecr.can_open) return invalid()
   }
   return data
 }

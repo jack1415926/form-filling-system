@@ -23,7 +23,8 @@ import StageNavigation, { SourceOverview } from './StageNavigation'
 import EngineeringChanges from './EngineeringChanges'
 import EcoFillerInbox from './EcoFillerInbox'
 import InactiveEcoSheet from './InactiveEcoSheet'
-import { processMenu, processStates, type ProcessFilter } from './engineeringChangeData'
+import { processMenu, processStates, type ProcessFilter, type EngineeringChange } from './engineeringChangeData'
+import DeleteEngineeringChangeDialog from './DeleteEngineeringChangeDialog'
 import { submissionChoiceWarning } from './submission'
 import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
@@ -262,6 +263,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
   const reviewAllowed = canReview(user)
   useEffect(() => { queryClient.setQueryData(['workspace-section'], section); return () => { queryClient.removeQueries({ queryKey: ['workspace-section'] }) } }, [section, queryClient])
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState<EngineeringChange | null>(null)
   const [inboxTargetId, setInboxTargetId] = useState<number | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -298,11 +300,18 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
     void queryClient.invalidateQueries({ queryKey: ['changes', user.id] })
   }
   const remove = useMutation({
-    mutationFn: (id: number) => api<void>(`/api/changes/${id}/`, 'DELETE', undefined, user.id),
-    onSuccess: (_, id) => { refreshAfterRemoval(id); message.success('草稿申请已删除') },
-    onError: (error, id) => { if (error instanceof ApiError && error.status === 404) refreshAfterRemoval(id) },
+    mutationFn: ({ row, deleteEco }: { row: EngineeringChange; deleteEco: boolean }) => api<void>(`/api/changes/${row.id}/`, 'DELETE', { confirm_delete: true, delete_eco: deleteEco, expected_eco_id: row.eco.id }, user.id),
+    onSuccess: (_, { row }) => {
+      for (const id of [row.id, row.eco.id].filter((id): id is number => id !== null)) {
+        refreshAfterRemoval(id)
+        for (const resource of ['stage-workflow', 'stage-navigation', 'publication', 'eco-filler', 'source-ecr', 'review-round', 'round-form-snapshot']) queryClient.removeQueries({ queryKey: [resource, user.id, id] })
+      }
+      for (const resource of ['review-inbox', 'review-list', 'eco-filler-inbox', 'publications']) void queryClient.invalidateQueries({ queryKey: [resource, user.id] })
+      setDeleting(null); message.success('整项工程变更已永久删除')
+    },
+    onError: (error, { row }) => { if (error instanceof ApiError && [404, 409].includes(error.status)) refreshAfterRemoval(row.id) },
   })
-  useEffect(() => { onLeaving(exit.isPending || confirming); return () => onLeaving(false) }, [exit.isPending, confirming, onLeaving])
+  useEffect(() => { onLeaving(exit.isPending || confirming || deleting !== null); return () => onLeaving(false) }, [exit.isPending, confirming, deleting, onLeaving])
   useEffect(() => {
     const handedOff = (event: Event) => {
       const detail = (event as CustomEvent<{ actor_id: number; change_id: number }>).detail
@@ -313,7 +322,7 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
     window.addEventListener('eco-filler-handed-off', handedOff)
     return () => window.removeEventListener('eco-filler-handed-off', handedOff)
   }, [user.id, selectedId, queryClient])
-  const listBusy = create.isPending || exit.isPending || remove.isPending || reauthBusy
+  const listBusy = create.isPending || exit.isPending || remove.isPending || reauthBusy || deleting !== null
   const navigateApplication = (action: () => void) => {
     if (saving || listBusy || confirming || reauthenticate) return
     if (!dirty) { action(); return }
@@ -361,7 +370,8 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
       </> : section === 'review' ? reviewAllowed ? <ReviewWorkbench user={user} target={reviewTarget} onSelect={setReviewTarget} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBusy={setSaving} onDirty={setDirty} renderForm={(record, onBack, formState) => <ConfigProvider theme={reviewReadOnlyTheme}><ChangeEditor key={record.id} reviewOnly record={record} onOpenChange={id => navigate(() => { setReviewTarget(null); setSection('mine'); setSelectedId(id) })} onDirty={formState.onDirty} onBusy={formState.onBusy} onLeaveMessage={() => {}} leaving={formState.leaving} onReauthenticate={onReauthenticate} onBack={onBack} onSaved={() => {}} /></ConfigProvider>} /> : <Alert type="warning" title="处理权限已撤销，不能继续访问他人申请。" action={<Button onClick={() => changeSection('home')}>返回工作台首页</Button>} /> : selectedId === null ? <>
         {create.error && <Alert type="error" title={create.error.message} className="form-alert" />}
         {remove.error && <Alert type="error" showIcon title={remove.error instanceof ApiError && remove.error.status === 404 ? '申请已不存在或不可访问，列表已刷新' : '删除失败，申请记录仍保留'} description={remove.error instanceof ApiError && remove.error.status === 404 ? undefined : remove.error.message} className="form-alert" />}
-        <EngineeringChanges user={user} workflow={processFilter} state={statusFilter} onWorkflow={setProcessFilter} onState={setStatusFilter} busy={listBusy} creating={create.isPending} removing={remove.isPending ? remove.variables : undefined} onCreate={() => create.mutate()} onOpen={id => setSelectedId(id)} onDelete={row => { remove.reset(); modal.confirm({ title: '删除这条ECR草稿？', content: <><p>{row.title || '未命名工程变更'}</p><p>ECR：{row.ecr.number || '未填写'}</p><p>该ECR草稿及关联填写数据将永久删除，无法恢复。</p></>, okText: '永久删除', cancelText: '取消', okButtonProps: { danger: true }, onOk: async () => { try { await remove.mutateAsync(row.id) } catch { /* Render the error beside the list. */ } } }) }} />
+        <EngineeringChanges user={user} workflow={processFilter} state={statusFilter} onWorkflow={setProcessFilter} onState={setStatusFilter} busy={listBusy} creating={create.isPending} removing={remove.isPending ? remove.variables.row.id : undefined} onCreate={() => create.mutate()} onOpen={id => setSelectedId(id)} onDelete={row => { remove.reset(); setDeleting(row) }} />
+        {deleting && <DeleteEngineeringChangeDialog key={deleting.id} row={deleting} pending={remove.isPending} error={remove.error} onCancel={() => { if (!remove.isPending) setDeleting(null) }} onConfirm={deleteEco => remove.mutate({ row: deleting, deleteEco })} />}
       </> : detail.data ? <>
         {detail.error && <Alert type="error" showIcon title="申请信息刷新失败，当前填写内容仍保留" description={detail.error.message} className="form-alert" action={<Button loading={detail.isFetching} disabled={saving || exit.isPending} onClick={() => void detail.refetch()}>重试</Button>} />}
         <ChangeEditor onOpenChange={id => navigate(() => { setInboxTargetId(null); setSelectedId(id) })} initialReviewOpen={inboxTargetId === selectedId} onLeaveMessage={setLeaveMessage} key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBack={() => navigate(() => { setDirty(false); setInboxTargetId(null); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />

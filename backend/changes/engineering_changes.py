@@ -57,7 +57,7 @@ class EngineeringChanges(APIView):
                     'id': source_id, 'title': eco.title if workflow == 'eco' and eco_visible else source.title,
                     'ecr': ecr_summary, 'eco': eco_summary,
                     'can_create_eco': is_ecr_coordinator(actor, source) and eco is None,
-                    'can_delete_ecr': ecr_visible and source.applicant_id == actor.pk and source.status == 'draft',
+                    'can_delete_ecr': ecr_visible and source.applicant_id == actor.pk,
                 })
             result.sort(key=lambda item: (max(
                 row.updated_at for row in [sources[item['id']], ecos.get(item['id'])]

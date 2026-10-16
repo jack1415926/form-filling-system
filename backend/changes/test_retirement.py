@@ -1,6 +1,8 @@
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.apps import apps
+from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -19,6 +21,22 @@ class RetirementTests(TestCase):
         self.round = ReviewRound.objects.create(change=self.old, number=1, title='retired', ecr_no='', review_mode='public', submitted_at=timezone.now())
         ReviewRecord.objects.create(change=self.old, round=self.round, reviewer=self.other)
         self.current = ChangeRequest.objects.create(applicant=self.owner, title='current')
+
+    def test_old_plain_feedback_model_table_and_api_are_removed(self):
+        with self.assertRaises(LookupError):
+            apps.get_model('changes', 'ReviewFeedback')
+        self.assertNotIn('review_feedback', connection.introspection.table_names())
+        self.current.status = 'pending'; self.current.current_review_round = 1; self.current.save()
+        ReviewRound.objects.create(change=self.current, number=1, title='Current', ecr_no='',
+                                   review_mode='designated', submitted_at=timezone.now())
+        path = f'/api/changes/{self.current.pk}/review-rounds/1/'
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('feedback', response.data)
+        self.assertNotIn('can_feedback', response.data)
+        self.assertIn('issues', response.data)
+        self.assertIn('history', response.data)
+        self.assertEqual(self.client.post(path + 'feedback/', {'text': 'retired'}, format='json').status_code, 404)
 
     def test_retired_requests_are_hidden_even_for_owner_and_assignee(self):
         self.assertEqual(self.current.stage, 'ecr')

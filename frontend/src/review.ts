@@ -10,14 +10,13 @@ export type RoundInfo = {
   submitted_at: string; approved_at: string | null; returned_at: string | null; returned_by: Reviewer | null; return_reason: string
   reviewers: Reviewer[]; approvals: (Reviewer & { approved_at: string })[]
 }
-export type Feedback = { id: number; round_number: number; author: Reviewer; request_id: string; text: string; created_at: string }
 export type ReviewIssue = { id: number; tab: string; location: string; text: string; source_round: number; author: Reviewer; state: 'awaiting_reply' | 'awaiting_review' | 'resolved'; version: number; can_respond: boolean; can_resolve: boolean; can_reject: boolean; events: { kind: string; text: string; state: string; version: number; round_number: number; author_id: number; request_id: string; created_at: string }[] }
 export type IssueInput = { tab?: string; location?: string; text: string; issue_id?: number; version?: number }
 export type ReplyDraft = { text: string; version: number }
 export function editReply(current: ReplyDraft | undefined, text: string, version: number): ReplyDraft {
   return { text, version: current?.text ? current.version : version }
 }
-export type ReviewData = { can_add_issue?: boolean; change_id: number; updated_at: string; current_round: number; round: RoundInfo; is_current: boolean; can_view_form: boolean; can_approve: boolean; can_return: boolean; can_feedback: boolean; form: ChangeRequest | null; history: RoundInfo[]; feedback: Feedback[]; issues: ReviewIssue[]; unresolved_count: number; issue_blockers: string[]; confirmed_requests: string[] }
+export type ReviewData = { can_add_issue?: boolean; change_id: number; updated_at: string; current_round: number; round: RoundInfo; is_current: boolean; can_view_form: boolean; can_approve: boolean; can_return: boolean; form: ChangeRequest | null; history: RoundInfo[]; issues: ReviewIssue[]; unresolved_count: number; issue_blockers: string[]; confirmed_requests: string[] }
 export function reviewChangeSnapshot(current: ChangeRequest | undefined, data: ReviewData): ChangeRequest | undefined {
   if (data.form) return newestResponse(current, { ...data.form, body_access: true })
   if (!current || !data.is_current || data.current_round !== current.current_review_round
@@ -69,9 +68,8 @@ export function checkedReview(value: unknown, id: number, number: number): Revie
   const valid = object(value) && value.change_id === id && date(value.updated_at) && Number.isSafeInteger(value.current_round)
     && validRound(value.round) && (value.round as RoundInfo).number === number
     && (value.can_add_issue === undefined || typeof value.can_add_issue === 'boolean')
-    && ['is_current', 'can_view_form', 'can_approve', 'can_return', 'can_feedback'].every((key) => typeof value[key] === 'boolean')
+    && ['is_current', 'can_view_form', 'can_approve', 'can_return'].every((key) => typeof value[key] === 'boolean')
     && Array.isArray(value.history) && value.history.every(validRound)
-    && Array.isArray(value.feedback) && value.feedback.every((row) => object(row) && Number.isSafeInteger(row.id) && person(row.author) && typeof row.request_id === 'string' && typeof row.text === 'string' && date(row.created_at))
     && Array.isArray(value.issues) && value.issues.every((row) => object(row) && Number.isSafeInteger(row.id) && Number(row.id) > 0 && person(row.author)
       && typeof row.tab === 'string' && row.tab in issueTabs && typeof row.location === 'string' && typeof row.text === 'string'
       && Number.isSafeInteger(row.source_round) && Number(row.source_round) > 0 && Number.isSafeInteger(row.version) && Number(row.version) > 0

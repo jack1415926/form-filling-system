@@ -1,6 +1,6 @@
 # 安装、启动、更新与检查
 
-更新日期：2026-10-14。技术基线为Node.js 24、Python 3.14、MySQL 8.4、PowerShell 7；依赖以backend/requirements.txt和frontend/package-lock.json为准。当前迁移终点0026。功能和验收状态见[README](../README.md)，历史验证见[索引](testing/README.md)。
+更新日期：2026-10-16。技术基线为Node.js 24、Python 3.14、MySQL 8.4、PowerShell 7；依赖以backend/requirements.txt和frontend/package-lock.json为准。当前迁移终点0027，本机form_system已应用全部迁移，无待应用迁移；0027删除旧普通留言表review_feedback，其他设备须先核对该表是否还有需要保留的旧留言，再执行升级。完整结构见[字段与关系](design/DATABASE-ER-FULL.md)。功能和验收状态见[README](../README.md)，历史验证见[索引](testing/README.md)。
 
 ## 首次安装
 
@@ -49,7 +49,20 @@ pwsh -NoProfile -File .\scripts/backend.ps1 createsuperuser
 
 ## 日常启动与停止
 
-MySQL服务名以当前设备核对为准，启动需要管理员权限；不为启动改自启动类型。当前电脑按用户2026-10-13要求保持MySQL Running／Manual，后续验证结束不停止它。
+2026-10-16新增普通用户内网启动入口（不需要 Windows 管理员权限）：
+
+```powershell
+pwsh -NoProfile -File scripts/start-lan.ps1
+# 多块网卡时用 -LanIp 指定本机当前内网 IPv4
+```
+
+脚本读取本机配置、识别当前地址，前端监听 `0.0.0.0:5173`，后端和数据库保持本机连接。IP 允许列表及 CSRF 来源通过进程环境传给新启动的后端，不改写本地配置；前端代理优先使用进程的 BACKEND_PORT。已有服务经代理／CSRF校验通过则复用；旧服务配置不匹配时明确提示先停止，不自动结束已有进程。用户启动的后台服务可在任务管理器按项目进程路径及命令行确认后结束；前台启动仍使用 Ctrl+C。
+
+若 MySQL 未运行，本机已有的 `.local/mysql/start.ps1` 可作为普通用户启动 127.0.0.1:3307 实例及网页；该本机脚本、MySQL 安装和数据不随 Git 分发。其他设备若没有该启动器，应先由用户启动自己的 MySQL 实例，再运行此入口。不会安装或启动需要管理员权限的 Windows 系统服务，也不改防火墙。首次使用其他设备仍按上文完成环境配置；跨电脑访问需现有防火墙／公司网络允许，见[内网说明](COMPANY-LAN.md)。
+
+五种状态测试数据：`pwsh -NoProfile -File scripts/test-data.ps1`，可选择流程、状态和已有账号，详见[测试数据说明](TEST-DATA.md)。
+
+以下为旧系统服务启动方式：MySQL服务名以当前设备核对为准，启动需要管理员权限；不为启动改自启动类型。当前应优先使用上面的普通用户实例；2026-10-13的MySQL Running／Manual为历史记录，后续验证结束仍不停止用户的数据库。
 
 在根目录终端启动后端：
 
@@ -71,13 +84,13 @@ pwsh -NoProfile -File .\scripts/backend.ps1 showmigrations changes
 pwsh -NoProfile -File .\scripts/backend.ps1 check --database default
 ```
 
-确认迁移至0026后重启前后端。0019已有新阶段／任务、0020已有发布／来源、0021已有ECO任务／补充／发布、0022已有多人负责人／任务或指定批准记录、0023已有真实ECO创建或交接记录、0026已有完整轮次快照时，逆迁移拒绝丢失证据；不要删除数据绕过守卫。0026不回填旧轮次，完整历史从升级后的新提交开始保存。备份是否完成和是否做过恢复演练是不同事实。
+确认迁移至0027后重启前后端。0019已有新阶段／任务、0020已有发布／来源、0021已有ECO任务／补充／发布、0022已有多人负责人／任务或指定批准记录、0023已有真实ECO创建或交接记录、0026已有完整轮次快照时，逆迁移拒绝丢失证据；不要删除数据绕过守卫。0026不回填旧轮次，完整历史从升级后的新提交开始保存。0027会删除review_feedback表及其中的旧普通留言，回退迁移只能重建空表，不能恢复原留言；本机执行前已确认该表为空，其他设备须单独核对。备份是否完成和是否做过恢复演练是不同事实。
 
 `.venv`、`.local`、数据库、账号／密码、样例、原Excel及截图不随Git同步。项目移动后解释器启动失败，先核对`.venv/pyvenv.cfg`和安装Python位置，再重建虚拟环境，不删除配置或数据库。本机测试凭据统一在`.local/accounts.json`，按真实账号ID去重，不记录role；不随Git同步，其他设备自行配置。旧账号配置及停用脚本已删除。
 
 ## 清理其他设备的旧单流程
 
-其他设备单独升级到0026；如仍有stage=legacy旧申请，可在停止写入后通过Django shell删除这些申请及旧审核员／填写员组。仅按stage=legacy筛选，不能按日期或状态删除当前ECR／ECO。当前不提供额外清理命令，也不保留停用测试／脚本归档。本次两个清理备份目录已删除；早期其他备份属于各批历史证据，不代表本批备份仍存在。
+其他设备单独升级到0027；如仍有stage=legacy旧申请，可在停止写入后通过Django shell删除这些申请及旧审核员／填写员组。仅按stage=legacy筛选，不能按日期或状态删除当前ECR／ECO。当前不提供额外清理命令，也不保留停用测试／脚本归档。本次两个清理备份目录已删除；早期其他备份属于各批历史证据，不代表本批备份仍存在。
 
 ## 检查与排障
 

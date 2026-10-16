@@ -2,6 +2,7 @@ from .review_access import readable_change, editable_change
 import json
 
 from django.contrib.auth import authenticate, login, logout
+from django.conf import settings
 from django.db import transaction
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
@@ -21,10 +22,30 @@ from .questions import QUESTIONS
 from .dispositions import LOCATIONS
 from .permissions import account_changed
 from .roles import can_manage_feedback, can_review
+from rest_framework import serializers
+
+
+class DeleteChangeValues(serializers.Serializer):
+    confirm_delete = serializers.BooleanField(default=False)
+    delete_eco = serializers.BooleanField(default=False)
+    expected_eco_id = serializers.IntegerField(min_value=1, allow_null=True, required=False)
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict) or set(data) - set(self.fields):
+            raise serializers.ValidationError({'detail': '删除请求格式错误或包含未知字段。'})
+        if data.get('expected_eco_id') is not None and type(data['expected_eco_id']) is not int:
+            raise serializers.ValidationError({'expected_eco_id': '必须为整数或空值。'})
+        return super().to_internal_value(data)
+
+    def validate(self, values):
+        for field in ['confirm_delete', 'delete_eco']:
+            if field in self.initial_data and type(self.initial_data[field]) is not bool:
+                raise serializers.ValidationError({field: '必须为布尔值。'})
+        return values
 
 
 def user_data(user):
-    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "can_review": can_review(user), "can_manage_feedback": can_manage_feedback(user)}
+    return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "can_review": can_review(user), "can_manage_feedback": can_manage_feedback(user), "can_generate_test_data": settings.DEBUG}
 
 
 @require_GET
@@ -103,12 +124,24 @@ class ChangeDetail(generics.RetrieveUpdateAPIView):
             return Response(serializer.data)
 
     def delete(self, request, *args, **kwargs):
+        values = DeleteChangeValues(data=request.data)
+        values.is_valid(raise_exception=True)
+        data = values.validated_data
         with transaction.atomic():
+            if not request.user.is_active:
+                return Response({'detail': '申请不存在或没有删除权限。'}, status=404)
             record = editable_change(request, kwargs["pk"])
             if record.stage == 'eco':
-                return Response({'detail': '关联ECO不能删除，请在草稿中修订。'}, status=409)
-            if record.status != ChangeRequest.Status.DRAFT:
-                return Response({"detail": "只能删除草稿申请。"}, status=status.HTTP_409_CONFLICT)
+                return Response({'detail': '请由来源ECR发起人从ECR入口删除整项工程变更。'}, status=409)
+            if record.status != ChangeRequest.Status.DRAFT and not data['confirm_delete']:
+                return Response({'detail': '请确认永久删除整项工程变更及其历史记录。'}, status=409)
+            eco = ChangeRequest.objects.select_for_update().filter(source_ecr=record).first()
+            if 'expected_eco_id' in data and data['expected_eco_id'] != (eco.pk if eco else None):
+                return Response({'detail': '关联ECO已变化，请刷新列表后重新确认删除范围。'}, status=409)
+            if eco:
+                if not data['confirm_delete'] or not data['delete_eco'] or data.get('expected_eco_id') != eco.pk:
+                    return Response({'detail': '此ECR有关联ECO，必须确认同时删除该ECO；否则保留整个工程变更。'}, status=409)
+                eco.delete()
             record.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 

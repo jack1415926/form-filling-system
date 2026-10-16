@@ -100,7 +100,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
     {!data ? query.isPending && <Spin tip="正在读取审核轮次…"><div className="loading-space" /></Spin> : <>
       {compact && <section className="panel material-section">
         <div className="section-heading"><span>第{data.round.number}轮审核 · {labels[data.round.state]}</span><Button disabled={busy || !!confirm || leaving} onClick={openReview}>查看审核历史与意见</Button></div>
-        <p className="muted">各轮审核、修改回应和历史留言保留；已批准申请的记录只读。</p>
+        <p className="muted">各轮审核、修改意见和回应保留；已批准申请的记录只读。</p>
         {data.round.required_approvers?.some(person => person.id === actor.id) && data.round.state === 'pending' && <><p>{approvalProgress(data.round)}</p><Button type="primary" disabled={!!approvalReason} onClick={() => setConfirm('approve')}>本人同意批准</Button>{approvalReason && <p className="muted">{approvalReason}</p>}</>}
       </section>}
       {!compact && <section className="panel list-panel material-section">
@@ -155,7 +155,6 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
           {round.tasks?.map(task => <div key={`${task.action_key}:${task.owner.id}`}><p>{task.action_key} · {task.owner.display_name} · {task.confirmed_at ? '已确认' : '未确认'} · {task.date || '未填日期'}</p><p className="question-text">{task.result || '未填结果'} · {task.status || '未填业务状态'}</p>{task.confirmed_at && <p>确认时间：{new Date(task.confirmed_at).toLocaleString('zh-CN')}</p>}</div>)}
           {round.approved_at && <p>本流程批准：{new Date(round.approved_at).toLocaleString('zh-CN')}</p>}
         </section>)}
-        <h3>历史留言，只读</h3>{data.feedback.map((note) => <div className="review-note" key={note.id}><strong>第{note.round_number}轮 · {note.author.display_name}</strong><span className="muted"> · {new Date(note.created_at).toLocaleString('zh-CN')}</span><p className="question-text">{note.text}</p></div>)}
       </Drawer>
     </>}
     <Modal open={!!confirm} title={confirm === 'return' ? '确认多条意见并退回本流程？' : '同意批准本流程？'} okText={confirm === 'return' ? '确认退回' : '确认批准'} cancelText="继续检查" onCancel={() => setConfirm(null)} okButtonProps={{ disabled: confirm === 'return' && !validDrafts, danger: confirm === 'return' }} onOk={() => { if (confirm) void perform(newAction(confirm, confirm === 'return' ? { issues: drafts.map((row) => ({ ...row, text: row.text.trim() })) } : {})) }}>

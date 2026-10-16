@@ -28,11 +28,13 @@ from changes.publication import PublicationList, AllPublicationList, Publication
 from changes.eco_filler import EcoFillerDetail, EcoFillerReceipt, EcoFillerInbox, EcoFillerMarkRead
 from changes.stage_navigation import StageNavigation, SourceEcr
 from changes.engineering_changes import EngineeringChanges
+from changes.test_case_views import TestCaseCreate
 from changes.review_inbox import ReviewInbox, MarkInboxRead
 from changes.system_feedback_views import FeedbackList, FeedbackDetail, FeedbackRequest, ManagedList, ManagedDetail, ManagedAction, ManagedRequest
 from changes.system_feedback_views import FeedbackFollowup, FollowupRequest, FeedbackInbox, FeedbackMarkRead
 
 urlpatterns = [
+    path('api/test-cases/', TestCaseCreate.as_view()),
     path('api/eco-filler/inbox/', EcoFillerInbox.as_view()),
     path('api/eco-filler/inbox/read/', EcoFillerMarkRead.as_view()),
     path('api/engineering-changes/', EngineeringChanges.as_view()),

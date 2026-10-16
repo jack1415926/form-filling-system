@@ -1,4 +1,4 @@
-export type User = { id: number; username: string; display_name: string; can_review?: boolean; can_manage_feedback?: boolean }
+export type User = { id: number; username: string; display_name: string; can_review?: boolean; can_manage_feedback?: boolean; can_generate_test_data?: boolean }
 export type Overview = {
   title: string; ecr_no: string; eco_no: string; affected_products: string
   affected_region: string; initiating_factory: string; affected_factories: string

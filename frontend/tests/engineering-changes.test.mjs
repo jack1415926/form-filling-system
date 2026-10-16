@@ -19,6 +19,13 @@ test('关联列表允许来源摘要但拒绝错账号、重复记录、隐藏�
   assert.throws(() => checkedEngineering({ actor_id: 9, items: [malformed] }, 9))
 })
 
+test('发起人的删除能力可用于所有流程状态，但不可用于无来源正文权限的记录', () => {
+  for (const status of ['draft', 'pending', 'returned', 'approved', 'published']) {
+    const item = row(); item.ecr = summary('ecr', 1, status); item.can_delete_ecr = true
+    assert.equal(checkedEngineering({ actor_id: 9, items: [item] }, 9).items[0].can_delete_ecr, true)
+  }
+})
+
 test('两份流程均保留八表导航且自己的进度不受另一流程影响', () => {
   for (const stage of ['ecr', 'eco']) {
     const flat = processMenu(stage).flatMap(item => item.children ?? [item])

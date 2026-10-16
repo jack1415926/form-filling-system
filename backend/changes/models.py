@@ -168,18 +168,6 @@ class TaskOperation(models.Model):
         constraints = [models.UniqueConstraint(fields=['task', 'author', 'request_id'], name='task_request_receipt')]
 
 
-class ReviewFeedback(models.Model):
-    round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE, related_name="feedback")
-    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
-    request_id = models.UUIDField()
-    text = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "review_feedback"
-        constraints = [models.UniqueConstraint(fields=["round", "author", "request_id"], name="review_unique_feedback")]
-
-
 class ReviewInboxRead(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE)
