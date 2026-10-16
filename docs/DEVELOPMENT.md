@@ -1,12 +1,49 @@
-# 安装、启动、更新与检查
+# 安装、启动与维护
 
-更新日期：2026-10-16。技术基线为Node.js 24、Python 3.14、MySQL 8.4、PowerShell 7；依赖以backend/requirements.txt和frontend/package-lock.json为准。当前迁移终点0027，本机form_system已应用全部迁移，无待应用迁移；0027删除旧普通留言表review_feedback，其他设备须先核对该表是否还有需要保留的旧留言，再执行升级。完整结构见[字段与关系](design/DATABASE-ER-FULL.md)。功能和验收状态见[README](../README.md)，历史验证见[索引](testing/README.md)。
+更新日期：2026-10-16。**这台电脑已经配置好，平时直接看第一节。** 换电脑或从未安装过项目，才需要执行“首次安装”。本页用于开发和内网演示，正式部署另行安排。
 
-## 首次安装
+## 平时启动：只执行这一条
 
-克隆仓库并进入项目目录后，核对`node --version`、`python --version`及PowerShell 7。SSH不可用时用HTTPS；需要代理时仅给当前安装／Git进程配置，不修改全局Git代理。已有环境正常时不重新安装。
+在项目根目录打开 **PowerShell 7**。根目录就是同时包含README.md、backend、frontend、scripts的目录。
 
-在MySQL中创建utf8mb4／InnoDB开发库及本机应用账号；示例密码必须替换：
+```powershell
+pwsh -NoProfile -File scripts/start-lan.ps1
+```
+
+脚本会检查数据库，启动前后端，并打印可打开的地址。正常情况下会出现以下一种结果：
+
+| 输出 | 含义及下一步 |
+| --- | --- |
+| 内网入口：http://某个IP:5173/ | 已启动并通过本机代理／CSRF检查，打开这个地址 |
+| 已有服务可用，内网入口：… | 服务已在运行，直接打开；这不是重新加载后端代码 |
+| 请用-LanIp指定当前内网IPv4 | 存在多个地址；在同一命令末尾加-LanIp和提示列表中实际要使用的地址 |
+| 网页端口已有监听，请先停止… | 现有服务未通过检查；按下一节停止当前项目前后端后，再执行启动命令 |
+| MySQL未启动／缺少本机配置 | 按“首次安装”核对配置与数据库；其他电脑需先启动自己的MySQL |
+
+自己在服务电脑上也可打开 **[http://localhost:5173/](http://localhost:5173/)**。同事使用脚本输出的内网地址；保持前端地址一致，避免在同一操作中混用localhost和127.0.0.1。
+
+这条命令会把前后端放到后台运行，命令返回或关闭PowerShell后，网页服务仍会运行。它不会自动安装依赖、迁移数据库、重启已有服务或修改防火墙。
+
+本机的特殊情况：MySQL配置为127.0.0.1:3307且存在`.local/mysql/start.ps1`时，数据库未运行会调用该启动器。该启动器只保存在这台电脑上，不随Git分发。其他电脑先启动已安装的MySQL，再运行上述命令。
+
+## 停止与重启
+
+| 启动方式 | 停止方法 |
+| --- | --- |
+| 上述后台启动 | 在任务管理器“详细信息”中查看命令行，确认属于本项目后，结束前端Vite的node进程和后端runserver的Python进程 |
+| 后文手动前台启动 | 分别在前端、后端两个终端按Ctrl+C |
+
+关闭浏览器只会关闭页面，不会停止服务。后台启动后，在原PowerShell中按Ctrl+C也不会停止已经启动的后台进程。当前没有统一停止脚本；不要仅按node.exe或python.exe名称批量结束其他项目。
+
+重启步骤是：**保存页面输入 → 停止本项目前后端 → 重新执行启动命令 → 刷新浏览器。** 数据库单独管理，普通前后端重启不需要停止MySQL。后台后端使用`--noreload`，修改Python代码或更新后端后须重启；重新运行启动命令可能只复用旧进程。
+
+## 首次安装：仅在新环境执行
+
+需要Node.js 24、Python 3.14、MySQL 8.4和PowerShell 7。已有环境正常时无需重复安装；依赖版本以backend/requirements.txt和frontend/package-lock.json为准。
+
+### 1. 创建数据库及账号
+
+先安装并启动MySQL，再以有权限的数据库账号执行下列示例。替换示例密码；这些是开发环境权限。
 
 ```sql
 CREATE DATABASE form_system CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
@@ -15,9 +52,11 @@ GRANT ALL PRIVILEGES ON form_system.* TO 'form_system_app'@'localhost';
 GRANT ALL PRIVILEGES ON test_form_system.* TO 'form_system_app'@'localhost';
 ```
 
-最后一项用于独立测试库的创建／删除；测试库不能与开发库同名，settings会拒绝该配置。上述仅本机开发权限，不作为生产授权方案。
+最后一项用于自动化测试库的创建／删除，不影响平时启动。测试库必须与开发库不同。
 
-在根目录创建本机配置`.local/development.json`，实际密钥和密码不提交Git：
+### 2. 保存本机配置
+
+在项目根目录创建`.local/development.json`，按实际MySQL设置填写；以下3306只是示例，不能用它覆盖另一台电脑已有的正确配置。密钥和密码不提交Git。
 
 ```json
 {
@@ -33,7 +72,17 @@ GRANT ALL PRIVILEGES ON test_form_system.* TO 'form_system_app'@'localhost';
 }
 ```
 
-脚本加载该文件，已有同名进程环境变量优先。后端端口默认8000，前端页面默认5173；改后端端口时同时设置上述BACKEND_PORT和`frontend/.env.local`的`BACKEND_PORT=所选端口`，然后重启两个进程。
+| 端口 | 用途 |
+| --- | --- |
+| 5173 | 浏览器访问的前端地址 |
+| BACKEND_PORT，默认8000 | 前端代理连接的Django接口，保持本机监听 |
+| DB_PORT | 已安装MySQL的实际监听端口，与网页端口不同 |
+
+改后端端口时，同时把`frontend/.env.local`中的BACKEND_PORT设为同一个值，并重启前后端。后端脚本读取本机JSON；已有同名进程环境变量优先，旧终端中的覆盖值也需要核对。
+
+### 3. 安装项目依赖并初始化
+
+在项目根目录执行：
 
 ```powershell
 python -m venv .venv
@@ -41,71 +90,59 @@ python -m venv .venv
 Push-Location frontend
 npm.cmd ci
 Pop-Location
-pwsh -NoProfile -File .\scripts/backend.ps1 migrate --noinput
-pwsh -NoProfile -File .\scripts/backend.ps1 createsuperuser
+pwsh -NoProfile -File scripts/backend.ps1 migrate --noinput
+pwsh -NoProfile -File scripts/backend.ps1 createsuperuser
 ```
 
-业务账号可通过技术管理员的Django `/admin/` 创建。同一有效账号可发起本人申请，也可承担指定任务；旧“审核员”组已退出业务权限，“反馈管理员”组是独立附加权限，staff／superuser不自动获得业务授权。其他设备独立创建账号，不猜测匹配旧负责人文字。
+最后一条创建Django管理账号。业务账号可在`/admin/`中创建；staff／superuser不自动获得申请、任务或发布权限。后续按第一节启动，使用已有业务账号登录。
 
-## 日常启动与停止
+## 手动分开启动：仅用于开发排障
 
-2026-10-16新增普通用户内网启动入口（不需要 Windows 管理员权限）：
+先确保MySQL已运行，并停止同一项目的后台前后端。这种方式便于直接看日志；两个终端都要保持运行。
+
+终端一，在项目根目录启动后端：
 
 ```powershell
-pwsh -NoProfile -File scripts/start-lan.ps1
-# 多块网卡时用 -LanIp 指定本机当前内网 IPv4
+pwsh -NoProfile -File scripts/backend.ps1
 ```
 
-脚本读取本机配置、识别当前地址，前端监听 `0.0.0.0:5173`，后端和数据库保持本机连接。IP 允许列表及 CSRF 来源通过进程环境传给新启动的后端，不改写本地配置；前端代理优先使用进程的 BACKEND_PORT。已有服务经代理／CSRF校验通过则复用；旧服务配置不匹配时明确提示先停止，不自动结束已有进程。用户启动的后台服务可在任务管理器按项目进程路径及命令行确认后结束；前台启动仍使用 Ctrl+C。
-
-若 MySQL 未运行，本机已有的 `.local/mysql/start.ps1` 可作为普通用户启动本机配置中的数据库实例及网页；该本机脚本、MySQL 安装和数据不随 Git 分发。其他设备若没有该启动器，应先由用户启动自己的 MySQL 实例，再运行此入口。不会安装或启动需要管理员权限的 Windows 系统服务，也不改防火墙。首次使用其他设备仍按上文完成环境配置；跨电脑访问需现有防火墙／公司网络允许，见[内网说明](COMPANY-LAN.md)。
-
-五种状态测试数据：`pwsh -NoProfile -File scripts/test-data.ps1`，可选择流程、状态和已有账号，详见[测试数据说明](TEST-DATA.md)。
-
-在根目录终端启动后端：
+终端二，在项目根目录启动前端：
 
 ```powershell
-pwsh -NoProfile -File .\scripts/backend.ps1
+Set-Location frontend
+npm.cmd run dev
 ```
 
-另一终端在frontend目录运行`npm.cmd run dev`。浏览器统一打开**http://localhost:5173/**，由Vite代理`/api`；不要混用localhost和127.0.0.1作为前端地址，避免Cookie／CSRF问题。后端默认127.0.0.1:8000，实际端口以本机配置为准。
+打开[http://localhost:5173/](http://localhost:5173/)。需要同事经内网访问时，使用第一节的统一入口，让脚本处理当前IP的允许主机和CSRF来源，详见[内网说明](COMPANY-LAN.md)。
 
-端口占用先查已有项目进程，不重复启动。结束网页服务在两个终端按Ctrl+C；保持MySQL运行不代表网页已启动，也不代表正式部署。本机历史内网配置见[COMPANY-LAN](COMPANY-LAN.md)，地址／网段需重新核验。
+## 更新代码与迁移
 
-## 更新与迁移
+先保存输入、保留工作区改动及本机配置；数据库需要变更时，先备份并停止写入。Git更新本身不升级数据库。
 
-先检查Git工作区，保留未提交内容、配置、业务原件及数据库。拉取代码不迁移数据库；含结构变更时先备份开发库并停止项目写入，再执行：
+在根目录执行：
 
 ```powershell
-pwsh -NoProfile -File .\scripts/backend.ps1 migrate --noinput
-pwsh -NoProfile -File .\scripts/backend.ps1 showmigrations changes
-pwsh -NoProfile -File .\scripts/backend.ps1 check --database default
+pwsh -NoProfile -File scripts/backend.ps1 migrate --plan
+pwsh -NoProfile -File scripts/backend.ps1 migrate --noinput
+pwsh -NoProfile -File scripts/backend.ps1 check --database default
 ```
 
-确认迁移至0027后重启前后端。0019已有新阶段／任务、0020已有发布／来源、0021已有ECO任务／补充／发布、0022已有多人负责人／任务或指定批准记录、0023已有真实ECO创建或交接记录、0026已有完整轮次快照时，逆迁移拒绝丢失证据；不要删除数据绕过守卫。0026不回填旧轮次，完整历史从升级后的新提交开始保存。0027会删除review_feedback表及其中的旧普通留言，回退迁移只能重建空表，不能恢复原留言；本机执行前已确认该表为空，其他设备须单独核对。备份是否完成和是否做过恢复演练是不同事实。
+当前迁移终点为0027。其他设备升级前，须核对review_feedback旧普通留言的保留要求：0027会删除该表，回退只能重建空表。0026不补造旧轮正文；已有任务、发布、交接或完整快照时，相关逆迁移守卫会拒绝丢失证据，不应删除数据绕过。完成后按“停止与重启”重新加载服务。
 
-`.venv`、`.local`、数据库、账号／密码、样例、原Excel及截图不随Git同步。项目移动后解释器启动失败，先核对`.venv/pyvenv.cfg`和安装Python位置，再重建虚拟环境，不删除配置或数据库。本机测试凭据统一在`.local/accounts.json`，按真实账号ID去重，不记录role；不随Git同步，其他设备自行配置。旧账号配置及停用脚本已删除。
+`.local`、`.venv`、数据库、凭据及源Excel不随Git同步。项目移动后虚拟环境失效时，重建解释器环境，保留本机配置和数据库。测试账号记录位于本机`.local/accounts.json`，其他设备自行配置。
 
-## 清理其他设备的旧单流程
+## 失败时先看哪里
 
-其他设备单独升级到0027；如仍有stage=legacy旧申请，可在停止写入后通过Django shell删除这些申请及旧审核员／填写员组。仅按stage=legacy筛选，不能按日期或状态删除当前ECR／ECO。当前不提供额外清理命令，也不保留停用测试／脚本归档。
+| 现象 | 先检查 |
+| --- | --- |
+| pwsh找不到 | 是否安装并使用PowerShell 7 |
+| 缺少.local/development.json或.venv | 按首次安装补齐配置／依赖 |
+| 数据库连接失败 | MySQL是否运行，DB_HOST／DB_PORT／账号是否正确 |
+| 首页可打开，接口失败 | 前端代理端口是否与BACKEND_PORT一致，后端日志是否报错 |
+| 登录出现CSRF错误 | 前端地址是否一致，当前IP是否改变；停止旧服务后重新运行统一入口 |
+| 更新代码后仍是旧行为 | 是否复用了--noreload旧后端；完整重启前后端 |
+| 本机能打开，同事打不开 | 按[内网说明](COMPANY-LAN.md)检查实际网络、已有防火墙规则及跨设备连接 |
 
-## 检查与排障
+后台日志通常在`.local/lan/backend.stderr.log`和`.local/lan/frontend.stderr.log`；若通过本机数据库启动器启动，则查看`.local/mysql/`下的同名日志。
 
-在根目录执行后端检查，在frontend目录执行前端检查：
-
-```powershell
-pwsh -NoProfile -File .\scripts/backend.ps1 test changes --noinput
-pwsh -NoProfile -File .\scripts/backend.ps1 makemigrations --check --dry-run
-Push-Location frontend
-npm.cmd test
-npm.cmd run lint
-npm.cmd run build
-Pop-Location
-```
-
-后端完整检查使用独立test_form_system，结束后销毁；需要MySQL可用及测试库权限。新阶段专项可选changes.test_eco_stage、changes.test_publication、changes.test_ecr_stage。测试快速哈希仅限测试类，生产保持默认强哈希。
-
-登录失败先确认后端／代理及两端端口一致；服务在运行仍出现旧接口行为时核对进程版本，尤其`--noreload`进程须重启。网络超时保留输入与UUID，原账号重登查询；账号切换清理旧缓存。不能把构建成功、模拟页面或数据库连接失败当作真实业务验收。
-
-当前测试入口及执行结果见[测试说明](testing/README.md)，保留断言的原因见[关键回归](testing/REGRESSIONS.md)。旧机器状态和历次上传过程不作为运行说明。
+自动化测试入口与测试库说明集中在[测试说明](testing/README.md)。日常启动无需先运行测试、生成样例或重新迁移。需要合成测试数据时见[测试数据说明](TEST-DATA.md)；生产部署、用户业务验收和跨设备验证分别确认。
