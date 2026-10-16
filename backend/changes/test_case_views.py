@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from .management.commands.seed_workflow import Command, STATES
 from .models import ChangeRequest
-from .review_issues import StrictValues
+from .request_values import StrictValues
 
 
 class TestCaseValues(StrictValues):

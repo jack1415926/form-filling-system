@@ -1,72 +1,60 @@
-# 验证记录导航
+# 测试说明
 
-更新日期：2026-10-14。每份记录保留当批复现、修复、测试范围及数据核对；日期内的“尚未提交”“服务停止”等为历史快照。当前运行和代码交付见[项目首页](../../README.md)，完整过程见[历史索引](HISTORY.md)。
+更新日期：2026-10-16。此页维护当前测试入口与最近执行结果；具体修复原因、数据职责及保留依据见[关键回归](REGRESSIONS.md)，未解决问题见[待办](../REQUIREMENTS-REFACTOR-TODO.md)。
 
-用户本日明确“没有意见或进一步修改要求即默认通过”：人工反馈第一至六批据此通过，第七批及后续交付适用相同规则。较早分批正文中的“待复验”保留为交付时快照，以此处和待办的最新状态为准；不据此关闭无关的完整业务流程或部署待办。
+## 当前验证
 
-## 界面方案预览
+| 检查 | 整理前 | 整理后 |
+| --- | --- | --- |
+| 后端全量真实MySQL | 183项通过 | 182项通过，独立测试库已销毁 |
+| 前端全量Node测试 | 118项通过 | 103项通过 |
+| 文档链接／片段、测试命令、代码差异 | — | 全部本地链接与片段有效，命令入口有效，diff检查通过 |
+| 当前序列图 | — | 两幅重写序列图通过Mermaid语法解析，未重新渲染历史图片 |
 
-[ECR／ECO双流程A/B交互原型](WORKFLOW-AB-PREVIEW-2026-10-13.md)：独立入口与工程变更统一入口共用八表；仅本机内存示例，尚未选定或应用正式产品。5项原型专项及TypeScript检查通过，并完成浏览器交互检查。
+两轮均在2026-10-16本机运行；不混用更早批次的测试总数，不以数量减少承诺固定耗时提升。本批未改产品业务源码、模型或迁移，未运行浏览器端到端和业务人工验收。前一批职责整理的lint／TypeScript／Vite构建通过，本批未重复构建。
 
-2026-10-14正式lint范围调整：排除本机`.local/**`预览目录，`npm run lint`通过；原因及验证边界见上述原型记录。
+## 运行
 
-## 当前交付
+根目录执行后端全量：
 
-[移除旧普通审核留言表](REVIEW-FEEDBACK-REMOVAL-2026-10-16.md)：按用户授权删除review_feedback及旧读取／展示兼容，本机已应用0027；42项MySQL、13项前端专项及构建／lint通过，其余29表业务摘要一致。当前29张业务表、230字段。
+```powershell
+pwsh -NoProfile -File scripts/backend.ps1 test changes --noinput
+```
 
-[数据库表必要性与历史遗留审查](DATABASE-SIMPLIFICATION-AUDIT-2026-10-16.md)：核对30张表的现行读写与本机行数；review_feedback为首要清理候选，旧人员字段另列评估，其余保留。仅审查，未改模型、迁移或数据库。
+测试使用本机配置中的DB_TEST_NAME，必须与开发库不同。先确认没有其他工作占用该测试库；测试会创建并销毁它。MySQL连接或权限失败不算通过，也不改用SQLite冒充验证。环境安装与迁移见[开发说明](../DEVELOPMENT.md)。
 
-[数据库结构文档同步至0026](DATABASE-SCHEMA-0026-2026-10-16.md)：本机迁移与30表／236字段只读核验，完整Mermaid源及当前文档入口同步；60条外键约束／62列分别统计，旧图与历史记录保留原版本。
+前端目录执行：
 
-[ECR内ECO模板详情样式](ECO-TEMPLATE-STYLE-2026-10-16.md)：只读预览改为与行动填写页一致的表单布局，字段全部禁用；构建／lint及隔离页面验证通过，无后端修改。
+```powershell
+npm.cmd test
+# 当前沙箱若禁止启动子进程，使用同进程收集全部测试
+node --test --test-isolation=none tests/*.test.mjs
+```
 
-[整项工程变更永久删除](ENGINEERING-DELETION-2026-10-16.md)：ECR发起人可删除任意状态整项工程，有ECO须勾选一并删除；事务回滚和权限保留。22项MySQL、3项前端专项、构建／lint及隔离页面／接口验证通过，未删除现有开发申请。
+按改动选择专项，例如 `npm.cmd run test:questions`、`npm.cmd run test:contracts`；后端可传 `changes.test_round_snapshots` 等模块。改变产品代码时另运行lint／构建；只改文档和测试，不反复启动页面或生成业务样例。
 
-[网页生成测试用例](TEST-CASE-GENERATOR-2026-10-16.md)：工程变更列表直接选择流程、五种状态和人员；生成后打开申请，开发环境限定及重试防重复。三个MySQL专项、前端lint／构建、独立测试库真实页面和内网入口检查通过。
+## 测试地图
 
-[五种场景测试数据与普通用户内网启动](TEST-DATA-LAN-2026-10-16.md)：交互生成 ECR／ECO 五种场景，保留真实来源／快照／操作证据；两个 MySQL 专项、脚本实际生成、内网代理／CSRF及前端构建通过；跨设备访问仍待验证。
+| 领域 | 后端changes模块 | 前端tests文件 |
+| --- | --- | --- |
+| 登录／概述／编号 | tests | api、response-contracts、latest-response、request-id、date-validation |
+| 物料／处置 | test_materials | material-save、autosave |
+| 问题／模板 | test_questions、test_emc、test_execution_plan、test_significant_change、test_dates | question-draft、template-definitions、execution-plan、significant-change |
+| 阶段／多人／来源 | test_ecr_stage、test_eco_stage、test_multi_owner_approval、test_publication | ecr-stage、ecr-recovery、eco-stage、action-owner、publication |
+| 列表／交接／接收提醒 | test_engineering_changes、test_eco_filler、test_filler_inbox | engineering-changes、eco-filler |
+| 正式意见／审核消息 | test_review_issues、test_review_inbox | review、review-inbox |
+| 完整轮次快照 | test_round_snapshots | round-snapshots |
+| 整项删除／停用入口 | test_engineering_deletion、test_retirement | engineering-changes |
+| 独立反馈／样例生成 | test_system_feedback、test_seed_workflow | system-feedback |
+| 结构／历史迁移 | test_migrations、test_structural_migrations、test_action_owners、test_snapshot_migration及业务模块中的迁移守卫 | — |
 
-[27题批量回答](BULK-QUESTION-ANSWERS-2026-10-14.md)：全是／全否后可逐题调整，保留备注和原保存／权限；ECO继承ECR但修改独立。16项前端专项及一个MySQL复制专项、lint／构建通过。
+后端`test_case_views.py`是开发测试数据接口，虽然名称以test开头，但不是测试套件，不能因清理测试而删除。迁移测试及并发测试验证的是不同风险，不能由普通成功路径替代。
 
-[退回后的完整历史表单与轮次快照](ROUND-FORM-SNAPSHOTS-2026-10-14.md)：新提交冻结八表，批准／退回统一只读历史；37项MySQL专项、112项前端及lint／构建通过，已备份迁移0026；旧轮不补造快照。
+## 本次精简
 
-同日追加历史页签修复：补齐正式StrictMode环境复现与八页签回归，移除提前清空快照缓存，并统一24px卡片内边距；15项前端专项、lint／构建通过，详见上述记录。
+- 删除旧整单提交／公开提交恢复路径的前端模拟；现行checkedChange／checkedReviewers校验保留为response-contracts。当前阶段提交与未知结果恢复继续由ecr-stage／ecr-recovery／eco-stage覆盖。
+- browser-feedback的三个断言组并入api、eco-stage、significant-change；问题缓存回归并入question-draft；多人来源证据并入publication；行动定义与EMC表头合并为template-definitions。删除对应旧文件并更新npm命令。
+- 后端五项审核修复并入test_multi_owner_approval，保留真实事务隔离；仅删除test_materials中重复的草稿级联／编号释放测试，由整项删除专项覆盖。未确认删除的真实CSRF及并发断言保留并明确命名。
+- 按日期分散的验证流水账合并为本页和REGRESSIONS；源表映射、当前规则、待办、部署边界保留在对应文档。已移除的旧原型、旧机器状态和旧计数不再维护独立说明。
 
-同日code review三项修复：目标轮次全文权限独立校验、历史前后页导航、ECO说明去重；39项MySQL及32项前端专项、lint／构建通过，详见上述记录。
-
-[退回权限同步与ECO列表标题修复](RETURN-ACCESS-ECO-TITLE-2026-10-14.md)：当前轮次退回同步状态与正文权限，保留输入保护；ECO独立列表使用自身标题。25项MySQL及40项前端专项、lint／构建和独立测试库页面验证通过。
-
-| 记录 | 范围 |
-| --- | --- |
-| [人工反馈第一批：导航调整](MANUAL-FEEDBACK-NAVIGATION-2026-10-13.md) | 批注3、7：删除自行添加的分类／题数，意见历史移到末尾；仅本批，按用户规则默认通过 |
-| [人工反馈第二批：卡片留白](MANUAL-FEEDBACK-SPACING-2026-10-13.md) | 批注1、2、4：进度／发布卡片内部及标题、正文间距；技术检查通过，用户反馈“还可以” |
-| [人工反馈第三批：取消强制滚动](MANUAL-FEEDBACK-SCROLL-2026-10-13.md) | 批注5：不再在切换时强制滚到页首；输入保护页面检查、lint／构建通过，按用户规则默认通过 |
-| [人工反馈第四批：统一返回入口](MANUAL-FEEDBACK-BACK-2026-10-13.md) | 批注6：移除子表重复返回；22个页面状态及输入保护检查、108项前端测试、lint／构建通过，按用户规则默认通过 |
-| [人工反馈第五批：来源ECR编号](MANUAL-FEEDBACK-SOURCE-NUMBER-2026-10-13.md) | 批注9、10：来源编号独立只读显示、不进入保存请求；隔离页面检查通过，按用户规则默认通过 |
-| [人工反馈第六批：提交后人员摘要](MANUAL-FEEDBACK-PEOPLE-2026-10-13.md) | 批注11：发布人／批准人只读摘要、失败重试；十种隔离场景、108项前端测试、lint／构建通过，按用户规则默认通过 |
-| [人工反馈第七批：ECR／ECO页签](MANUAL-FEEDBACK-PROCESS-TABS-2026-10-13.md) | 批注8：两类流程分别展示、来源关联和状态筛选；隔离页面检查、相关检查、lint／构建通过，无异议默认通过 |
-| [人工反馈第八批：只读折叠](MANUAL-FEEDBACK-FOLD-2026-10-13.md) | 用户确认两种页面均需要；默认显示已选行动、可查看全部；六种隔离场景、108项前端测试、lint／构建通过，无异议默认通过 |
-| [人工反馈第九批：ECO填写提醒](MANUAL-FEEDBACK-FILLER-INBOX-2026-10-14.md) | 创建／交接接收提醒、持久已读；三个MySQL专项及入口检查、lint／构建通过；备份升级0025，无异议默认通过 |
-| [全项目审查四项修复](CODE-REVIEW-FIXES-2026-10-13.md) | 多人任务重提初值、提交登录恢复、创建ECR编号校验及浏览器回归入口；157项MySQL、108项前端通过 |
-| [旧流程及账号清理](LEGACY-RETIREMENT-2026-10-13.md) | legacy申请清理、原型停用、统一账号与role移除；迁移0024；停用归档／清理工具／本批备份直接删除；最新11项专项通过 |
-| [多人及ECO交接审查修复](CODE-REVIEW-ECO-FILLER-2026-10-13.md) | 批准绕过、多人来源结果缺失、初始批准人创建500均已修复；39项后端、20项前端专项通过 |
-| [ECO填写人交接](ECO-FILLER-HANDOFF-2026-10-13.md) | 指定任意填写人、受控交接、原ECR人员只读、回执恢复；23项MySQL、16项前端及0023数据核对 |
-| [浏览器反馈修复](BROWSER-FEEDBACK-2026-10-13.md) | 阶段同步、多人行动及批准、子表适用性、查询反馈和业务错误标签；188项MySQL、100项前端及0022数据核对 |
-| [交付前审查](CODE-REVIEW-2026-10-13.md) | 两项产品修复、184项MySQL全量、97项前端、8个隔离页面断言与文档整理 |
-| [ECO第三批](ECO-STAGE-NAVIGATION-2026-10-13.md) | 独立任务、退回重提、批准发布、六阶段和必要待办；18个真实页面断言 |
-| [发布与ECO第二批](ECR-PUBLICATION-ECO-2026-10-13.md) | 只读来源、事务复制、关联／编号、丢响应恢复；14个真实页面断言 |
-| [ECR第一批](ECR-STAGE-2026-10-12.md)／[五项修复](ECR-REVIEW-FIXES-2026-10-12.md) | 任务闭环、原作者复核、旧轮证据与保存恢复 |
-| [统一账号](DUAL-WORKSPACE-2026-10-12.md)、[指定关系](ASSIGNMENT-ACCESS-2026-10-12.md)、[负责人关联](ACTION-OWNERS-2026-10-12.md) | 三步需求纠正及旧数据保留 |
-
-## 历史专题
-
-| 主题 | 证据入口 |
-| --- | --- |
-| 基础与源表 | [物料](MATERIALS-2026-10-01.md)、[处置](DISPOSITIONS-2026-10-01.md)、[问题](QUESTIONS-2026-10-02.md)、[ECR／ECO早期填写](ECR-ECO-2026-10-02.md) |
-| 保存与导航 | [自动保存／源表补核／保存切页](AUTOSAVE-BUSINESS-REVIEW-2026-10-03.md)、[状态同步与抽屉](STATE-SYNC-FIXES-2026-10-03.md)、[恢复修复](SAVE-RECOVERY-FIXES.md) |
-| EMC／计划／实质性评估 | [EMC接入](EMC-INTEGRATION-2026-10-03.md)、[执行计划](EXECUTION-PLAN-2026-10-03.md)、[实质性评估](SIGNIFICANT-CHANGE-2026-10-04.md) |
-| legacy审核与意见 | [提交](SUBMISSION-2026-10-04.md)、[审核规则](REVIEW-WORKFLOW-2026-10-05.md)、[正式意见](REVIEW-ISSUES-2026-10-05.md)、[复验及可读性](REVERIFICATION-2026-10-05.md) |
-| 消息与系统反馈 | [全局提醒和已读](REVIEW-INBOX-2026-10-08.md)、[系统反馈及统一入口](SYSTEM-FEEDBACK-2026-10-08.md)、[双向沟通](FEEDBACK-CONVERSATION-2026-10-09.md)、[未读修复](FEEDBACK-UNREAD-2026-10-09.md) |
-| 测试维护 | [精简计时](TEST-SIMPLIFICATION-2026-10-02.md)、[合并依据](TEST-CONSOLIDATION-2026-10-08.md)、[整理](TEST-CLEANUP-2026-10-12.md) |
-
-短记录合并后的正文保留在上表主题中；没有删除独有证据来减少文件数。其他早期审查、预览和设备快照仍可按日期查阅本目录；记录中的已删除脚本或备份路径只解释当批证据，不是当前运行入口。历史测试数量不作为当前全量，技术验证不关闭用户业务验收。
+后续维护在相应主题补充必要信息；不新增停用测试归档或每小批一份Markdown。Git提交／推送状态以Git记录为准。

@@ -2,6 +2,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound
 from .models import ChangeRequest
+from .request_values import conflict
 
 
 def is_owner(user, change):
@@ -20,7 +21,6 @@ def editable_change(request, pk):
     record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, stage__in=['ecr', 'eco'])
     if record.applicant_id != request.user.pk:
         if record.stage == 'eco' and (is_eco_coordinator(request.user, record) or record.filler_events.filter(previous_filler=request.user).exists()):
-            from .review_issues import conflict
             conflict('ECO当前由其他人员填写。填写人已变更或你仅有查看权限；未保存输入仍保留，请核对。')
         raise NotFound('申请不存在或没有修改权限。')
     return record

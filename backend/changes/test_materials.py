@@ -233,23 +233,7 @@ class MaterialFlowTests(TestCase):
         for values in [dict(location_group='company', location_item='company_finished', disposition='NA'), dict(location_group='supplier', location_item='company_raw', disposition='NA'), dict(location_group='company', location_item='company_raw', disposition='UNKNOWN')]:
             with self.subTest(values=values), self.assertRaises(IntegrityError), transaction.atomic():
                 MaterialDisposition.objects.create(material=material, **values)
-
-    def test_draft_delete_cascades_materials_and_releases_numbers(self):
-        self.record.ecr_no = 'DELETE-ECR'
-        self.record.save()
-        material = MaterialChange.objects.create(change=self.record, category='revision')
-        path = f'/api/changes/{self.record.pk}/'
-        response = self.client.delete(path)
-        self.assertEqual(response.status_code, 204)
-        self.assertEqual(response.content, b'')
-        self.assertFalse(ChangeRequest.objects.filter(pk=self.record.pk).exists())
-        self.assertFalse(MaterialChange.objects.filter(pk=material.pk).exists())
-        self.assertEqual(self.client.get(path).status_code, 404)
-        self.assertEqual(self.client.delete(path).status_code, 404)
-        replacement = self.client.post('/api/changes/', {'ecr_no': 'DELETE-ECR'}, format='json')
-        self.assertEqual(replacement.status_code, 201)
-
-    def test_application_delete_enforces_owner_auth_csrf_and_state(self):
+    def test_unconfirmed_application_delete_requires_owner_csrf_and_draft(self):
         path = f'/api/changes/{self.record.pk}/'
         self.assertEqual(self.client.put(path, {}, format='json').status_code, 405)
         material = MaterialChange.objects.create(change=self.record, category='addition')
@@ -402,7 +386,7 @@ class ConcurrentMaterialTests(TransactionTestCase):
                     self.assertEqual(future.result(timeout=15), 409)
         self.assertEqual(MaterialChange.objects.count(), 1)
 
-    def test_application_delete_waits_for_save_lock_and_rechecks_state(self):
+    def test_unconfirmed_application_delete_rechecks_confirmation_after_waiting_for_lock(self):
         started = Event()
         with ThreadPoolExecutor(max_workers=1) as executor:
             with transaction.atomic():

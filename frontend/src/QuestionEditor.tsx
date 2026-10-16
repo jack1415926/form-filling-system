@@ -7,6 +7,7 @@ import useAutosave from './useAutosave'
 import { questionFields, questionAnswerFields, questionPayload } from './autosaveFields'
 import type { SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
+import { refreshQuestionDependents } from './queryRefresh'
 
 type Props = {
   record: ChangeRequest; onDirty: (value: boolean) => void; onBusy: (value: boolean) => void
@@ -27,7 +28,7 @@ function QuestionForm({ data, record, onDirty, onBusy, onPrevious, onNext, saveR
       const latest = newestResponse(queryClient.getQueryData<QuestionData>(key), result)
       if (save.queue.active) {
         queryClient.setQueryData(key, latest)
-        for (const name of ['ecr-actions', 'eco-actions', 'change', 'changes']) void queryClient.invalidateQueries({ queryKey: [name, actorId, ...(name === 'changes' ? [] : [record.id])] })
+        void refreshQuestionDependents(queryClient, actorId, record.id)
       }
       return questionFields(latest)
     },

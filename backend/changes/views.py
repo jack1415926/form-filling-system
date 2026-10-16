@@ -22,6 +22,7 @@ from .questions import QUESTIONS
 from .dispositions import LOCATIONS
 from .permissions import account_changed
 from .roles import can_manage_feedback, can_review
+from .stage_actions import save_action_assignment
 from rest_framework import serializers
 
 
@@ -301,15 +302,7 @@ class EcrActionDetail(APIView):
             instance = existing or EcrActionResponse(change=record, action_key=action_key)
             serializer = EcrActionSerializer(instance, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
-            fields = serializer.validated_data
-            if any((set(instance.owners.values_list('pk', flat=True)) if instance.pk else set()) != {user.pk for user in value} if key == 'owners' else getattr(instance, key) != value for key, value in fields.items()):
-                if not instance.pk:
-                    instance.save()
-                serializer.save()
-                if not (instance.owner or instance.owner_user_id or instance.owners.exists() or instance.extra_required or instance.result or instance.status or instance.date):
-                    instance.delete()
-                record.updated_at = timezone.now()
-                record.save(update_fields=["updated_at"])
+            save_action_assignment(record, serializer)
             return Response(EcrActionList.data(record))
 
 
@@ -353,13 +346,5 @@ class EcoActionDetail(APIView):
             instance = existing or EcoActionResponse(change=record, action_key=action_key)
             serializer = EcoActionSerializer(instance, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
-            fields = serializer.validated_data
-            if any((set(instance.owners.values_list('pk', flat=True)) if instance.pk else set()) != {user.pk for user in value} if key == 'owners' else getattr(instance, key) != value for key, value in fields.items()):
-                if not instance.pk:
-                    instance.save()
-                serializer.save()
-                if not (instance.owner or instance.owner_user_id or instance.owners.exists() or instance.extra_required or instance.result or instance.status or instance.date):
-                    instance.delete()
-                record.updated_at = timezone.now()
-                record.save(update_fields=["updated_at"])
+            save_action_assignment(record, serializer)
             return Response(EcoActionList.data(record))

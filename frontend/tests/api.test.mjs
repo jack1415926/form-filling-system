@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { api, ApiError, formatApiErrors } from '../src/api.ts'
 
 test('nested validation errors retain field paths and messages', () => {
+  assert.deepEqual(formatApiErrors({ eco_no: ['提交前必须填写。'] }), ['ECO编号：提交前必须填写。'])
   assert.deepEqual(formatApiErrors({ dispositions: { company_finished: { disposition: ['非法选项'], remark: ['备注错误'] } } }), [
     'dispositions.company_finished.disposition：非法选项',
     'dispositions.company_finished.remark：备注错误',

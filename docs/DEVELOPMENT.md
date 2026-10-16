@@ -58,11 +58,9 @@ pwsh -NoProfile -File scripts/start-lan.ps1
 
 脚本读取本机配置、识别当前地址，前端监听 `0.0.0.0:5173`，后端和数据库保持本机连接。IP 允许列表及 CSRF 来源通过进程环境传给新启动的后端，不改写本地配置；前端代理优先使用进程的 BACKEND_PORT。已有服务经代理／CSRF校验通过则复用；旧服务配置不匹配时明确提示先停止，不自动结束已有进程。用户启动的后台服务可在任务管理器按项目进程路径及命令行确认后结束；前台启动仍使用 Ctrl+C。
 
-若 MySQL 未运行，本机已有的 `.local/mysql/start.ps1` 可作为普通用户启动 127.0.0.1:3307 实例及网页；该本机脚本、MySQL 安装和数据不随 Git 分发。其他设备若没有该启动器，应先由用户启动自己的 MySQL 实例，再运行此入口。不会安装或启动需要管理员权限的 Windows 系统服务，也不改防火墙。首次使用其他设备仍按上文完成环境配置；跨电脑访问需现有防火墙／公司网络允许，见[内网说明](COMPANY-LAN.md)。
+若 MySQL 未运行，本机已有的 `.local/mysql/start.ps1` 可作为普通用户启动本机配置中的数据库实例及网页；该本机脚本、MySQL 安装和数据不随 Git 分发。其他设备若没有该启动器，应先由用户启动自己的 MySQL 实例，再运行此入口。不会安装或启动需要管理员权限的 Windows 系统服务，也不改防火墙。首次使用其他设备仍按上文完成环境配置；跨电脑访问需现有防火墙／公司网络允许，见[内网说明](COMPANY-LAN.md)。
 
 五种状态测试数据：`pwsh -NoProfile -File scripts/test-data.ps1`，可选择流程、状态和已有账号，详见[测试数据说明](TEST-DATA.md)。
-
-以下为旧系统服务启动方式：MySQL服务名以当前设备核对为准，启动需要管理员权限；不为启动改自启动类型。当前应优先使用上面的普通用户实例；2026-10-13的MySQL Running／Manual为历史记录，后续验证结束仍不停止用户的数据库。
 
 在根目录终端启动后端：
 
@@ -70,7 +68,7 @@ pwsh -NoProfile -File scripts/start-lan.ps1
 pwsh -NoProfile -File .\scripts/backend.ps1
 ```
 
-另一终端在frontend目录运行`npm.cmd run dev`。浏览器统一打开**http://localhost:5173/**，由Vite代理`/api`；不要混用localhost和127.0.0.1作为前端地址，避免Cookie／CSRF问题。后端默认127.0.0.1:8000，当前电脑覆盖为8001。
+另一终端在frontend目录运行`npm.cmd run dev`。浏览器统一打开**http://localhost:5173/**，由Vite代理`/api`；不要混用localhost和127.0.0.1作为前端地址，避免Cookie／CSRF问题。后端默认127.0.0.1:8000，实际端口以本机配置为准。
 
 端口占用先查已有项目进程，不重复启动。结束网页服务在两个终端按Ctrl+C；保持MySQL运行不代表网页已启动，也不代表正式部署。本机历史内网配置见[COMPANY-LAN](COMPANY-LAN.md)，地址／网段需重新核验。
 
@@ -90,7 +88,7 @@ pwsh -NoProfile -File .\scripts/backend.ps1 check --database default
 
 ## 清理其他设备的旧单流程
 
-其他设备单独升级到0027；如仍有stage=legacy旧申请，可在停止写入后通过Django shell删除这些申请及旧审核员／填写员组。仅按stage=legacy筛选，不能按日期或状态删除当前ECR／ECO。当前不提供额外清理命令，也不保留停用测试／脚本归档。本次两个清理备份目录已删除；早期其他备份属于各批历史证据，不代表本批备份仍存在。
+其他设备单独升级到0027；如仍有stage=legacy旧申请，可在停止写入后通过Django shell删除这些申请及旧审核员／填写员组。仅按stage=legacy筛选，不能按日期或状态删除当前ECR／ECO。当前不提供额外清理命令，也不保留停用测试／脚本归档。
 
 ## 检查与排障
 
@@ -110,4 +108,4 @@ Pop-Location
 
 登录失败先确认后端／代理及两端端口一致；服务在运行仍出现旧接口行为时核对进程版本，尤其`--noreload`进程须重启。网络超时保留输入与UUID，原账号重登查询；账号切换清理旧缓存。不能把构建成功、模拟页面或数据库连接失败当作真实业务验收。
 
-最新清理及验证边界见[清理记录](testing/LEGACY-RETIREMENT-2026-10-13.md)，各批历史验证见[验证目录](testing/README.md)；旧机器启动、截图、备份和测试数字保留在历史记录，不作为当前运行状态。
+当前测试入口及执行结果见[测试说明](testing/README.md)，保留断言的原因见[关键回归](testing/REGRESSIONS.md)。旧机器状态和历次上传过程不作为运行说明。

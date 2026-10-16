@@ -1,14 +1,12 @@
 # Excel 填报内容与开发对应关系
 
-2026-10-13补充：旧自由结果填写、整单提交、公开审核和普通留言业务入口已删除；本机旧单流程申请已清理。当前权限与流程以[MVP](MVP.md)为准。
+更新日期：2026-10-16。只维护源Excel坐标、字段／接口和模板疑点；当前状态见[README](../README.md)，规则见[MVP](MVP.md)，技术验证见[目录](testing/README.md)。
 
-更新日期：2026-10-13。只维护源Excel坐标、字段／接口和模板疑点；当前状态见[README](../README.md)，规则见[MVP](MVP.md)，技术验证见[目录](testing/README.md)。
-
-本轮恢复并核对的来源为 `reference/ECR-26010601-去除部分南京反应体物料号.xls`；此前旧机记录的文件名带 `(1)`。本轮重新只读核对概述单元格及十一张工作表名称，未运行宏、更新外部链接或保存原文件；复制及提取前后 SHA256 一致，不凭文件名推断与旧机文件内容完全相同。已填写的内容作为试填参考，不直接转换为每个新申请的默认值。
+已记录的源表为 `reference/ECR-26010601-去除部分南京反应体物料号.xls`。此前只读核对概述单元格及十一张工作表名称时，未运行宏、更新外链或保存原件，复制及提取前后SHA256一致；本次文档整理未重读Excel。已填内容仅作试填参考，不作为新申请默认值。
 
 ## 当前阶段接口与来源
 
-stage-workflow／stage-submission／action-tasks／publication支持ECR和ECO，响应stage决定行动键及状态；ECO提交使用本单eco_no，轮次记录来源ecr_no。草稿／退回行动PATCH只允许owner_user_id／extra_required，结果由提交后本人任务接口保存；implementation_stage可保存但不能确认。
+stage-workflow／stage-submission／action-tasks／publication支持ECR和ECO，响应stage决定行动键及状态；ECO提交使用本单eco_no，轮次记录来源ecr_no。草稿／退回行动PATCH只允许owner_user_id或owner_user_ids及extra_required，结果由提交后本人任务接口保存；implementation_stage可保存但不能确认。
 
 概述只读字段为stage／status、source_ecr_id／source_ecr_no／eco_creation_request_id和published_by_id／published_at／publication_request_id。ECO的ecr_no保持空，来源编号关联显示；非空ECR／ECO编号分别全局唯一。
 
@@ -16,10 +14,12 @@ stage-workflow／stage-submission／action-tasks／publication支持ECR和ECO，
 | --- | --- |
 | GET publications，兼容ecr-publications | 本人的指定发布列表；通用列表stage=all/ecr/eco，state=approved/published |
 | GET／POST changes/{id}/publication | 查询能力／回执，指定发布人带request_id和expected_round执行发布 |
-| POST changes/{id}/eco | 原发起人从已发布ECR创建；仅request_id，首次201、重复200返回已有ECO，不覆盖草稿 |
+| POST changes/{id}/eco | 原发起人或实际发布人从已发布ECR创建，携带request_id及filler_id；首次201、重复200，不覆盖草稿 |
+| GET／POST changes/{eco_id}/eco-filler | 查询当前填写人／交接能力；交接携带request_id、expected_filler_id及filler_id |
 | GET changes/{id}/stage-navigation | 有权阶段摘要、编号、轮次、进度与can_open；无权相邻阶段隐藏数据 |
 | GET changes/{eco_id}/source-ecr | 来源发布概述、编号及时间，不授予完整ECR历史访问 |
 | GET changes/{eco_id}/ecr-actions | 来源问题及行动结果只读引用；PATCH拒绝 |
+| GET changes/{id}/review-rounds/{number}/form-snapshot | 按目标轮次全文授权返回完整历史快照及只读任务；旧轮可明确返回snapshot=null |
 
 复制基础使用新主键和新物料／EMC外键，不复制旧新增UUID、任务、意见或行动结果。业务准入、发布和权限统一见[MVP](MVP.md)。消息按stage／eco_no显示，支持approved待发布；context及已读接口保持。
 
@@ -43,7 +43,7 @@ stage-workflow／stage-submission／action-tasks／publication支持ECR和ECO，
 
 `applicant` 关联登录用户，与 D10 的业务负责人文字分开保存。`status`、`created_at`、`updated_at` 为系统字段。所有概述业务字段可暂不填写；短文本的长度和日期格式由后端检查。不自动编号；新阶段提交要求标题及本阶段编号非空，草稿允许留空。
 
-编号规则见 [MVP](MVP.md#legacy兼容)；本文件维护映射，不另记录实现状态。当前状态见 [README](../README.md#当前进度)。
+编号规则见 [MVP](MVP.md)；本文件维护映射，不另记录实现状态。当前状态见 [README](../README.md#当前状态)。
 
 ## 物料与处置映射（已实现）
 
@@ -78,7 +78,7 @@ stage-workflow／stage-submission／action-tasks／publication支持ECR和ECO，
 
 物料接口请求／返回增加 `dispositions` 对象：以 `company_finished` 等十个位置键为索引，值包含 `disposition` 和 `remark`。PATCH 只更新提交的格，省略的位置或格不改变；显式空字符串用于清空，处置和备注均为空时删除该位置记录，读取时由页面显示未填写。新增类别拒绝处置字段。保存沿用申请行锁和事务，基础物料与处置一并提交；新增 UUID 重试同时比较处置内容，变化则返回 409。
 
-2026-10-03 原 `.xls` 只读补核：J17:S19、J28:S61 的数据验证均引用 T12:T17 六种处置，允许空白；新增区不在其覆盖范围。F14 注释为“物料原先的分类”，说明升版分类含义，不构成处置方式限制。两张目标表未发现额外的处置组合限制；业务适用性不由模板选项自动判断。提取方式与边界见 [源表补核](testing/AUTOSAVE-BUSINESS-REVIEW-2026-10-03.md#后续源表只读补核2026-10-03)。
+2026-10-03 原 `.xls` 只读补核：J17:S19、J28:S61 的数据验证均引用 T12:T17 六种处置，允许空白；新增区不在其覆盖范围。F14 注释为“物料原先的分类”，说明升版分类含义，不构成处置方式限制。两张目标表未发现额外的处置组合限制；业务适用性不由模板选项自动判断。提取方式与边界见 [关键回归](testing/REGRESSIONS.md)。
 
 正式页面的数据请求及退出请求携带 `X-Expected-User`（页面预期账号 ID）。后端仍以当前认证账号决定权限；该头仅作上下文前提校验，不授予任何权限。与当前账号不符时返回 409、`code=account_changed`，操作不执行，页面刷新身份并切换工作台。旧 API 客户端未携带此头时保持既有认证行为；登录、身份读取及 CSRF 获取不绑定旧账号。物料列表 GET 在同一事务内锁定申请并完成基础字段及处置读取，避免混合不同版本。
 
@@ -103,7 +103,7 @@ stage-workflow／stage-submission／action-tasks／publication支持ECR和ECO，
 
 源表 A 列为职能分组（合并区域需要按原组归属读取）、B 列为题号、C 列为评估回答、D 列为固定题目、E 列为备注；题目位于第 3—29 行，共 27 题。网页需保留完整题干，区分未回答／是／否，新申请不复制源实例的回答。
 
-本批逐题核对题号、题干和职能，与原表一致；原文件 SHA256 未变。七组为法规 1—4、风险 5、研发 6—16、生产 17—20、EHS 21、售后 22—25、QA 26—27。固定题目和提示由后端 `questions.py` 维护，客户端从接口读取。
+此前已逐题核对题号、题干和职能，与原表一致，源文件SHA256未变。七组为法规1—4、风险5、研发6—16、生产17—20、EHS21、售后22—25、QA26—27。固定题目和提示由后端`questions.py`维护，客户端从接口读取。
 
 第 5 题要求回答否时说明风险理由；第 13 题要求不影响 DHF 充分性／适宜性时说明理由；第 14 题要求不需要设计验证时备注理由。已确认这三题选否且备注为空时仅提示，不阻断草稿保存；草稿保存允许未回答，当前ECR／ECO提交须完成全部27题回答。第 13 题保留完整复合题干和一个综合回答格，不拆分；不同判断的细节填在备注。不能仅从实例空备注判断这些规则已经满足。
 
@@ -125,17 +125,17 @@ ECO 固定定义存于 `backend/changes/eco_actions.json`，61 条行动逐项�
 
 GET `/api/changes/{id}/eco-actions/`返回独立ECO行动。ECO草稿／退回PATCH仅负责人／补充标记，结果走任务接口；省略保持、显式空值清空。ECO status 允许空／completed／not_applicable／implementation_stage，对应未填写／完成／不适用／在实施阶段完成，字段长度24。原负责人文字只读且最多255，负责人通过owner_user_id关联账号，完成情况为多行文本，日期为 ISO 或 null。问题回答为只读计算值，不接受客户端改写定义或映射。
 
-新ECO只能从已发布ECR创建，行动范围按ECO本单问题及补充标记确定，负责人确认不适用须原因；implementation_stage不能确认。ECO本单问题与行动结果独立，来源ECR发布结果只读引用，包含多人逐人确认结果。新申请原文字／结果／状态为空，账号关联和日期为null；本机源表 ECO!D3:G63 全空，因此 #8 不创建样例记录。源文件和 ECR／ECO／主清单逐项核对见 [本轮记录](testing/ECR-ECO-2026-10-02.md)。
+新ECO只能从已发布ECR创建，行动范围按ECO本单问题及补充标记确定，负责人确认不适用须原因；implementation_stage不能确认。ECO本单问题与行动结果独立，来源ECR发布结果只读引用，包含多人逐人确认结果。新申请原文字／结果／状态为空，账号关联和日期为null；本机源表 ECO!D3:G63 全空，不预填样例记录。源文件和 ECR／ECO／主清单逐项核对见 [关键回归](testing/REGRESSIONS.md)。
 
 新阶段提交根据当前纳入负责人派发冻结任务，原意见提出者按轮保留复核职责；单纯草稿关联不授予正文权限。负责人、批准人和发布人分别指定；旧姓名不自动匹配账号。执行计划保持固定活动及填写结果分离；F 主子表保留题目标识、适用性、回答、原因、下一步和结论的对应关系。
 
 ## 设计变更执行计划（已实现）
 
-源表 A3:E3 为活动、责任人、开始时间、结束时间、备注；A4:A14 的 11 条活动逐项对应 plan_001—plan_011，包括“里程碑 9”。活动只读，不增删排序或按问题联动；B:D 的样例责任人与空日期不预填，新申请及 #8 只显示空白填写。日期用 ISO 日期／NULL，责任人文字最多255字符，备注多行文本。
+源表A3:E3为活动、责任人、开始时间、结束时间、备注；A4:A14的11条活动对应plan_001—plan_011，包括“里程碑9”。活动只读，不增删排序或按问题联动；B:D的样例责任人与空日期不预填。日期用ISO日期／NULL，责任人文字最多255字符，备注多行文本。
 
 源表日期验证只有输入提示，没有顺序限制。本批按用户确认新增：两端填写时结束日期不得早于开始日期，前端／接口／数据库一致；同日、单端日期及空白允许。任何一行非法整批不写入，活动不自动执行注册或发布动作。
 
-GET／PATCH `/api/changes/{id}/execution-plan/` 返回 `{updated_at, rows}`，PATCH 接受 `{responses: {plan_001: {owner, start_date, end_date, remark}}}`；省略保持，文字空串／日期NULL清空。全空删除填写行，固定活动保留；读和空请求不写入。详情见 [本批记录](testing/EXECUTION-PLAN-2026-10-03.md)。
+GET／PATCH `/api/changes/{id}/execution-plan/` 返回 `{updated_at, rows}`，PATCH 接受 `{responses: {plan_001: {owner, start_date, end_date, remark}}}`；省略保持，文字空串／日期NULL清空。全空删除填写行，固定活动保留；读和空请求不写入。详情见 [关键回归](testing/REGRESSIONS.md)。
 
 ## 隐藏辅助表与规则来源
 
@@ -151,7 +151,7 @@ GET／PATCH `/api/changes/{id}/execution-plan/` 返回 `{updated_at, rows}`，PA
 
 GET/PATCH `/api/changes/{id}/emc/` 返回矩阵、updated_at、initialized和can_fill。PATCH结构为 `{"cells":{"emc_change_001/emc_test_001":{"mark":"X","remark":"说明"}}}`；省略保持、空字符串清空。只允许本人申请，metadata、行列、角色等字段拒绝；超级用户也不开放跨申请维护。
 
-四张表为emc_reference、emc_reference_row、emc_reference_test、emc_reference_cell。稳定行／列键与物理主键分开，交叉格通过行和测试外键关联，同格唯一及复合归属约束。GET返回默认配置但不写库，首次实际填写保存本单副本；空格不创建记录，清空两格删除记录但保留参考。旧申请未补录EMC结果，问题7改变不删除填写。来源与限制见[接入记录](testing/EMC-INTEGRATION-2026-10-03.md)。
+四张表为emc_reference、emc_reference_row、emc_reference_test、emc_reference_cell。稳定行／列键与物理主键分开，交叉格通过行和测试外键关联，同格唯一及复合归属约束。GET返回默认配置但不写库，首次实际填写保存本单副本；空格不创建记录，清空两格删除记录但保留参考。旧申请未补录EMC结果，问题7改变不删除填写。来源与限制见[关键回归](testing/REGRESSIONS.md)。
 
 ## 实质性变更评估主表／子表（已实现）
 
@@ -161,32 +161,32 @@ GET/PATCH `/api/changes/{id}/emc/` 返回矩阵、updated_at、initialized和can
 
 固定定义在backend/changes/significant_change.json，来源地址、原主表公式、验证说明及原分组标题随定义保留；GET/PATCH `/api/changes/{id}/significant-change/` 返回完整定义和updated_at。PATCH格式为 `{"assessment":{"final_conclusion":"significant"},"charts":{"A":{"applicability":"Y","result":"continue"}},"questions":{"sub_b_1_1":{"answer":"N","reason":"原因"}}}`；省略保持、空字符串清空，未知字段、非法标识或选项整批拒绝，全部字段空白删除对应填写记录。GET不创建数据，固定文字不随申请复制。
 
-主表B不适用提前结束提示、多行说明重复引用Chart B、C-2原分组标题及第0项参考清单缺失均标注疑点，不自动改分支或结论；未回答不等于N，不适用不删除回答，改答不清除人工结论。源文件哈希、74个分支及验证定义比对见 [交付记录](testing/SIGNIFICANT-CHANGE-2026-10-04.md)。
+主表B不适用提前结束提示、多行说明重复引用Chart B、C-2原分组标题及第0项参考清单缺失均标注疑点，不自动改分支或结论；未回答不等于N，不适用不删除回答，改答不清除人工结论。源文件哈希、74个分支及验证定义比对见 [关键回归](testing/REGRESSIONS.md)。
 
 ## 当前阶段提交与轮次（系统新增）
 
 stage、review_mode、submitted_at及current_review_round为系统字段，不对应原Excel单元格。ECR／ECO通过stage-submission提交，冻结行动任务、负责人和指定批准人；至少一位有效批准人，零任务明确确认后仍须逐人同意，再由指定发布人显式发布。旧submission整单入口及公开审核已删除。
 
-review_round冻结本轮标题、编号、时间和终态；action_task保存逐人行动结果／确认，review_record保存参与关系及approval_required／approved_at，意见事件记录回应与原提出者复核。修订重提产生新轮，旧确认与旧批准不计入当前进度；基础表没有完整逐轮快照。详细权限以[MVP](MVP.md)为准。
+review_round冻结本轮标题、编号、时间和终态；action_task保存逐人行动结果／确认，review_record保存参与关系及approval_required／approved_at，意见事件记录回应与原提出者复核。修订重提产生新轮，旧确认与旧批准不计入当前进度；0026起review_round.form_snapshot冻结本轮八表内容和定义；旧轮没有快照时明确提示缺失，不用实时正文补造。详细权限以[MVP](MVP.md)为准。
 
 ## 正式审核修改意见（0014，已实现）
 
 独立系统反馈（0015）使用system_feedback及system_feedback_event，不属于Excel字段，不关联申请或审核轮次；反馈类型、文字、状态、公开处理记录及UUID／版本为系统新增字段。review_feedback旧普通留言表及读取／展示兼容已在0027移除，现行正式意见仍使用review_issue及review_issue_event。0016另新增review_inbox_read，保存用户、轮次、消息批签名及已读时间，按用户／轮次唯一；不属于Excel字段，也不改变业务待办。当前字段与类型以models.py及迁移为准；[数据库ER文档及完整字段源](design/DATABASE-ER-FULL.md)已于2026-10-16按本机0027结构更新，旧图片仍为历史快照。
 
-系统新增内容，不属于Excel原字段。每条意见保存所属网页页签、可选题号／行动号／物料文字定位、具体问题、原提出者和来源轮次；定位不绑定可被删除的物料记录。review_issue保存状态和版本，review_issue_event追加回应、确认解决及继续修改过程。未解决项跨轮保留，重提冻结当前行动分配与批准人，原提出者确认解决后才允许正常批准。旧单流程普通留言业务已停用；独立系统反馈已由0015批次接入，与正式审核意见分别保存。[审核意见交付与验证](testing/REVIEW-ISSUES-2026-10-05.md)。
+系统新增内容，不属于Excel原字段。每条意见保存所属网页页签、可选题号／行动号／物料文字定位、具体问题、原提出者和来源轮次；定位不绑定可被删除的物料记录。review_issue保存状态和版本，review_issue_event追加回应、确认解决及继续修改过程。未解决项跨轮保留，重提冻结当前行动分配与批准人，原提出者确认解决后才允许正常批准。旧单流程普通留言业务已停用；独立系统反馈已由0015批次接入，与正式审核意见分别保存。[关键回归](testing/REGRESSIONS.md)。
 
 ## 系统反馈追加与提醒（0017）
 
 SystemFeedbackEvent新增kind区分manager／followup，历史事件默认manager；用户追加只允许本人，原文只读，关闭后追加转为processing。system_feedback_read保存user_id、feedback_id和入站消息version，用户／反馈唯一。追加和管理员处理共用反馈行锁、UUID及预期版本；已读同样锁反馈并核对入站快照。系统反馈不是Excel字段，不修改申请状态。
 
-## 当前阶段任务接口（0019～0024）
+## 当前阶段任务接口
 
 stage只读，新建为ecr，eco只能从已发布ECR创建。publisher_id指定本单发布人，stage_approver_ids指定批准人；草稿／退回行动PATCH仅负责人集合及extra_required。result／status／date由冻结轮次中各负责人通过任务接口填写和确认；ECOimplementation_stage只能保存，不能确认。0024仅改变模型默认阶段，不新增表。
 
-任务快照绑定轮次及稳定行动标识，version和请求回执保护保存／确认；本轮确认不复用旧轮确认。阶段数据含actor_id、change_id、current_round、actions、tasks、unanswered、issue_blockers和submission_requests，完整响应经校验后更新缓存。修订期间其他参与者只取得授权任务／意见历史，change为null、actions为空，不泄露正在修订的正文。新接口路径、载荷及验证见[第一批记录](testing/ECR-STAGE-2026-10-12.md)。旧自由填写和整单提交入口不再提供。
+任务快照绑定轮次及稳定行动标识，version和请求回执保护保存／确认；本轮确认不复用旧轮确认。阶段数据含actor_id、change_id、current_round、actions、tasks、unanswered、issue_blockers和submission_requests，完整响应经校验后更新缓存。修订期间其他参与者只取得授权任务／意见历史，change为null、actions为空，不泄露正在修订的正文。新接口路径、载荷及验证见[关键回归](testing/REGRESSIONS.md)。旧自由填写和整单提交入口不再提供。
 
-## 五项审查修复与接口行为
+## 保存恢复与接口行为
 
 载荷及路径未新增：任务保存重试先确认原UUID，若仍有后续输入则以新版本／新UUID写入；任务状态或版本再次变化时保留输入并提示核对。GET阶段数据在完整性校验后按updated_at合并，迟到响应不覆盖较新缓存。确认优先查原回执；无回执且任务结束／版本变化时释放不可执行原确认，未发送输入保留。
 
-工作台合并任务与意见dirty／busy，但不使用自身busy禁用查询／重试。本人在returned提出并回应意见时沿用单条发起人消息及原已读签名，不再返回重复申请ID。最新验证见[五项修复记录](testing/ECR-REVIEW-FIXES-2026-10-12.md)。
+工作台合并任务与意见dirty／busy，但不使用自身busy禁用查询／重试。本人在returned提出并回应意见时沿用单条发起人消息及原已读签名，不再返回重复申请ID。最新验证见[关键回归](testing/REGRESSIONS.md)。

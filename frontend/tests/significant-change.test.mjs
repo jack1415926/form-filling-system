@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { significantFields, significantPayload, subResult, conclusionHint, needsConclusionReview } from '../src/significantChangeDraft.ts'
+import { significantFields, significantPayload, subResult, conclusionHint, needsConclusionReview, canOpenSubchart } from '../src/significantChangeDraft.ts'
 import { Autosave } from '../src/autosave.ts'
 import { ApiError } from '../src/api.ts'
 import definition from '../../backend/changes/significant_change.json' with { type: 'json' }
@@ -21,6 +21,8 @@ test('decimal display numbers use dot-free stable keys and sparse clearing spans
 })
 
 test('branch hints have no result for unanswered and do not overwrite manual conclusions', () => {
+  assert.equal(canOpenSubchart('Y'), true)
+  for (const value of ['', 'N', undefined]) assert.equal(canOpenSubchart(value), false)
   const row = data.questions.find((row) => row.id === 'sub_b_1_1')
   assert.equal(subResult(row, ''), ''); assert.equal(subResult(row, 'N'), row.no_result); assert.equal(subResult(row, 'Y'), row.yes_result)
   const values = significantFields(data)

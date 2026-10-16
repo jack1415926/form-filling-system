@@ -1,9 +1,10 @@
 import uuid
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
-from .models import ChangeRequest, QuestionResponse
+from .models import ChangeRequest, QuestionResponse, ReviewRound
+from .stage_workflow import approve_if_complete
 
 
 class MultiOwnerApprovalTests(TestCase):
@@ -88,6 +89,42 @@ class MultiOwnerApprovalTests(TestCase):
         self.assertEqual(self.client.patch(path, {'owner_user_ids': []}, format='json').status_code, 200)
         self.assertFalse(self.change.ecr_responses.exists())
 
+    def test_assignment_noops_clearing_and_existing_results_for_both_stages(self):
+        for stage in ['ecr', 'eco']:
+            with self.subTest(stage=stage):
+                record = self.change
+                if stage == 'eco':
+                    self.change.status = 'published'; self.change.published_at = timezone.now()
+                    self.change.published_by = self.applicant; self.change.publication_request_id = uuid.uuid4()
+                    self.change.save()
+                    record = ChangeRequest.objects.create(stage='eco', source_ecr=self.change,
+                        eco_creation_request_id=uuid.uuid4(), applicant=self.applicant)
+                path = f'/api/changes/{record.pk}/{stage}-actions/{stage}_001/'
+                relation = record.eco_responses if stage == 'eco' else record.ecr_responses
+                original_time = record.updated_at
+                self.assertEqual(self.client.patch(path, {}, format='json').status_code, 200)
+                record.refresh_from_db()
+                self.assertEqual(record.updated_at, original_time)
+                self.assertFalse(relation.exists())
+                values = {'owner_user_ids': [self.first.pk, self.second.pk], 'extra_required': True}
+                self.assertEqual(self.client.patch(path, values, format='json').status_code, 200)
+                record.refresh_from_db(); assigned_time = record.updated_at
+                self.assertSetEqual(set(relation.get().owners.values_list('pk', flat=True)), {self.first.pk, self.second.pk})
+                self.assertEqual(self.client.patch(path, values, format='json').status_code, 200)
+                record.refresh_from_db()
+                self.assertEqual(record.updated_at, assigned_time)
+                self.assertEqual(self.client.patch(path, {'owner_user_ids': [], 'extra_required': False}, format='json').status_code, 200)
+                self.assertFalse(relation.exists())
+                self.assertEqual(self.client.patch(path, {'owner_user_id': self.first.pk}, format='json').status_code, 200)
+                row = relation.get()
+                self.assertSetEqual(set(row.owners.values_list('pk', flat=True)), {self.first.pk})
+                row.result = 'Previously saved result'; row.save(update_fields=['result'])
+                self.assertEqual(self.client.patch(path, {'owner_user_id': None}, format='json').status_code, 200)
+                row.refresh_from_db()
+                self.assertEqual(row.result, 'Previously saved result')
+                self.assertIsNone(row.owner_user_id)
+                self.assertFalse(row.owners.exists())
+
     def test_resubmission_retains_each_owners_results_and_clears_reassigned_initial_values(self):
         for stage in ['ecr', 'eco']:
             with self.subTest(stage=stage):
@@ -131,3 +168,69 @@ class MultiOwnerApprovalTests(TestCase):
                         self.assertIsNone(task.confirmed_at)
                         self.assertEqual(task.version, 1)
                 self.assertEqual(list(self.change.review_rounds.get(number=1).tasks.values_list('owner_id', 'result', 'status', 'date', 'confirmed_at')), original)
+
+
+class ApprovalRegressionTests(TransactionTestCase):
+    def setUp(self):
+        self.a, self.b, self.c, self.d = [get_user_model().objects.create_user('review-probe-' + name) for name in 'abcd']
+        self.client = APIClient(); self.client.force_authenticate(self.a)
+        self.record = ChangeRequest.objects.create(applicant=self.a, stage='ecr', publisher=self.a, title='Review probe', ecr_no='REVIEW-PROBE')
+        QuestionResponse.objects.bulk_create([QuestionResponse(change=self.record, number=n, answer='N') for n in range(1, 28)])
+        self.path = f'/api/changes/{self.record.pk}/'
+
+    def test_new_submission_without_approvers_must_be_rejected(self):
+        response = self.client.post(self.path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': 0, 'acknowledge_no_tasks': True}, format='json')
+        self.record.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('stage_approver_ids', response.data)
+        self.assertEqual(self.record.status, 'draft')
+        self.assertFalse(self.record.review_rounds.exists())
+
+    def test_published_source_exposes_both_owners_results_to_eco_filler(self):
+        self.assertEqual(self.client.patch(self.path, {'stage_approver_ids': [self.a.pk]}, format='json').status_code, 200)
+        self.assertEqual(self.client.patch(self.path + 'ecr-actions/ecr_001/', {'owner_user_ids': [self.b.pk, self.c.pk], 'extra_required': True}, format='json').status_code, 200)
+        self.assertEqual(self.client.post(self.path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': 0}, format='json').status_code, 200)
+        texts = []
+        for task in self.record.review_rounds.get().tasks.select_related('owner'):
+            self.client.force_authenticate(task.owner)
+            text = task.owner.username + '-confirmed-result'; texts.append(text)
+            task_path = self.path + f'action-tasks/{task.pk}/'
+            self.assertEqual(self.client.patch(task_path, {'request_id': str(uuid.uuid4()), 'version': 1, 'result': text, 'status': 'completed', 'date': '2026-10-13'}, format='json').status_code, 200)
+            self.assertEqual(self.client.post(task_path, {'request_id': str(uuid.uuid4()), 'version': 2}, format='json').status_code, 200)
+        self.client.force_authenticate(self.a)
+        self.assertEqual(self.client.post(self.path + 'review-rounds/1/approve/', {'request_id': str(uuid.uuid4())}, format='json').status_code, 200)
+        self.assertEqual(self.client.post(self.path + 'publication/', {'request_id': str(uuid.uuid4()), 'expected_round': 1}, format='json').status_code, 200)
+        response = self.client.post(self.path + 'eco/', {'request_id': str(uuid.uuid4()), 'filler_id': self.d.pk}, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.client.force_authenticate(self.d)
+        source = self.client.get(f"/api/changes/{response.data['change']['id']}/ecr-actions/")
+        self.assertEqual(source.status_code, 200)
+        action = next(row for row in source.data['actions'] if row['id'] == 'ecr_001')
+        results = action['task_results']
+        self.assertEqual([row['result'] for row in results], texts)
+        self.assertEqual({row['owner']['id'] for row in results}, {self.b.pk, self.c.pk})
+        self.assertTrue(all(row['status'] == 'completed' and row['date'] == '2026-10-13' and row['confirmed_at'] and row['round'] == 1 for row in results))
+        self.assertEqual(self.client.get(self.path).status_code, 404)
+
+    def test_create_with_valid_approvers_must_not_return_server_error(self):
+        self.client.raise_request_exception = False
+        response = self.client.post('/api/changes/', {'title': 'Configured draft', 'stage_approver_ids': [self.b.pk]}, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['stage_approver_ids'], [self.b.pk])
+
+    def test_existing_old_round_without_approvers_remains_compatible(self):
+        self.record.status = 'pending'; self.record.current_review_round = 1; self.record.save()
+        ReviewRound.objects.create(change=self.record, number=1, review_mode='designated', title=self.record.title, ecr_no=self.record.ecr_no, submitted_at=timezone.now())
+        approve_if_complete(self.record)
+        self.record.refresh_from_db(); self.assertEqual(self.record.status, 'approved')
+
+    def test_ecr_creation_rejects_eco_number_without_reserving_it(self):
+        before = ChangeRequest.objects.count()
+        response = self.client.post('/api/changes/', {'title': 'Invalid ECR', 'eco_no': 'RESERVED-ECO'}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('eco_no', response.data)
+        self.assertEqual(ChangeRequest.objects.count(), before)
+        self.assertFalse(ChangeRequest.objects.filter(eco_no='RESERVED-ECO').exists())
+        response = self.client.post('/api/changes/', {'title': 'Valid ECR', 'eco_no': ''}, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['stage'], 'ecr')

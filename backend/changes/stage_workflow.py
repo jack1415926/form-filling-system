@@ -9,17 +9,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .dates import BusinessDateField
-from .ecr import ECR_ACTIONS
-from .eco import ECO_ACTIONS
-from .models import ActionTask, ChangeRequest, EcrActionResponse, EcoActionResponse, ReviewRecord, ReviewRound, TaskOperation
+from .models import ActionTask, ChangeRequest, ReviewRecord, ReviewRound, TaskOperation
 from .permissions import ExpectedAccountPermission
 from .review_access import can_read_round, eligible, is_publication_reader, can_read_body, editable_change
-from .review_issues import StrictValues, blockers, canonical, conflict
+from .review_issues import blockers
+from .request_values import StrictValues, canonical, conflict
 from .serializers import ChangeRequestSerializer
-
-
-def stage_parts(record):
-    return (ECO_ACTIONS, EcoActionResponse, record.eco_responses) if record.stage == 'eco' else (ECR_ACTIONS, EcrActionResponse, record.ecr_responses)
+from .stage_actions import action_data, stage_parts, task_data
 
 
 def approve_if_complete(record):
@@ -35,40 +31,14 @@ def approve_if_complete(record):
     record.save(update_fields=['status', 'updated_at'])
 
 
-def task_data(task, actor, record):
-    current = task.round.number == record.current_review_round
-    editable = current and record.status == 'pending' and task.round.state == 'pending' and task.owner_id == actor.pk and actor.is_active and task.confirmed_at is None
-    return {'id': task.pk, 'round': task.round.number, 'action_key': task.action_key,
-            'owner_id': task.owner_id, 'owner_name': task.owner.get_full_name() or task.owner.username,
-            'result': task.result, 'status': task.status, 'date': task.date.isoformat() if task.date else None,
-            'version': task.version, 'confirmed_at': task.confirmed_at.isoformat() if task.confirmed_at else None,
-            'can_edit': editable,
-            'confirmed_requests': [str(value) for value in task.operations.filter(author=actor).values_list('request_id', flat=True)]}
-
-
 def stage_data(record, actor):
     answers = dict(record.question_responses.values_list('number', 'answer'))
-    definitions, _, relation = stage_parts(record)
-    responses = {row.action_key: row for row in relation.select_related('owner_user')}
     round = record.review_rounds.filter(number=record.current_review_round).first()
     visible_rounds = [row.pk for row in record.review_rounds.all() if can_read_round(actor, row)]
     tasks = [task_data(task, actor, record) for task in ActionTask.objects.filter(round_id__in=visible_rounds).select_related('round', 'owner').prefetch_related('operations').order_by('round__number', 'action_key')]
     # Revision body is private. Old task snapshots remain available to participants.
     body_visible = can_read_body(actor, record)
-    actions = []
-    if body_visible:
-        for definition in definitions:
-            row = responses.get(definition['id'])
-            owners = list(row.owners.order_by('pk')) if row else []
-            if not owners and row and row.owner_user:
-                owners = [row.owner_user]
-            actions.append({**definition, 'question_answer': answers.get(definition['number'], ''),
-                'extra_required': bool(row and row.extra_required), 'required': answers.get(definition['number']) == 'Y' or bool(row and row.extra_required),
-                'owner_user_id': row.owner_user_id if row else None,
-                'owner_user_ids': [u.pk for u in owners],
-                'owner_users': [{'id': u.pk, 'display_name': u.get_full_name() or u.username, 'is_active': u.is_active} for u in owners],
-                'owner_name': '、'.join(u.get_full_name() or u.username for u in owners),
-                'owner_active': bool(owners) and all(u.is_active for u in owners)})
+    actions = action_data(record, answers) if body_visible else []
     return {'actor_id': actor.pk, 'stage': record.stage, 'change': ChangeRequestSerializer(record).data if body_visible else None,
             'change_id': record.pk, 'updated_at': record.updated_at.isoformat(), 'status': record.status,
             'current_round': record.current_review_round, 'actions': actions, 'tasks': tasks,

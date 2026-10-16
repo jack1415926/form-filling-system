@@ -1,3 +1,5 @@
+import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { refreshQuestionDependents } from '../src/queryRefresh.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { ApiError } from '../src/api.ts'
@@ -35,4 +37,30 @@ test('only ambiguous failures require confirmation, including unreadable success
   for (const status of [0, 200, 502, 500]) assert.equal(saveResultUnconfirmed(new ApiError(status, '错误')), true)
   for (const status of [400, 401, 403, 404, 405, 409]) assert.equal(saveResultUnconfirmed(new ApiError(status, '拒绝')), false)
   assert.equal(saveResultUnconfirmed(new Error('未知请求结果')), true)
+})
+
+test('saving questions refreshes stage actions and admission even while the previous cache is fresh', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: Infinity } } })
+  const key = ['stage-workflow', 2, 5]
+  const old = { actions: [{ required: false }], unanswered: [1] }
+  const saved = { actions: [{ required: true }], unanswered: [] }
+  client.setQueryData(key, old)
+  client.setQueryData(['stage-workflow', 3, 5], old)
+  client.setQueryData(['stage-workflow', 2, 6], old)
+  let fetched = 0
+  const observer = new QueryObserver(client, { queryKey: key, queryFn: async () => { fetched++; return saved } })
+  let unsubscribe = observer.subscribe(() => {})
+  try {
+    assert.equal(fetched, 0)
+    unsubscribe()
+    await refreshQuestionDependents(client, 2, 5)
+    assert.equal(fetched, 0)
+    assert.equal(client.getQueryState(key).isInvalidated, true)
+    unsubscribe = observer.subscribe(() => {})
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(fetched, 1)
+    assert.deepEqual(observer.getCurrentResult().data, saved)
+    assert.equal(client.getQueryState(['stage-workflow', 3, 5]).isInvalidated, false)
+    assert.equal(client.getQueryState(['stage-workflow', 2, 6]).isInvalidated, false)
+  } finally { unsubscribe(); client.clear() }
 })

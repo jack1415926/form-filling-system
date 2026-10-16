@@ -13,7 +13,7 @@ from .models import (ChangeRequest, MaterialChange, MaterialDisposition, Questio
                      ExecutionPlanResponse, SignificantAssessment, SignificantChartResponse,
                      SignificantQuestionResponse)
 from .review_access import readable_change, is_publication_reader, is_ecr_coordinator
-from .review_issues import StrictValues, conflict, canonical
+from .request_values import StrictValues, conflict, canonical
 from .models import EcoFillerEvent
 from .eco_filler import receipt
 from .serializers import ChangeRequestSerializer

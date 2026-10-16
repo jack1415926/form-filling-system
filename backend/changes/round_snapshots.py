@@ -9,8 +9,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import ChangeRequest
-from .review_access import is_owner, eligible, is_publication_reader, is_eco_coordinator, is_ecr_coordinator
+from .review_access import is_owner, eligible, is_publication_reader, is_eco_coordinator, is_ecr_coordinator, can_read_body
 from .serializers import ChangeRequestSerializer, MaterialChangeSerializer
+from .stage_actions import action_data, task_data
 
 
 def capture_form(record, round, actor):
@@ -19,7 +20,6 @@ def capture_form(record, round, actor):
     from .emc_views import matrix_data
     from .execution_plan_views import ExecutionPlanDetail
     from .significant_change_views import SignificantChangeDetail
-    from .stage_workflow import stage_data
     from .publication import BASE_FIELDS
 
     ecr = record.source_ecr if record.stage == 'eco' else record
@@ -27,7 +27,7 @@ def capture_form(record, round, actor):
         'version': 1, 'change_id': record.pk, 'number': round.number,
         'captured_at': round.submitted_at.isoformat(),
         'overview': ChangeRequestSerializer(record).data,
-        'actions': stage_data(record, actor)['actions'],
+        'actions': action_data(record) if can_read_body(actor, record) else [],
         'source_overview': {field: getattr(ecr, field) for field in BASE_FIELDS} if record.stage == 'eco' else None,
         'sheets': {
             'materials': MaterialChangeSerializer(record.materials.order_by('pk').prefetch_related('dispositions'), many=True).data,
@@ -54,8 +54,6 @@ class RoundFormSnapshot(APIView):
     http_method_names = ['get', 'head', 'options']
 
     def get(self, request, pk, number):
-        from .stage_workflow import task_data
-
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk)
             round = get_object_or_404(record.review_rounds, number=number)

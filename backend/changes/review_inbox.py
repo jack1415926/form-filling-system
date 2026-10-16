@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from .models import ChangeRequest, ReviewInboxRead, ReviewRound
 from .permissions import ExpectedAccountPermission
-from .review_issues import StrictValues
+from .request_values import StrictValues
 
 
 class ReviewInbox(APIView):

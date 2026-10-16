@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from .models import ChangeRequest, EcoFillerEvent, EcoFillerInboxRead
 from .review_access import can_read_body, is_eco_coordinator, readable_change
-from .review_issues import StrictValues, canonical, conflict
+from .request_values import StrictValues, canonical, conflict
 
 
 def person(user):

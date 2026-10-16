@@ -1,62 +1,35 @@
-# 公司内网访问配置（历史记录）
+# 公司内网访问
 
-2026-10-13本次只读核验：MySQL为Running／Manual，5173、8001及原型5181无监听，网页服务未启动；下方IP／网段／防火墙仍是历史配置，未重新核验。当前运行方法统一见[开发说明](DEVELOPMENT.md)。
+更新日期：2026-10-16。用于内部演示与审阅；正式部署和另一台电脑实际访问仍待验证。
 
-2026-10-12当前状态：本轮只读核验MySQL为Stopped／Manual，5173及8001没有监听，项目当前未提供网页服务。本文件IP、网段和防火墙配置为2026-10-09记录，本轮没有重新核验，也不代表正式部署或当前其他设备可访问。启动与本机端口配置见[开发说明](DEVELOPMENT.md)，当前功能与待办见[README](../README.md)。
+## 启动
 
-配置日期：2026-10-09。
-
-同事在当前公司网段内打开 **http://192.168.39.131:5173/**，使用各自的系统账号登录。提供服务的这台电脑需要保持开机、连接公司网络，前后端进程需要保持运行。
-
-## 已完成的配置
-
-- 前端 `frontend/vite.config.ts` 监听 `0.0.0.0:5173`，`/api` 继续代理到本机后端。
-- 后端 `backend/backend/settings.py` 支持通过逗号分隔的 `DJANGO_ALLOWED_HOSTS` 和 `DJANGO_CSRF_TRUSTED_ORIGINS` 扩展原有允许列表。
-- 当前设备的 `.local/development.json` 新增 `DJANGO_ALLOWED_HOSTS=192.168.39.131`、`DJANGO_CSRF_TRUSTED_ORIGINS=http://192.168.39.131:5173`，保留原密钥和数据库配置；该文件不提交 Git。
-- Windows 防火墙规则 `FormFilling-LAN-5173`：允许入站 TCP 5173，限域网络、`WLAN 2` 接口、本机地址 `192.168.39.131`，来源限 `192.168.38.0/23`。
-- 后端继续监听 `127.0.0.1:8000`。
-
-原配置备份、启动日志及本机操作脚本位于 `.local/lan-access-20261009/`，不提交 Git。
-
-## 已验证与待验证
-
-已在提供服务的电脑上验证：Django check 无问题；前端监听 `0.0.0.0:5173`；通过局域网 IP 请求首页返回 200、CSRF 接口返回令牌；携带该地址的 Origin 和有效 CSRF 令牌提交无效账号，返回预期的账号密码错误，说明代理及 CSRF 校验链路通畅。防火墙规则已经读取核对。
-
-另一台电脑的实际连接尚需验证：请同事打开上述地址。如果无法打开，在同事电脑的 PowerShell 执行：
+项目根目录执行：
 
 ```powershell
-Test-NetConnection 192.168.39.131 -Port 5173
+pwsh -NoProfile -File scripts/start-lan.ps1
+# 多块网卡时加 -LanIp，指定本机当前内网IPv4
 ```
 
-若 `TcpTestSucceeded` 为 False，核对两台电脑是否在上述网段、服务电脑是否仍在线。公司其他网段需要确认路由和访问策略，并按实际来源网段调整此防火墙规则；无线客户端隔离或公司网络策略需要 IT 处理。
+以脚本输出的本次实际地址为准。同事使用该地址和自己的系统账号登录，服务电脑须保持开机并连接公司网络。不要沿用旧记录中的IP、网卡、端口或防火墙状态。
 
-## 重启
+- 前端监听`0.0.0.0:5173`，通过`/api`代理本机后端；后端和数据库不直接对内网开放。
+- 后端端口、数据库及凭据读取本机配置，安装方式见[开发说明](DEVELOPMENT.md)。
+- 脚本识别本次地址，给新进程设置允许主机与CSRF来源，不改写本机配置。既有服务校验通过则复用；配置不匹配时提示先停止，不自动结束进程。
+- MySQL未运行时可复用本机普通用户启动器；其他设备没有该启动器时先自行启动数据库。无需Windows管理员权限，不改防火墙或系统服务。
 
-在项目根目录启动后端：
+## 验证与排障
+
+脚本检查的是服务电脑经内网IP访问首页、代理及CSRF链路。本机检查成功不能代替同事电脑的验证。
+
+在另一台电脑打开脚本输出的地址，确认登录、读取和保存。无法连接时执行：
 
 ```powershell
-pwsh -NoProfile -File .\scripts\backend.ps1
+Test-NetConnection <服务电脑当前IP> -Port 5173
 ```
 
-另开终端启动前端：
+失败时核对服务是否运行、两台电脑的网络、路由、无线隔离和既有防火墙规则；需要调整公司网络或管理员规则时交由IT处理。端口可达但登录失败时，再检查前端地址是否一致、代理后端端口和CSRF来源。
 
-```powershell
-cd frontend
-npm.cmd run dev
-```
+技术说明使用[项目指南](PROJECT_GUIDE.md)。旧`.local/mt-review`副本不会自动同步；需要分享时重新生成，不把旧副本当作当前文档。账号、凭据、日志及本机配置不提交Git。
 
-已有服务运行时不要重复启动。网页本机入口仍可使用 `http://localhost:5173/`，同事使用局域网 IP 入口。
-
-## IP 变化与撤销
-
-换网络或 DHCP 地址变化后，重新确认 IP，并同步更新 `.local/development.json` 中两项地址和防火墙的本机地址／来源网段，再重启后端。不要直接复制该设备的地址到其他设备。
-
-停止共享时，停止前端服务，并在管理员 PowerShell 中删除本次规则：
-
-```powershell
-Remove-NetFirewallRule -Name 'FormFilling-LAN-5173'
-```
-
-如需恢复只限本机监听，把 `frontend/vite.config.ts` 的 `host` 改回 `localhost`，删除本机配置中本次新增的两项，再重启前后端。
-
-配置依据：[Vite server.host 与代理](https://vite.dev/config/server-options)、[Django ALLOWED_HOSTS](https://docs.djangoproject.com/en/6.0/ref/settings/#allowed-hosts) 和 [CSRF_TRUSTED_ORIGINS](https://docs.djangoproject.com/en/6.0/ref/settings/#csrf-trusted-origins)。
+停止前台进程使用Ctrl+C；后台进程按项目路径和命令行确认后结束。数据库由用户管理，检查结束不自动停止。

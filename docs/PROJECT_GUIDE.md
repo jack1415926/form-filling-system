@@ -29,8 +29,8 @@ flowchart LR
 | --- | --- | --- |
 | 登录、工作台与页签 | App.tsx、api.ts | views.py、permissions.py、signals.py |
 | 基础概述与物料／处置 | App.tsx、MaterialEditor.tsx、DispositionFields.tsx | views.py、serializers.py、dispositions.py |
-| 27题及批量回答 | QuestionEditor.tsx、autosaveFields.ts、questionDraft.ts | questions.py、views.py |
-| ECR／ECO任务 | StageWorkflow.tsx、ecrStage.ts；ECO内EcrEditor只读展示来源ECR | stage_workflow.py、ecr.py／eco.py及两份行动JSON |
+| 27题及批量回答 | QuestionEditor.tsx、autosaveFields.ts、questionDraft.ts、queryRefresh.ts | questions.py、views.py |
+| ECR／ECO任务 | StageWorkflow.tsx、ecrStage.ts；ECO内EcrEditor只读展示来源ECR | stage_workflow.py、stage_actions.py、ecr.py／eco.py及两份行动JSON |
 | 发布与事务复制 | PublicationPanel.tsx、publication.ts | publication.py |
 | 整项永久删除 | EngineeringChanges、DeleteEngineeringChangeDialog、App.tsx | ChangeDetail.delete；先删关联ECO、再删ECR，保留事务和来源保护关系 |
 | 六阶段及来源摘要 | StageNavigation.tsx、stageNavigationData.ts | stage_navigation.py |
@@ -40,6 +40,7 @@ flowchart LR
 | EMC、计划、实质性评估 | EmcEditor、ExecutionPlanEditor、SignificantChangeEditor及对应草稿模块 | emc_views、execution_plan_views、significant_change_views及固定定义 |
 | 独立系统反馈 | SystemFeedbackPanel.tsx、systemFeedback.ts | system_feedback_views.py |
 | 保存与切页 | useAutosave.ts、autosave.ts、SaveBeforeSwitch.tsx、latestResponse.ts | 各写接口的事务／父申请锁 |
+| 通用请求校验／冲突 | api.ts及各业务响应校验 | request_values.py；各业务专用校验仍独立 |
 
 前端入口位于`frontend/src/`，后端业务位于`backend/changes/`；URL在[urls.py](../backend/backend/urls.py)，结构与约束在[models.py](../backend/changes/models.py)。旧整单提交、旧role及停用脚本／测试归档已删除；账号名单接口仍用于选择有效用户，不按旧角色授权。当前未使用路由框架，刷新重建React页面状态，已保存内容从MySQL读取。
 
@@ -88,4 +89,4 @@ API总期限30秒覆盖CSRF、请求和响应正文；写超时是结果未确�
 
 练习可用自己的草稿追踪“标题”或“处置备注”的页面→API→serializer→model链路，并用另一临时账号核对授权拒绝。不要拿正式样例做删除练习。
 
-分批过程、历史样例及独有验证数字统一保留在[历史索引](testing/HISTORY.md)及[验证目录](testing/README.md)，不在当前指南重复旧业务规则和测试日志。
+自动化入口与最新执行结果见[测试说明](testing/README.md)，修复原因及保留依据集中在[关键回归](testing/REGRESSIONS.md)。

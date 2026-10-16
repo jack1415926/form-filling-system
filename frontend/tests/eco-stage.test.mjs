@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { checkedStage, saveTaskPatch, taskConfirmationState, stageSubmissionState } from '../src/ecrStage.ts'
-import { checkedNavigation, newestNavigation, stageSteps } from '../src/stageNavigationData.ts'
+import { checkedNavigation, newestNavigation, stageSteps, currentStageIndex } from '../src/stageNavigationData.ts'
 import { checkedPublication } from '../src/publication.ts'
 import { checkedInbox } from '../src/reviewInboxData.ts'
 
@@ -35,6 +35,9 @@ test('ECO save recovery keeps original UUID, newer input and old-round confirmat
 })
 
 test('six stage nodes show terminal completion, return to revision and zero-task approval awaiting release', () => {
+  for (const [stage, status, expected] of [['eco', 'draft', 3], ['eco', 'pending', 4], ['eco', 'approved', 5], ['ecr', 'draft', 0]]) {
+    assert.equal(currentStageIndex({ stage, status }), expected)
+  }
   assert.deepEqual(stageSteps({ ...visible, stage: 'ecr', status: 'published' }).map(step => step.status), ['finish', 'finish', 'finish'])
   assert.deepEqual(stageSteps({ ...visible, status: 'approved', confirmed: 0, total: 0 }).map(step => step.status), ['finish', 'finish', 'process'])
   const returned = stageSteps({ ...visible, status: 'returned', confirmed: 0, total: 0 })
