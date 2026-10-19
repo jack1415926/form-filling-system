@@ -42,6 +42,8 @@ export function formatApiErrors(value: unknown, path = ''): string[] {
   return value == null ? [] : [`${path ? path + '：' : ''}${String(value)}`]
 }
 
+let sessionVersion = 0
+
 export async function api<T>(path: string, method = 'GET', body?: unknown, expectedUserId?: number): Promise<T> {
   const controller = new AbortController()
   const timeoutError = new ApiError(0, method === 'GET'
@@ -53,16 +55,16 @@ export async function api<T>(path: string, method = 'GET', body?: unknown, expec
   })
   try {
     // The deadline also covers CSRF acquisition and a stalled response body.
-    return await Promise.race([request<T>(path, method, body, expectedUserId, controller.signal), deadline])
+    return await Promise.race([request<T>(path, method, body, expectedUserId, controller.signal, sessionVersion), deadline])
   } finally { clearTimeout(timer!) }
 }
 
-async function request<T>(path: string, method: string, body: unknown, expectedUserId: number | undefined, signal: AbortSignal): Promise<T> {
+async function request<T>(path: string, method: string, body: unknown, expectedUserId: number | undefined, signal: AbortSignal, version: number): Promise<T> {
   let csrfToken = ''
   if (method !== 'GET') {
     const cookie = document.cookie.split('; ').find((value) => value.startsWith('csrftoken='))
     csrfToken = cookie ? decodeURIComponent(cookie.slice('csrftoken='.length)) : ''
-    if (!csrfToken) csrfToken = (await request<{ csrfToken: string }>('/api/auth/csrf/', 'GET', undefined, undefined, signal)).csrfToken
+    if (!csrfToken) csrfToken = (await request<{ csrfToken: string }>('/api/auth/csrf/', 'GET', undefined, expectedUserId, signal, version)).csrfToken
   }
   signal.throwIfAborted()
   let response: Response
@@ -72,23 +74,36 @@ async function request<T>(path: string, method: string, body: unknown, expectedU
       headers: { 'Content-Type': 'application/json', ...(method !== 'GET' ? { 'X-CSRFToken': csrfToken } : {}), ...(expectedUserId !== undefined ? { 'X-Expected-User': String(expectedUserId) } : {}) },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     })
-  } catch { throw new ApiError(0, '无法连接服务器，请检查连接后重试。填写内容仍保留。') }
+  } catch { throw new ApiError(0, method === 'GET' ? '无法连接服务器，请检查连接后重试。' : '连接中断，操作结果未确认。请保留输入，先核对结果再重试。') }
   signal.throwIfAborted()
   if (method === 'DELETE' && response.status === 204) return undefined as T
   const data = await response.json().catch(() => null)
   signal.throwIfAborted()
   if (!response.ok) {
-    if (data?.code === 'account_changed') window.dispatchEvent(new Event('account-changed'))
-    if (data?.code === 'feedback_permission_changed') window.dispatchEvent(new CustomEvent('feedback-permission-changed', { detail: { expectedUserId } }))
-    if (response.status === 401 || (response.status === 403 && data?.code !== 'feedback_permission_changed' && data?.detail && !String(data.detail).includes('CSRF'))) {
+    const detail = typeof data?.detail === 'string' ? data.detail : ''
+    const unauthenticated = response.status === 401 || response.status === 403 && (data?.code === 'not_authenticated' || detail === 'Authentication credentials were not provided.')
+    const csrfFailed = response.status === 403 && (data?.code === 'csrf_failed' || /^CSRF\b/i.test(detail))
+    if (version === sessionVersion) {
+      if (data?.code === 'account_changed') window.dispatchEvent(new Event('account-changed'))
+      if (data?.code === 'feedback_permission_changed') window.dispatchEvent(new CustomEvent('feedback-permission-changed', { detail: { expectedUserId } }))
+      if (unauthenticated || csrfFailed) window.dispatchEvent(new CustomEvent('authentication-required', { detail: { expectedUserId } }))
+    }
+    if ((unauthenticated || csrfFailed) && version !== sessionVersion) throw new ApiError(response.status, '登录状态已更新，原请求未执行，请重试。')
+    if (unauthenticated) {
       throw new ApiError(response.status, '登录已失效或尚未登录，请重新登录。未保存的填写内容仍保留。')
     }
-    const message = data ? formatApiErrors(data.detail ?? data).join('；') : '请求验证失败，请重新登录后重试。'
-    throw new ApiError(response.status, String(message))
+    if (csrfFailed) throw new ApiError(response.status, '安全校验失败，请使用原账号重新登录后重试。填写内容仍保留。')
+    if (response.status >= 500) throw new ApiError(response.status, method === 'GET'
+      ? `服务器暂时不可用（HTTP ${response.status}），请稍后重试。`
+      : `服务器异常（HTTP ${response.status}），操作结果未确认。请保留输入，先核对结果再重试。`)
+    const messages: Record<number, string> = { 400: '请求内容有误，请检查填写内容。', 403: '当前账号没有此操作权限。', 404: '记录不存在或当前账号无权访问。', 409: '数据或流程状态已变化，请核对最新状态后重试。', 429: '操作过于频繁，请稍后重试。' }
+    const message = data ? formatApiErrors(data.detail ?? data).join('；') : ''
+    throw new ApiError(response.status, message || messages[response.status] || `请求失败（HTTP ${response.status}），请核对后重试。`)
   }
   if (data === null || typeof data !== 'object') {
     throw new ApiError(response.status, '服务器返回格式异常，未能确认操作结果。请保留填写内容后重试。')
   }
+  if (method === 'POST' && (path === '/api/auth/login/' || path === '/api/auth/logout/')) sessionVersion++
   return data as T
 }
 

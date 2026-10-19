@@ -13,11 +13,13 @@ test('nested validation errors retain field paths and messages', () => {
 
 const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve() }
 test('unauthorized session requests require reauthentication without a retired role event', async (t) => {
-  mockEnvironment(t, async () => new Response(JSON.stringify({ detail: 'Authentication required' }), { status: 403 }))
-  let changed = 0
+  mockEnvironment(t, async () => new Response(JSON.stringify({ detail: '身份认证信息未提供。', code: 'not_authenticated' }), { status: 403 }))
+  let changed = 0, recovery = 0
   window.addEventListener('role-changed', () => changed++)
+  window.addEventListener('authentication-required', () => recovery++)
   await assert.rejects(api('/api/changes/'), (error) => error.status === 403 && error.message.includes('登录已失效'))
   assert.equal(changed, 0)
+  assert.equal(recovery, 1)
 })
 
 function mockEnvironment(t, fetcher, cookie = 'csrftoken=test-csrf') {
@@ -29,13 +31,75 @@ function mockEnvironment(t, fetcher, cookie = 'csrftoken=test-csrf') {
 
 test('feedback permission loss refreshes only its capability, without a business role or login failure', async (t) => {
   mockEnvironment(t, async () => new Response(JSON.stringify({ detail: '反馈管理权限已取消', code: 'feedback_permission_changed' }), { status: 403 }))
-  let feedback = 0, role = 0, actor
+  let feedback = 0, role = 0, recovery = 0, actor
+  window.addEventListener('authentication-required', () => recovery++)
   window.addEventListener('feedback-permission-changed', (event) => { feedback++; actor = event.detail.expectedUserId })
   window.addEventListener('role-changed', () => role++)
   await assert.rejects(api('/api/system-feedback/manage/', 'GET', undefined, 7), (error) => error.status === 403 && error.message === '反馈管理权限已取消')
   assert.equal(feedback, 1)
   assert.equal(role, 0)
   assert.equal(actor, 7)
+  assert.equal(recovery, 0)
+})
+
+test('expired login and CSRF failures expose recovery for the expected account', async (t) => {
+  for (const status of [401, 403]) {
+    await t.test(String(status), async (t) => {
+      mockEnvironment(t, async () => new Response(JSON.stringify({ detail: status === 403 ? 'CSRF verification failed' : '请先登录。' }), { status }))
+      const actors = []
+      window.addEventListener('authentication-required', event => actors.push(event.detail.expectedUserId))
+      await assert.rejects(api('/api/changes/7/', 'PATCH', { title: '保留输入' }, 7), error => error.status === status)
+      assert.deepEqual(actors, [7])
+    })
+  }
+})
+
+test('business errors preserve their status and detail without requesting login or switching accounts', async (t) => {
+  for (const status of [400, 403, 404, 409, 422, 429]) {
+    await t.test(String(status), async t => {
+      mockEnvironment(t, async () => new Response(JSON.stringify({ detail: `业务拒绝${status}` }), { status }))
+      const events = []
+      for (const event of ['authentication-required', 'account-changed', 'feedback-permission-changed']) window.addEventListener(event, () => events.push(event))
+      await assert.rejects(api('/api/changes/7/', 'PATCH', {}, 7), error => error.status === status && error.message === `业务拒绝${status}`)
+      assert.deepEqual(events, [])
+    })
+  }
+})
+
+test('non-JSON errors and server failures give status-specific recovery without suggesting login', async (t) => {
+  for (const [status, text] of [[400, '请求内容'], [403, '权限'], [404, '不存在'], [409, '状态'], [429, '频繁'], [500, '结果未确认'], [502, '结果未确认'], [503, '结果未确认']]) {
+    await t.test(String(status), async t => {
+      mockEnvironment(t, async () => new Response('<html>error</html>', { status }))
+      let recovery = 0
+      window.addEventListener('authentication-required', () => recovery++)
+      await assert.rejects(api('/api/changes/7/', 'PATCH', {}, 7), error => error.status === status && error.message.includes(text) && !error.message.includes('登录'))
+      assert.equal(recovery, 0)
+    })
+  }
+})
+
+test('old authentication errors cannot reopen recovery after successful login or logout', async (t) => {
+  for (const action of ['login', 'logout']) {
+    await t.test(action, async t => {
+      let release, recovery = 0
+      mockEnvironment(t, path => path === '/old' ? new Promise(resolve => { release = resolve }) : Promise.resolve(new Response(JSON.stringify({ user: { id: 7 } }))))
+      window.addEventListener('authentication-required', () => recovery++)
+      const pending = assert.rejects(api('/old', 'GET', undefined, 7), error => error.status === 401 && error.message.includes('登录状态已更新'))
+      await api(`/api/auth/${action}/`, 'POST', {}, 7)
+      release(new Response(JSON.stringify({ detail: '请先登录。' }), { status: 401 }))
+      await pending
+      assert.equal(recovery, 0)
+      globalThis.fetch = async () => new Response(JSON.stringify({ detail: '请先登录。' }), { status: 401 })
+      await assert.rejects(api('/new', 'GET', undefined, 7), error => error.status === 401)
+      assert.equal(recovery, 1)
+    })
+  }
+})
+
+test('network failures distinguish reads from unconfirmed writes', async t => {
+  mockEnvironment(t, async () => { throw new TypeError('network error') })
+  await assert.rejects(api('/read'), error => error.status === 0 && error.message.includes('无法连接') && !error.message.includes('结果未确认'))
+  await assert.rejects(api('/write', 'POST', {}, 7), error => error.status === 0 && error.message.includes('结果未确认') && !error.message.includes('登录'))
 })
 
 test('30-second GET deadline rejects even if transport ignores cancellation', async (t) => {

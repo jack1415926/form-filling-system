@@ -1,8 +1,14 @@
 # 测试说明
 
-更新日期：2026-10-16。此页维护当前测试入口与最近执行结果；具体修复原因、数据职责及保留依据见[关键回归](REGRESSIONS.md)，未解决问题见[待办](../REQUIREMENTS-REFACTOR-TODO.md)。
+更新日期：2026-10-19。此页维护当前测试入口与最近执行结果；具体修复原因、数据职责及保留依据见[关键回归](REGRESSIONS.md)，未解决问题见[待办](../REQUIREMENTS-REFACTOR-TODO.md)。
 
 ## 当前验证
+
+2026-10-19身份恢复与错误分类：前端全量126项、lint与TypeScript／Vite构建通过；后端`changes.test_api_errors`五项通过，均为不访问数据库的SimpleTestCase，未重跑全量MySQL测试。模拟接口浏览器验证了普通403不误报登录失效、重新登录前请求迟到不重开提示，以及同账号重新登录保留输入并恢复自动保存；不等同于真实会话和完整业务验收。人工触发方式及错误码边界见[保存与身份](REGRESSIONS.md#保存与身份)。
+
+本项目后端已重启加载新配置，经当前Vite代理核验未登录身份接口401、未登录业务接口403／not_authenticated、缺少CSRF的登录接口403／csrf_failed；未登录真实账号、未写业务数据。
+
+以下保留2026-10-16整理批次的结果：
 
 | 检查 | 整理前 | 整理后 |
 | --- | --- | --- |
@@ -38,6 +44,7 @@ node --test --test-isolation=none tests/*.test.mjs
 | 领域 | 后端changes模块 | 前端tests文件 |
 | --- | --- | --- |
 | 登录／概述／编号 | tests | api、response-contracts、latest-response、request-id、date-validation |
+| 认证与错误分类 | test_api_errors（无需数据库） | api、autosave |
 | 物料／处置 | test_materials | material-save、autosave |
 | 问题／模板 | test_questions、test_emc、test_execution_plan、test_significant_change、test_dates | question-draft、template-definitions、execution-plan、significant-change |
 | 阶段／多人／来源 | test_ecr_stage、test_eco_stage、test_multi_owner_approval、test_publication | ecr-stage、ecr-recovery、eco-stage、action-owner、publication |

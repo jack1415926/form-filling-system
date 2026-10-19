@@ -50,7 +50,7 @@ class FollowupInput(StrictInput):
 class ManagerPermission(BasePermission):
     def has_permission(self, request, view):
         if not can_manage_feedback(request.user):
-            error = APIException({'detail': '反馈管理权限已取消或未配置，请刷新身份。', 'code': 'feedback_permission_changed'})
+            error = APIException({'detail': '反馈管理权限已取消或未配置，请重新登录后核对权限。', 'code': 'feedback_permission_changed'})
             error.status_code = 403
             raise error
         return True

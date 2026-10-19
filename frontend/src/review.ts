@@ -41,7 +41,7 @@ export function approvalBlockReason(data: ReviewData, actorId: number, draftCoun
   if (data.round.approvals.some((row) => row.id === actorId)) return '你已同意批准本轮申请，无需重复批准；请等待其他审核人员。'
   if (data.unresolved_count) return `尚有 ${data.unresolved_count} 条未解决意见，须由原提出者确认解决后才能批准。`
   if (['ecr', 'eco'].includes(data.round.stage ?? '') && data.round.tasks?.some(task => !task.confirmed_at)) return '全部行动负责人确认任务后才能批准。'
-  if (!data.can_approve) return '当前账号没有本轮批准权限，请刷新身份和审核记录核对。'
+  if (!data.can_approve) return '当前账号没有本轮批准权限，请重新登录并刷新审核记录核对。'
   if (draftCount) return '存在未提交的修改意见，请先处理或删除未提交意见，再同意批准。'
   return null
 }

@@ -238,17 +238,27 @@ type BusinessWorkspaceProps = { user: User; feedbackRef: RefObject<FeedbackHandl
 function AuthenticatedWorkspace({ user, error, fetching, retry }: { user: User; error: Error | null; fetching: boolean; retry: () => void }) {
   const queryClient = useQueryClient(), feedbackRef = useRef<FeedbackHandle>(null)
   const [reauthenticate, setReauthenticate] = useState(false), [reauthBusy, setReauthBusy] = useState(false)
+  const [sessionNeedsLogin, setSessionNeedsLogin] = useState(false)
+  useEffect(() => {
+    const requireLogin = (event: Event) => {
+      const expectedUserId = (event as CustomEvent<{ expectedUserId?: number }>).detail?.expectedUserId
+      if (expectedUserId === undefined || expectedUserId === user.id) setSessionNeedsLogin(true)
+    }
+    window.addEventListener('authentication-required', requireLogin)
+    return () => window.removeEventListener('authentication-required', requireLogin)
+  }, [user.id])
   const [leaving, setLeaving] = useState(false)
   const workspaceProps = { user, feedbackRef, reauthenticate, reauthBusy, onReauthenticate: () => setReauthenticate(true), onLeaving: setLeaving }
   return <>
-    <UserWorkspace {...workspaceProps} sessionError={error} sessionFetching={fetching} retrySession={retry} />
+    <UserWorkspace {...workspaceProps} sessionNeedsLogin={sessionNeedsLogin} sessionError={error} sessionFetching={fetching} retrySession={retry} />
     <SystemFeedbackPanel user={user} handleRef={feedbackRef} leaving={leaving || reauthenticate} onReauthenticate={() => setReauthenticate(true)} />
     <Modal open={reauthenticate} title="重新登录" footer={null} destroyOnHidden closable={!reauthBusy} maskClosable={false} keyboard={!reauthBusy} onCancel={() => setReauthenticate(false)}>
-      <p className="muted">使用原账号可继续系统反馈；切换账号会关闭原申请和反馈草稿。</p>
+      <p className="muted">使用原账号登录可保留当前页面输入，并恢复因登录失效暂停的自动保存；切换账号会关闭原申请和反馈草稿。未保存输入仅保留在当前页面，请勿刷新或关闭。</p>
       <Login compact onBusy={setReauthBusy} onLogin={(current) => {
         if (current.id !== user.id) queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' })
         queryClient.setQueryData(['me'], current)
         setReauthenticate(false)
+        setSessionNeedsLogin(false)
         if (current.id === user.id) window.dispatchEvent(new Event('editor-reauthenticated'))
         for (const resource of ['changes', 'change', 'materials', 'questions', 'ecr-actions', 'eco-actions', 'emc', 'execution-plan', 'significant-change', 'submission', 'stage-workflow', 'publication', 'publications', 'ecr-publications', 'stage-navigation', 'source-ecr', 'reviewers', 'review-list', 'review-round', 'review-inbox', 'system-feedback-list', 'system-feedback-detail']) void queryClient.invalidateQueries({ queryKey: [resource, current.id] })
       }} />
@@ -256,7 +266,7 @@ function AuthenticatedWorkspace({ user, error, fetching, retry }: { user: User; 
   </>
 }
 
-function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feedbackRef, reauthenticate, reauthBusy, onReauthenticate, onLeaving }: BusinessWorkspaceProps & { sessionError: Error | null; sessionFetching: boolean; retrySession: () => void }) {
+function UserWorkspace({ user, sessionNeedsLogin, sessionError, retrySession, sessionFetching, feedbackRef, reauthenticate, reauthBusy, onReauthenticate, onLeaving }: BusinessWorkspaceProps & { sessionNeedsLogin: boolean; sessionError: Error | null; sessionFetching: boolean; retrySession: () => void }) {
   const queryClient = useQueryClient()
   const { modal, message } = AntApp.useApp()
   const [section, setSection] = useState<'home' | 'mine' | 'review'>('home')
@@ -359,8 +369,9 @@ function UserWorkspace({ user, sessionError, retrySession, sessionFetching, feed
     return () => window.removeEventListener(inboxNavigationEvent, openMessage)
   })
   return <div className="app-shell">
-    <header className="topbar"><div className="brand"><span className="brand-mark">变</span><div><strong>表单填报系统</strong><span>设计变更工作台</span></div></div>{user && <div className="user-menu"><span>{user.display_name}</span>{user.can_manage_feedback && <Button onClick={() => feedbackRef.current?.manage()}>反馈管理</Button>}<Button disabled={saving || listBusy} onClick={retrySession}>刷新身份</Button><Button disabled={saving || listBusy} onClick={onReauthenticate}>重新登录</Button><Button type="text" loading={exit.isPending} disabled={saving || listBusy} onClick={() => navigate(() => exit.mutate())}>退出登录</Button></div>}</header>
+    <header className="topbar"><div className="brand"><span className="brand-mark">变</span><div><strong>表单填报系统</strong><span>设计变更工作台</span></div></div>{user && <div className="user-menu"><span>{user.display_name}</span>{user.can_manage_feedback && <Button onClick={() => feedbackRef.current?.manage()}>反馈管理</Button>}<Button type="text" loading={exit.isPending} disabled={saving || listBusy} onClick={() => navigate(() => exit.mutate())}>退出登录</Button></div>}</header>
     <main className="workspace">
+      {sessionNeedsLogin && <Alert type="warning" showIcon title="当前操作需要重新登录，未保存输入仍保留在本页面" description="请使用原账号重新登录后继续；不要刷新或关闭页面。若权限已被撤销，重新登录不会恢复该权限。" className="form-alert" action={<Button disabled={reauthBusy} onClick={onReauthenticate}>重新登录</Button>} />}
       {sessionError && <Alert type="error" showIcon title="登录信息刷新失败，当前填写内容仍保留" description={sessionError.message} className="form-alert" action={<Button loading={sessionFetching} disabled={saving || exit.isPending} onClick={retrySession}>重试</Button>} />}
       {exit.error && <Alert type="error" title={exit.error.message} className="form-alert" />}
       <nav className="workspace-navigation"><Button type={section === 'home' ? 'primary' : 'default'} disabled={saving || listBusy || confirming} onClick={() => changeSection('home')}>工作台</Button><Button type={section === 'mine' ? 'primary' : 'default'} disabled={saving || listBusy || confirming} onClick={() => changeSection('mine')}>工程变更</Button><Button type={section === 'review' ? 'primary' : 'default'} disabled={saving || listBusy || confirming || !reviewAllowed} onClick={() => changeSection('review')}>待我处理</Button><span className="workspace-return" ref={setReturnTarget} /></nav>

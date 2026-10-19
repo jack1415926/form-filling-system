@@ -152,7 +152,9 @@ CORS_ALLOWED_ORIGINS = [
 CSRF_TRUSTED_ORIGINS = ["http://localhost:5173"]
 CSRF_TRUSTED_ORIGINS += [origin.strip() for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "changes.api_errors.exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated", "changes.permissions.ExpectedAccountPermission"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
 }
+CSRF_FAILURE_VIEW = "changes.api_errors.csrf_failure"
