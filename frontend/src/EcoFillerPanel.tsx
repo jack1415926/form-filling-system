@@ -64,14 +64,15 @@ export default function EcoFillerPanel({ record, leaving, onBusy, onReauthentica
     try { await check(unknown) } catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : String(failure)) } finally { if (active.current) setBusy(false) }
   }
   const data = query.data, disabled = leaving || busy || !!unknown
-  return <section className="panel form-alert"><h2>ECO填写人</h2>
-    {data && <p>{data.filler.display_name}（{data.filler.username}）{!data.filler.is_active && ' · 已停用'}</p>}
+  return <section className="panel form-alert eco-filler-panel"><div className="eco-filler-heading"><div><h2>ECO填写人</h2>
+    {data && <p>{data.filler.display_name}（{data.filler.username}）{!data.filler.is_active && ' · 已停用'}</p>}</div>
+    <Button disabled={disabled} onClick={() => void query.refetch()}>刷新填写人</Button></div>
     {data && data.filler.id !== actor && <p className="muted">当前由上述人员填写；你可按权限查看，不能代为修改或提交。</p>}
     {data?.can_transfer && <><Space wrap><Select aria-label="新的ECO填写人" style={{ minWidth: 280 }} disabled={disabled} value={target} placeholder="选择新的填写人，包括自己" showSearch optionFilterProp="label" options={(people.data ?? []).filter(person => person.id !== data.filler.id).map(person => ({ value: person.id, label: `${person.display_name}（${person.username}）` }))} onChange={setTarget} />
       <Button disabled={disabled || !target} loading={busy} onClick={() => modal.confirm({ title: '更换ECO填写人？', content: '已保存内容和历史保持不变，新填写人负责后续填写与提交；发布人不会自动改变。', onOk: () => run({ request_id: crypto.randomUUID(), filler_id: target!, expected_filler_id: data.filler.id, expected_updated_at: data.change.updated_at }) })}>更换填写人</Button></Space><p className="muted">交接前请先保存当前页面，未保存、正在保存或结果未确认时不能交接。</p></>}
     {(error || query.error || people.error) && <Alert type="error" title={error || query.error?.message || people.error?.message} />}
     {people.error && <Button disabled={disabled} onClick={() => void people.refetch()}>重试读取填写人名单</Button>}
-    <Space wrap><Button disabled={leaving || busy || !!unknown} onClick={() => void query.refetch()}>刷新填写人</Button>{unknown && <><Button disabled={busy || leaving} onClick={() => void recover()}>查询交接结果</Button><Button disabled={busy || leaving} onClick={() => void run(unknown)}>按原请求重试</Button><Button disabled={busy || leaving} onClick={onReauthenticate}>原账号重新登录</Button></>}</Space>
+    {unknown && <Space wrap><Button disabled={busy || leaving} onClick={() => void recover()}>查询交接结果</Button><Button disabled={busy || leaving} onClick={() => void run(unknown)}>按原请求重试</Button><Button disabled={busy || leaving} onClick={onReauthenticate}>原账号重新登录</Button></Space>}
     {unknown && <Alert type="warning" title="交接结果未确认，原请求及填写人选择已保留，请先查询或重试。" />}
     {!!data?.history.length && <details><summary>填写人历史（{data.history.length}条）</summary>{data.history.map((event, index) => <p key={event.request_id ?? `baseline-${index}`}>{new Date(event.created_at).toLocaleString('zh-CN')} · {event.kind === 'baseline' ? `历史基线：${event.filler.display_name}` : event.kind === 'create' ? `${event.actor?.display_name}创建，指定${event.filler.display_name}` : `${event.actor?.display_name}交接：${event.previous_filler?.display_name} → ${event.filler.display_name}`}</p>)}</details>}
   </section>

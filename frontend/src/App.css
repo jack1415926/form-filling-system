@@ -92,6 +92,7 @@
 
 .emc-group-title { width: max-content; max-width: 100%; margin: 0 auto; position: sticky; left: 300px; }
 .workspace-navigation { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 28px; }
+.workspace-return { margin-left: auto; }
 .engineering-filters { flex-wrap: wrap; gap: 16px; }
 .engineering-process { display: grid; gap: 8px; }
 .engineering-process .ant-tag { width: fit-content; margin: 0; }
@@ -108,7 +109,15 @@
 .process-body > .panel.form-alert > h2 { margin-bottom: 16px; }
 .process-body > .panel.form-alert > p { line-height: 1.7; margin-bottom: 16px; }
 .process-summary { padding: 24px; margin-bottom: 24px; }
-.process-summary .ant-descriptions { margin-bottom: 18px; }
+.process-summary-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 18px; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.process-summary-meta > :last-child { margin-left: auto; }
+.eco-filler-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px 24px; margin-bottom: 16px; }
+.eco-filler-heading > div { min-width: 0; overflow-wrap: anywhere; }
+.eco-filler-heading h2 { margin-bottom: 16px; }
+.eco-filler-heading p { margin-bottom: 0; }
+.eco-filler-panel > details { border-top: 1px solid #edf1ee; padding-top: 16px; margin-top: 16px; }
+.eco-filler-panel > details summary { cursor: pointer; }
+.eco-filler-panel > details p { margin: 12px 0 0; line-height: 1.7; overflow-wrap: anywhere; }
 .process-body .ant-steps { margin-bottom: 20px; }
 @media (max-width: 950px) { .process-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 16px; } }
 @media (max-width: 720px) { .process-layout { grid-template-columns: 1fr; } .process-heading h1 { font-size: 22px; } }

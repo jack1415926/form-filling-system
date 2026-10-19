@@ -98,7 +98,7 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
   return <>
     {query.error && <Alert type="error" title="审核记录读取失败" description={query.error.message} action={<Button disabled={busy} onClick={() => void query.refetch()}>重试</Button>} className="form-alert" />}
     {!data ? query.isPending && <Spin tip="正在读取审核轮次…"><div className="loading-space" /></Spin> : <>
-      {compact && <section className="panel material-section">
+      {compact && <section className="panel list-panel material-section">
         <div className="section-heading"><span>第{data.round.number}轮审核 · {labels[data.round.state]}</span><Button disabled={busy || !!confirm || leaving} onClick={openReview}>查看审核历史与意见</Button></div>
         <p className="muted">各轮审核、修改意见和回应保留；已批准申请的记录只读。</p>
         {data.round.required_approvers?.some(person => person.id === actor.id) && data.round.state === 'pending' && <><p>{approvalProgress(data.round)}</p><Button type="primary" disabled={!!approvalReason} onClick={() => setConfirm('approve')}>本人同意批准</Button>{approvalReason && <p className="muted">{approvalReason}</p>}</>}
