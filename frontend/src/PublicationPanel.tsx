@@ -5,7 +5,7 @@ import { api, ApiError, type ChangeRequest, type User } from './api'
 import { newestResponse } from './latestResponse'
 import { saveResultUnconfirmed } from './questionDraft'
 import { checkedReviewers } from './submission'
-import { checkedPublication, checkedCreatedEco, publicationSettled, newestPublication, type PublicationData, type PublicationOperation } from './publication'
+import { checkedPublication, checkedCreatedEco, publicationSettled, publicationCanRetry, newestPublication, type PublicationData, type PublicationOperation } from './publication'
 
 export default function PublicationPanel({ record, leaving, onBusy, onReauthenticate, onOpenChange }: {
   record: ChangeRequest; leaving: boolean; onBusy: (busy: boolean) => void; onReauthenticate: () => void; onOpenChange?: (id: number) => void
@@ -33,7 +33,8 @@ export default function PublicationPanel({ record, leaving, onBusy, onReauthenti
   const refresh = () => { for (const resource of ['changes', 'publications', 'ecr-publications', 'review-round', 'stage-workflow', 'stage-navigation']) void client.invalidateQueries({ queryKey: [resource, actor] }) }
   const settle = (data: PublicationData, operation: PublicationOperation) => {
     if (publicationSettled(data, operation)) { setUnknown(null); setError(''); refresh() }
-    else { setUnknown(operation); setError('原操作结果尚未确认，请查询或按原请求重试。') }
+    else if (!publicationCanRetry(data, operation)) { setUnknown(null); setError('当前发布权限、轮次或关联ECO已变化，原请求不再重试；请核对当前记录，不能据此认定原操作成功。'); refresh() }
+    else { setUnknown(operation); setError('暂未查到原操作的完成凭据；结果仍未确认，可稍后查询或按原请求重试。') }
   }
   const run = async (operation: PublicationOperation) => {
     setBusy(true); setError('')

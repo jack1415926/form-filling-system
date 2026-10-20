@@ -1,3 +1,4 @@
+import { checkedEmc } from './emcMatrix'
 import { actorUser, canEdit } from './workflow'
 import { useEffect, useImperativeHandle, useState, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -28,7 +29,7 @@ function EmcForm({ data, record, onDirty, onBusy, onPrevious, onNext, leaving, o
   const save = useAutosave({
     fields: emcFields(data), enabled: !locked && !leaving, paused, onDirty, onBusy,
     send: async (patch) => {
-      const result = await api<EmcData>(`/api/changes/${record.id}/emc/`, 'PATCH', emcPayload(patch), actorId)
+      const result = checkedEmc(await api<EmcData>(`/api/changes/${record.id}/emc/`, 'PATCH', emcPayload(patch), actorId))
       const key = ['emc', actorId, record.id]
       const latest = newestResponse(queryClient.getQueryData<EmcData>(key), result)
       if (save.queue.active) {
@@ -82,7 +83,7 @@ export default function EmcEditor(props: Props) {
   const actorId = actorUser(queryClient).id
   const queryKey = ['emc', actorId, record.id]
   const query = useQuery({ queryKey, refetchOnWindowFocus: false, queryFn: async () => {
-    const result = await api<EmcData>(`/api/changes/${record.id}/emc/`, 'GET', undefined, actorId)
+    const result = checkedEmc(await api<EmcData>(`/api/changes/${record.id}/emc/`, 'GET', undefined, actorId))
     return newestResponse(queryClient.getQueryData<EmcData>(queryKey), result)
   } })
   return <>{query.error && <Alert type="error" title={query.data ? 'EMC 刷新失败，当前填写仍保留' : '无法读取 EMC'} description={query.error.message} className="form-alert" action={<Button disabled={leaving} loading={query.isFetching} onClick={() => void query.refetch()}>重试</Button>} />}

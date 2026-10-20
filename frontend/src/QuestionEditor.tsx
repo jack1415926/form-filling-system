@@ -1,3 +1,4 @@
+import { checkedQuestions } from './questionDraft'
 import { actorUser, canEdit } from './workflow'
 import { useImperativeHandle, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -23,7 +24,7 @@ function QuestionForm({ data, record, onDirty, onBusy, onPrevious, onNext, saveR
   const save = useAutosave({
     fields: questionFields(data), enabled: !locked && !leaving, paused, onDirty, onBusy,
     send: async (patch) => {
-      const result = await api<QuestionData>(`/api/changes/${record.id}/questions/`, 'PATCH', questionPayload(patch), actorId)
+      const result = checkedQuestions(await api<QuestionData>(`/api/changes/${record.id}/questions/`, 'PATCH', questionPayload(patch), actorId))
       const key = ['questions', actorId, record.id]
       const latest = newestResponse(queryClient.getQueryData<QuestionData>(key), result)
       if (save.queue.active) {
@@ -66,7 +67,7 @@ export default function QuestionEditor(props: Props) {
   const questions = useQuery({
     queryKey,
     queryFn: async () => {
-      const result = await api<QuestionData>(`/api/changes/${record.id}/questions/`, 'GET', undefined, actorId)
+      const result = checkedQuestions(await api<QuestionData>(`/api/changes/${record.id}/questions/`, 'GET', undefined, actorId))
       // A delayed read must not regress the cache after a newer save either.
       return newestResponse(queryClient.getQueryData<QuestionData>(queryKey), result)
     },

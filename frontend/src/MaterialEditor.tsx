@@ -6,7 +6,7 @@ import DispositionFields from './DispositionFields'
 import { api, ApiError, type ChangeRequest, type Material, type MaterialCategory, type MaterialValues, type MaterialField } from './api'
 import useAutosave, { discardSavedWarning } from './useAutosave'
 import { materialFields, materialPayload } from './autosaveFields'
-import { checkedMaterial, materialFormValues } from './materialSave'
+import { checkedMaterial, checkedMaterials, materialFormValues } from './materialSave'
 
 const categories: { key: MaterialCategory; label: string }[] = [
   { key: 'revision', label: '升版的物料或文件' },
@@ -84,7 +84,7 @@ export default function MaterialEditor({ record, onDirty, onBusy, leaving, onRea
   const [filter, setFilter] = useState<MaterialCategory | ''>('')
   useEffect(() => { onEditorOpen(!!editor); return () => onEditorOpen(false) }, [editor, onEditorOpen])
   const locked = !canEdit(record, actorUser(queryClient))
-  const materials = useQuery({ queryKey: ['materials', actorId, record.id], queryFn: () => api<Material[]>(path, 'GET', undefined, actorId), refetchOnWindowFocus: false })
+  const materials = useQuery({ queryKey: ['materials', actorId, record.id], queryFn: async () => checkedMaterials(await api<unknown>(path, 'GET', undefined, actorId)), refetchOnWindowFocus: false })
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['materials', actorId, record.id] })
     void queryClient.invalidateQueries({ queryKey: ['change', actorId, record.id] })

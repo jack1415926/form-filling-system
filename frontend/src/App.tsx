@@ -26,7 +26,7 @@ import EcoFillerInbox from './EcoFillerInbox'
 import InactiveEcoSheet from './InactiveEcoSheet'
 import { processMenu, processStates, type ProcessFilter, type EngineeringChange } from './engineeringChangeData'
 import DeleteEngineeringChangeDialog from './DeleteEngineeringChangeDialog'
-import { submissionChoiceWarning } from './submission'
+import { submissionChoiceWarning, checkedChange } from './submission'
 import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
 import useAutosave, { discardSavedWarning } from './useAutosave'
@@ -88,7 +88,7 @@ export function OverviewEditor({ record, onDirty, onSaved, onBusy, leaving, onNe
     fields: overviewFields(record), enabled: !locked && !leaving, valid: !dateInvalid, paused, onDirty, onBusy,
     send: async (patch) => {
       try { await form.validateFields() } catch { throw new ApiError(400, '请修正表单校验提示后保存') }
-      const result = await api<ChangeRequest>('/api/changes/' + record.id + '/', 'PATCH', patch, actorId)
+      const result = checkedChange(await api<unknown>('/api/changes/' + record.id + '/', 'PATCH', patch, actorId), { id: record.id, applicant: record.applicant })
       const latest = newestResponse(queryClient.getQueryData<ChangeRequest>(['change', actorId, record.id]), result)
       if (save.queue.active) onSaved(latest)
       return overviewFields(latest)
@@ -277,6 +277,7 @@ function UserWorkspace({ user, sessionNeedsLogin, sessionError, retrySession, se
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState<EngineeringChange | null>(null)
   const [inboxTargetId, setInboxTargetId] = useState<number | null>(null)
+  const [publicationEntry, setPublicationEntry] = useState(0)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -288,7 +289,7 @@ function UserWorkspace({ user, sessionNeedsLogin, sessionError, retrySession, se
   }, [dirty, saving, confirming])
   const [processFilter, setProcessFilter] = useState<ProcessFilter>('ecr'), [statusFilter, setStatusFilter] = useState('all')
   const detail = useQuery({ queryKey: ['change', user.id, selectedId], queryFn: async () => {
-    const result = await api<ChangeRequest>('/api/changes/' + selectedId + '/', 'GET', undefined, user.id)
+    const result = checkedChange(await api<unknown>('/api/changes/' + selectedId + '/', 'GET', undefined, user.id), { id: selectedId! })
     return newestResponse(queryClient.getQueryData<ChangeRequest>(['change', user.id, selectedId]), result)
   }, enabled: section === 'mine' && selectedId !== null, refetchOnWindowFocus: false })
   const create = useMutation({
@@ -351,6 +352,16 @@ function UserWorkspace({ user, sessionNeedsLogin, sessionError, retrySession, se
       const { actor_id, item, onOpened } = (event as CustomEvent<InboxNavigation>).detail
       if (actor_id !== user.id) return
       if (saving || listBusy || confirming || reauthenticate) { message.warning('请先确认当前操作结果再切换申请。'); return }
+      if (item.context === 'publication') {
+        navigate(() => {
+          setDirty(false); setSaving(false); setReviewTarget(null); setInboxTargetId(null)
+          setPublicationEntry(value => value + 1); setSection('mine'); setSelectedId(item.change_id)
+          void queryClient.invalidateQueries({ queryKey: ['change', user.id, item.change_id] })
+          void queryClient.invalidateQueries({ queryKey: ['publication', user.id, item.change_id] })
+          onOpened()
+        })
+        return
+      }
       if (item.context === 'applicant' && section === 'mine' && selectedId === item.change_id) { onOpened(); if (item.open_issues) openReviewDrawer(); return }
       if (item.context === 'reviewer' && !reviewAllowed) { void retrySession(); return }
       if (item.context === 'reviewer' && section === 'review' && reviewTarget?.id === item.change_id && reviewTarget.number === item.round) {
@@ -380,14 +391,14 @@ function UserWorkspace({ user, sessionNeedsLogin, sessionError, retrySession, se
         <div className="page-heading"><div><span className="eyebrow">工作台</span><h1>{user.display_name}，欢迎回来</h1><p className="muted">在这里发起自己的变更申请{reviewAllowed ? '，也可以处理交给你的审核事项。' : '。'}</p></div></div>
         <div className="workspace-cards"><button className="workspace-card panel" disabled={listBusy} onClick={() => changeSection('mine')}><span className="workspace-card-icon">＋</span><h2>工程变更</h2><p className="muted">发起ECR，关联查看独立ECO，或继续填写有权处理的流程。</p><span className="workspace-card-link">进入工程变更 →</span></button>
           {reviewAllowed && <button className="workspace-card panel" disabled={listBusy} onClick={() => changeSection('review')}><span className="workspace-card-icon">✓</span><h2>待我处理</h2><p className="muted">处理自己的ECR／ECO任务、意见复核、批准和发布。</p><span className="workspace-card-link">进入待我处理 →</span></button>}</div>
-      </> : section === 'review' ? reviewAllowed ? <ReviewWorkbench user={user} target={reviewTarget} onSelect={setReviewTarget} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBusy={setSaving} onDirty={setDirty} renderForm={(record, onBack, formState) => <ConfigProvider theme={reviewReadOnlyTheme}><ChangeEditor key={record.id} reviewOnly record={record} onOpenChange={id => navigate(() => { setReviewTarget(null); setSection('mine'); setSelectedId(id) })} onDirty={formState.onDirty} onBusy={formState.onBusy} onLeaveMessage={() => {}} leaving={formState.leaving} onReauthenticate={onReauthenticate} onBack={onBack} onSaved={() => {}} /></ConfigProvider>} /> : <Alert type="warning" title="处理权限已撤销，不能继续访问他人申请。" action={<Button onClick={() => changeSection('home')}>返回工作台首页</Button>} /> : selectedId === null ? <>
+      </> : section === 'review' ? reviewAllowed ? <ReviewWorkbench user={user} target={reviewTarget} onSelect={setReviewTarget} onOpenChange={id => navigate(() => { setReviewTarget(null); setInboxTargetId(null); setSection('mine'); setSelectedId(id) })} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBusy={setSaving} onDirty={setDirty} renderForm={(record, onBack, formState) => <ConfigProvider theme={reviewReadOnlyTheme}><ChangeEditor key={record.id} reviewOnly record={record} onOpenChange={id => navigate(() => { setReviewTarget(null); setSection('mine'); setSelectedId(id) })} onDirty={formState.onDirty} onBusy={formState.onBusy} onLeaveMessage={() => {}} leaving={formState.leaving} onReauthenticate={onReauthenticate} onBack={onBack} onSaved={() => {}} /></ConfigProvider>} /> : <Alert type="warning" title="处理权限已撤销，不能继续访问他人申请。" action={<Button onClick={() => changeSection('home')}>返回工作台首页</Button>} /> : selectedId === null ? <>
         {create.error && <Alert type="error" title={create.error.message} className="form-alert" />}
         {remove.error && <Alert type="error" showIcon title={remove.error instanceof ApiError && remove.error.status === 404 ? '申请已不存在或不可访问，列表已刷新' : '删除失败，申请记录仍保留'} description={remove.error instanceof ApiError && remove.error.status === 404 ? undefined : remove.error.message} className="form-alert" />}
         <EngineeringChanges user={user} workflow={processFilter} state={statusFilter} onWorkflow={setProcessFilter} onState={setStatusFilter} busy={listBusy} creating={create.isPending} removing={remove.isPending ? remove.variables.row.id : undefined} onCreate={() => create.mutate()} onOpen={id => setSelectedId(id)} onDelete={row => { remove.reset(); setDeleting(row) }} />
         {deleting && <DeleteEngineeringChangeDialog key={deleting.id} row={deleting} pending={remove.isPending} error={remove.error} onCancel={() => { if (!remove.isPending) setDeleting(null) }} onConfirm={deleteEco => remove.mutate({ row: deleting, deleteEco })} />}
       </> : detail.data ? <>
         {detail.error && <Alert type="error" showIcon title="申请信息刷新失败，当前填写内容仍保留" description={detail.error.message} className="form-alert" action={<Button loading={detail.isFetching} disabled={saving || exit.isPending} onClick={() => void detail.refetch()}>重试</Button>} />}
-        <ChangeEditor returnTarget={returnTarget} onOpenChange={id => navigate(() => { setInboxTargetId(null); setSelectedId(id) })} initialReviewOpen={inboxTargetId === selectedId} onLeaveMessage={setLeaveMessage} key={selectedId} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBack={() => navigate(() => { setDirty(false); setInboxTargetId(null); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
+        <ChangeEditor returnTarget={returnTarget} onOpenChange={id => navigate(() => { setInboxTargetId(null); setSelectedId(id) })} initialReviewOpen={inboxTargetId === selectedId} onLeaveMessage={setLeaveMessage} key={`${selectedId}:${publicationEntry}`} record={detail.data} onDirty={setDirty} onBusy={setSaving} leaving={exit.isPending || reauthenticate || confirming} onReauthenticate={onReauthenticate} onBack={() => navigate(() => { setDirty(false); setInboxTargetId(null); setSelectedId(null); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) })} onSaved={(record) => { queryClient.setQueryData<ChangeRequest>(['change', user.id, record.id], (current) => newestResponse(current, record)); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) }} />
       </> : detail.isPending ? <Spin tip="正在读取草稿…"><div className="loading-space" /></Spin> : <Alert type="error" title={detail.error?.message ?? '无法读取申请。'} action={<><Button loading={detail.isFetching} disabled={exit.isPending} onClick={() => void detail.refetch()}>重试</Button><Button disabled={exit.isPending} onClick={() => { setSelectedId(null); setDirty(false) }}>返回列表</Button></>} />}
       <footer className="workspace-footer"><span className="muted">ECR与ECO分别填写、审核及发布；ECO从已发布ECR启动，两份流程保持数据和历史独立。</span></footer>
     </main>

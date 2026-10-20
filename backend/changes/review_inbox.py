@@ -80,7 +80,7 @@ class ReviewInbox(APIView):
             state='approved', change__status='approved', change__publisher=request.user).select_related('change')
         reads = dict(ReviewInboxRead.objects.filter(user=request.user, round__in=rows).values_list('round_id', 'signature'))
         return [{'change_id': row.change_id, 'round': row.number, 'stage': row.change.stage, 'title': row.title,
-                 'context': 'applicant' if row.change.applicant_id == request.user.pk else 'reviewer',
+                 'context': 'publication',
                  'ecr_no': row.ecr_no, 'eco_no': row.eco_no, 'status': 'approved', 'count': 1,
                  'summary': f'{row.change.stage.upper()}已批准，待本人发布', 'open_issues': False,
                  'message_key': signature, 'is_read': reads.get(row.pk) == signature}

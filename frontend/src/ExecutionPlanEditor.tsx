@@ -1,3 +1,4 @@
+import { checkedPlan } from './executionPlanDraft'
 import { actorUser, canEdit } from './workflow'
 import { useImperativeHandle, useState, type Ref } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -23,7 +24,7 @@ function PlanForm({ data, record, leaving, paused, saveRef, onDirty, onBusy, onP
     fields: executionPlanFields(data), enabled: !locked && !leaving, valid: (values) => !invalidPlanRows(values, data.rows, incomplete).length, paused, onDirty, onBusy,
     send: async (patch) => {
       if (invalidPlanRows(save.values, data.rows, incomplete).length) throw new ApiError(400, '请修正执行计划中的日期后保存。')
-      const result = await api<PlanData>(`/api/changes/${record.id}/execution-plan/`, 'PATCH', executionPlanPayload(patch), actorId)
+      const result = checkedPlan(await api<PlanData>(`/api/changes/${record.id}/execution-plan/`, 'PATCH', executionPlanPayload(patch), actorId))
       const key = ['execution-plan', actorId, record.id]
       const latest = newestResponse(queryClient.getQueryData<PlanData>(key), result)
       if (save.queue.active) {
@@ -76,7 +77,7 @@ export default function ExecutionPlanEditor(props: Props) {
   const actorId = actorUser(queryClient).id
   const queryKey = ['execution-plan', actorId, record.id]
   const query = useQuery({ queryKey, refetchOnWindowFocus: false, queryFn: async () => {
-    const result = await api<PlanData>(`/api/changes/${record.id}/execution-plan/`, 'GET', undefined, actorId)
+    const result = checkedPlan(await api<PlanData>(`/api/changes/${record.id}/execution-plan/`, 'GET', undefined, actorId))
     return newestResponse(queryClient.getQueryData<PlanData>(queryKey), result)
   } })
   return <>

@@ -6,6 +6,16 @@ const locations = ['company_finished', 'company_wip', 'company_raw', 'supplier_f
 const choices = ['', 'Use-up', 'Scrap', 'Rework', 'No Change', 'Balance', 'NA']
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
 
+export function checkedMaterials(value: unknown): Material[] {
+  const fields: MaterialField[] = ['material_no', 'description', 'material_class', 'old_revision', 'new_revision', 'revision', 'detailed_class', 'discontinued_project', 'change_description']
+  if (!Array.isArray(value) || new Set(value.map(row => row?.id)).size !== value.length) throw new ApiError(200, '物料列表响应不完整，请重试。')
+  for (const row of value) {
+    if (!row || !['revision', 'addition', 'discontinuation'].includes(row.category)) throw new ApiError(200, '物料列表响应不完整，请重试。')
+    checkedMaterial(row, row.category, fields)
+  }
+  return value
+}
+
 export function checkedMaterial(value: unknown, category: MaterialCategory, fields: MaterialField[], expectedId?: number): Material {
   const valid = object(value) && Number.isSafeInteger(value.id) && Number(value.id) > 0
     && (expectedId === undefined || value.id === expectedId) && value.category === category

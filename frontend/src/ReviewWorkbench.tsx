@@ -6,7 +6,7 @@ import { type RoundInfo, reviewStateLabels } from './review'
 import { modeLabel } from './submission'
 import ReviewPanel from './ReviewPanel'
 
-export default function ReviewWorkbench({ user, target: selected, onSelect: setSelected, leaving, onReauthenticate, renderForm, onBusy, onDirty }: { user: User; target: { id: number; number: number; showIssues?: boolean } | null; onSelect: (target: { id: number; number: number; showIssues?: boolean } | null) => void; leaving: boolean; onReauthenticate: () => void; renderForm: (record: ChangeRequest, onBack: () => void, state: { onBusy: (value: boolean) => void; onDirty: (value: boolean) => void; leaving: boolean }) => ReactNode; onBusy: (value: boolean) => void; onDirty: (value: boolean) => void }) {
+export default function ReviewWorkbench({ user, target: selected, onSelect: setSelected, onOpenChange, leaving, onReauthenticate, renderForm, onBusy, onDirty }: { user: User; target: { id: number; number: number; showIssues?: boolean } | null; onOpenChange: (id: number) => void; onSelect: (target: { id: number; number: number; showIssues?: boolean } | null) => void; leaving: boolean; onReauthenticate: () => void; renderForm: (record: ChangeRequest, onBack: () => void, state: { onBusy: (value: boolean) => void; onDirty: (value: boolean) => void; leaving: boolean }) => ReactNode; onBusy: (value: boolean) => void; onDirty: (value: boolean) => void }) {
   const [kind, setKind] = useState('designated')
   const [issueBusy, setIssueBusy] = useState(false), [issueDirty, setIssueDirty] = useState(false)
   const [formBusy, setFormBusy] = useState(false), [formDirty, setFormDirty] = useState(false)
@@ -25,7 +25,7 @@ export default function ReviewWorkbench({ user, target: selected, onSelect: setS
         {publications.error && <Alert type="error" title={publications.error.message} />}
         <section className="panel list-panel"><Table rowKey="id" loading={publications.isPending} dataSource={publications.data ?? []} columns={[
           { title: '标题', dataIndex: 'title' }, { title: '流程／编号', render: (_, row) => `${row.stage?.toUpperCase()} · ${row.stage === 'eco' ? row.eco_no : row.ecr_no}` }, { title: '状态', render: (_, row) => row.status === 'published' ? '已发布' : '已批准待发布' },
-          { title: '操作', render: (_, row) => <Button disabled={busy} onClick={() => setSelected({ id: row.id, number: row.current_review_round })}>查看申请</Button> },
+          { title: '操作', render: (_, row) => <Button disabled={busy} onClick={() => onOpenChange(row.id)}>查看申请</Button> },
         ]} /></section>
       </> : <>
       {list.error && <Alert type="error" title={list.error.message} className="form-alert" />}

@@ -61,7 +61,7 @@ export default function EcoFillerPanel({ record, leaving, onBusy, onReauthentica
   const recover = async () => {
     if (!unknown) return
     setBusy(true); setError('')
-    try { await check(unknown) } catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : String(failure)) } finally { if (active.current) setBusy(false) }
+    try { await check(unknown) } catch (failure) { if (active.current) setError(failure instanceof ApiError && failure.status === 404 ? '已查询，暂未找到原交接回执；结果仍未确认，可稍后查询或按原请求重试。' : failure instanceof Error ? failure.message : String(failure)) } finally { if (active.current) setBusy(false) }
   }
   const data = query.data, disabled = leaving || busy || !!unknown
   return <section className="panel form-alert eco-filler-panel"><div className="eco-filler-heading"><div><h2>ECO填写人</h2>

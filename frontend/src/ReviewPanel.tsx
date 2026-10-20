@@ -84,7 +84,10 @@ export default function ReviewPanel({ compact = false, initialOpen = false, chan
   const check = async () => {
     if (!unknown || flight.current) return
     flight.current = true; setBusy(true)
-    try { settle(unknown, checkedReview(await api<unknown>(path, 'GET', undefined, actor.id), changeId, number)) }
+    try {
+      const data = settle(unknown, checkedReview(await api<unknown>(path, 'GET', undefined, actor.id), changeId, number))
+      if (!actionConfirmed(unknown, data, actor.id) && actionCanRetry(unknown, data)) setError('已查询，暂未查到原操作记录；结果仍未确认，可稍后查询或按原请求重试。')
+    }
     catch (failure) { if (active.current) setError(failure instanceof Error ? failure.message : String(failure)) }
     finally { flight.current = false; if (active.current) setBusy(false) }
   }

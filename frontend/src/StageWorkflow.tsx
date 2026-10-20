@@ -106,7 +106,13 @@ function TaskEditor({ record, task, leaving, accept, read, onReauthenticate, ...
   } })
   const check = async () => {
     setBusy(true)
-    try { const data = await read(); if (unknown) settleConfirmation(data, unknown) }
+    try {
+      const data = await read()
+      if (unknown) {
+        settleConfirmation(data, unknown)
+        if (taskConfirmationState(data.tasks.find(row => row.id === task.id), unknown) === 'retryable') setError('已查询，暂未查到原确认记录；结果仍未确认，可稍后查询或按原请求重试。')
+      }
+    }
     catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) } finally { setBusy(false) }
   }
   const disabled = !task.can_edit || leaving || busy || !!unknown || save.manual
@@ -196,7 +202,13 @@ export function StageSubmission({ record, leaving, onPrevious, onReauthenticate,
   }
   const check = async () => {
     setBusy(true)
-    try { const data = await read(); if (unknown) settleSubmission(data, unknown) }
+    try {
+      const data = await read()
+      if (unknown) {
+        settleSubmission(data, unknown)
+        if (stageSubmissionState(data, unknown) === 'retryable') setError('已查询，暂未查到原提交记录；结果仍未确认，可稍后查询或按原请求重试。')
+      }
+    }
     catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)) } finally { setBusy(false) }
   }
   useEffect(() => { callbacks.onBusy(busy || !!unknown || publisher.pending); callbacks.onDirty(!!unknown || publisher.dirty) }, [callbacks, busy, unknown, publisher.pending, publisher.dirty])

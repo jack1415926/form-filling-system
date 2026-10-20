@@ -2,6 +2,14 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { checkedInbox } from '../src/reviewInboxData.ts'
 
+test('publication messages have a current-process destination regardless of applicant identity', () => {
+  for (const stage of ['ecr', 'eco']) {
+    const item = { context: 'publication', stage, change_id: 1, round: 2, title: 'Ready', ecr_no: 'ECR', eco_no: 'ECO', status: 'approved', count: 1, summary: 'Publish', open_issues: false, message_key: 'a'.repeat(64), is_read: false }
+    const data = { actor_id: 3, count: 1, unread_count: 1, items: [item] }
+    assert.equal(checkedInbox(data, { id: 3 }), data)
+  }
+})
+
 test('unified accounts support mixed task contexts, independent read counts and strict response validation', () => {
   {
     const user={id:3}

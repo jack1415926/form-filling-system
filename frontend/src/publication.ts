@@ -41,12 +41,19 @@ export function publicationSettled(data: PublicationData, operation: Publication
   return operation.kind === 'publish' ? data.change.status === 'published' : data.eco_id !== null && data.eco_creation_receipt?.request_id === operation.request_id && data.eco_creation_receipt.filler_id === operation.filler_id && data.eco_creation_receipt.actor_id === data.actor_id
 }
 
+export function publicationCanRetry(data: PublicationData, operation: PublicationOperation) {
+  return operation.kind === 'publish'
+    ? data.can_publish && data.change.current_review_round === operation.expected_round
+    : data.can_create_eco && data.eco_id === null
+}
+
 export function newestPublication(current: PublicationData | undefined, incoming: PublicationData): PublicationData {
   if (!current) return incoming
   // Creating an ECO does not mutate the immutable source timestamp. Its link only grows.
   if (current.change.updated_at === incoming.change.updated_at) {
     const ecoId = current.eco_id ?? incoming.eco_id
-    return { ...incoming, eco_id: ecoId, can_create_eco: ecoId === null && incoming.can_create_eco }
+    const link = incoming.eco_id === null && current.eco_id !== null ? current : incoming
+    return { ...incoming, eco_id: ecoId, eco_filler_id: link.eco_filler_id, eco_creation_receipt: link.eco_creation_receipt, can_create_eco: ecoId === null && incoming.can_create_eco }
   }
   return newestResponse(current.change, incoming.change) === current.change ? current : incoming
 }

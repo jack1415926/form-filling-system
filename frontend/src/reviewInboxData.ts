@@ -1,6 +1,6 @@
 import { ApiError, type User } from './api.ts'
 
-export type InboxItem = { context: 'applicant' | 'reviewer'; change_id: number; round: number; title: string; ecr_no: string; eco_no?: string; stage?: 'legacy' | 'ecr' | 'eco'; status: 'pending' | 'returned' | 'approved'; count: number; summary: string; open_issues: boolean; message_key: string; is_read: boolean }
+export type InboxItem = { context: 'applicant' | 'reviewer' | 'publication'; change_id: number; round: number; title: string; ecr_no: string; eco_no?: string; stage?: 'legacy' | 'ecr' | 'eco'; status: 'pending' | 'returned' | 'approved'; count: number; summary: string; open_issues: boolean; message_key: string; is_read: boolean }
 export type InboxData = { actor_id: number; count: number; unread_count: number; items: InboxItem[] }
 export type InboxNavigation = { actor_id: number; item: InboxItem; onOpened: () => void }
 export const inboxNavigationEvent = 'review-inbox-open-application'
@@ -11,7 +11,7 @@ export function checkedInbox(value: unknown, user: Pick<User, 'id'>): InboxData 
     || !data.items.every(item => item && positive(item.change_id) && positive(item.round) && positive(item.count)
       && typeof item.title === 'string' && typeof item.ecr_no === 'string' && typeof item.summary === 'string'
       && ['pending', 'returned', 'approved'].includes(item.status) && (item.stage === undefined || ['legacy', 'ecr', 'eco'].includes(item.stage)) && (item.stage !== 'eco' || typeof item.eco_no === 'string') && typeof item.open_issues === 'boolean'
-      && ['applicant', 'reviewer'].includes(item.context)
+      && ['applicant', 'reviewer', 'publication'].includes(item.context)
       && typeof item.is_read === 'boolean' && typeof item.message_key === 'string' && /^[0-9a-f]{64}$/.test(item.message_key))
     || new Set(data.items.map(item => item.change_id)).size !== data.items.length
     || data.count !== data.items.reduce((total, item) => total + item.count, 0)

@@ -1,7 +1,7 @@
 import { checkedPublishedResults } from '../src/actionOwners.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { checkedPublication, checkedCreatedEco, publicationSettled, newestPublication } from '../src/publication.ts'
+import { checkedPublication, checkedCreatedEco, publicationSettled, publicationCanRetry, newestPublication } from '../src/publication.ts'
 import { checkedStage } from '../src/ecrStage.ts'
 import { newestResponse } from '../src/latestResponse.ts'
 
@@ -46,11 +46,28 @@ test('published ECR preserves stage response and rejects editable terminal tasks
 })
 
 test('ECO recovery observes a new link at the unchanged source timestamp and late reads cannot erase it', () => {
-  const noEco = { ...published, actor_id: 1, can_create_eco: true }
-  const withEco = { ...noEco, eco_id: 20, can_create_eco: false }
+  const noEco = { ...published, actor_id: 1, can_create_eco: true, eco_filler_id: null, eco_creation_receipt: null }
+  const receipt = { actor_id: 1, request_id: request, filler_id: 2 }
+  const withEco = { ...noEco, eco_id: 20, eco_filler_id: 2, eco_creation_receipt: receipt, can_create_eco: false }
   assert.equal(newestPublication(noEco, withEco).eco_id, 20)
   assert.equal(newestPublication(withEco, noEco).eco_id, 20)
   assert.equal(newestPublication(withEco, noEco).can_create_eco, false)
+  assert.equal(newestPublication(withEco, noEco).eco_filler_id, 2)
+  assert.equal(newestPublication(withEco, noEco).eco_creation_receipt, receipt)
+  assert.equal(publicationSettled(newestPublication(withEco, noEco), { kind: 'create', request_id: request, filler_id: 2 }), true)
+})
+
+test('another creation or a changed publication state releases retry without claiming the original request succeeded', () => {
+  const create = { kind: 'create', request_id: request, filler_id: 1 }
+  const noEco = { ...published, can_create_eco: true }
+  const otherEco = { ...noEco, eco_id: 20, can_create_eco: false, eco_creation_receipt: { actor_id: 1, request_id: 'another-request', filler_id: 3 } }
+  assert.equal(publicationSettled(otherEco, create), false)
+  assert.equal(publicationCanRetry(otherEco, create), false)
+  assert.equal(publicationCanRetry(noEco, create), true)
+  const publish = { kind: 'publish', request_id: request, expected_round: 1 }
+  assert.equal(publicationCanRetry(data, publish), true)
+  assert.equal(publicationCanRetry({ ...data, can_publish: false }, publish), false)
+  assert.equal(publicationCanRetry({ ...data, change: { ...change, current_review_round: 2 } }, publish), false)
 })
 
 const result = id => ({id, round: 1, owner: {id, username: 'owner' + id, display_name: 'Owner' + id, is_active: true}, result: 'Confirmation ' + id, status: 'completed', date: '2026-10-13', confirmed_at: '2026-10-13T00:00:00Z'})

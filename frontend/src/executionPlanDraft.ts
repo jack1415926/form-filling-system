@@ -1,10 +1,23 @@
 import type { Fields } from './autosave'
+import { ApiError } from './api.ts'
 
 export type PlanValues = { owner: string; start_date: string | null; end_date: string | null; remark: string }
 export type PlanRow = PlanValues & { id: string; activity: string }
 export type PlanData = { updated_at: string; rows: PlanRow[] }
 export type PlanField = keyof PlanValues
 const fields: PlanField[] = ['owner', 'start_date', 'end_date', 'remark']
+
+export function checkedPlan(value: unknown): PlanData {
+  const data = value as PlanData | null
+  if (!data || typeof data.updated_at !== 'string' || !Number.isFinite(Date.parse(data.updated_at)) || !Array.isArray(data.rows) || data.rows.length !== 11
+    || new Set(data.rows.map(row => row?.id)).size !== 11
+    || !data.rows.every(row => row && /^plan_(?:00[1-9]|01[01])$/.test(row.id)
+      && ['activity', 'owner', 'remark'].every(key => typeof row[key as 'activity'] === 'string')
+      && [row.start_date, row.end_date].every(date => date === null || typeof date === 'string' && Number.isFinite(Date.parse(date))))) {
+    throw new ApiError(200, '执行计划响应不完整，请保留填写内容后重试。')
+  }
+  return data
+}
 
 export const executionPlanFields = (data: PlanData): Fields => Object.fromEntries(data.rows.flatMap((row) => fields.map((field) => [`${row.id}.${field}`, row[field]])))
 
