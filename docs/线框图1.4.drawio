@@ -1175,7 +1175,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="p14" name="08 27题问题评估">
-    <mxGraphModel dx="1164" dy="658" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1440" pageHeight="3527" math="0" shadow="0">
+    <mxGraphModel dx="1164" dy="658" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1440" pageHeight="1260" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -1201,7 +1201,7 @@
           <mxGeometry height="1" width="1378" x="31" y="124" as="geometry" />
         </mxCell>
         <mxCell id="p14-9" parent="1" style="rectangle;rounded=0;fillColor=#222222;strokeColor=none;strokeWidth=0;" value="" vertex="1">
-          <mxGeometry height="1" width="1378" x="31" y="3479" as="geometry" />
+          <mxGeometry height="1" width="1378" x="31" y="1210" as="geometry" />
         </mxCell>
         <mxCell id="p14-11" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="申请页面导航" vertex="1">
           <mxGeometry height="29" width="199" x="45" y="141" as="geometry" />
@@ -1243,12 +1243,12 @@
           <mxGeometry height="34" width="190" x="52" y="684" as="geometry" />
         </mxCell>
         <mxCell id="p14-24" parent="1" style="rectangle;rounded=0;fillColor=#222222;strokeColor=none;strokeWidth=0;" value="" vertex="1">
-          <mxGeometry height="3316" width="1" x="274" y="140" as="geometry" />
+          <mxGeometry height="1050" width="1" x="274" y="140" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-101" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;" value="申请 #[申请ID]" vertex="1">
           <mxGeometry height="24" width="1038" x="312" y="143" as="geometry" />
         </mxCell>
-        <mxCell id="p14-new-102" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=23;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="问题评估" vertex="1">
+        <mxCell id="p14-new-102" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=23;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="问题评估（局部示例，共27题）" vertex="1">
           <mxGeometry height="40" width="1038" x="312" y="177" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-103" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;" value="“未回答”和“否”是两种不同状态。批量选择保留备注，之后仍可逐题修改。缺少条件性理由时会提示，草稿仍可保存。" vertex="1">
@@ -1296,589 +1296,94 @@
         <mxCell id="p14-new-117" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
           <mxGeometry height="47" width="420" x="921" y="452" as="geometry" />
         </mxCell>
-        <mxCell id="p14-new-118" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="2" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="518" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-119" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响一个受监管或安规机构关注的关键器件。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="518" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-120" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="518" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-121" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="531" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-122" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="518" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-123" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="530" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-124" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="3" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="596" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-125" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响产品注册认证，如国内NMPA，&#10;受影响的产品是否已获得CE证书。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="596" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-126" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="596" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-127" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="609" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-128" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="596" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-129" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="608" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-130" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="4" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="674" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-131" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响WEEE或者RoHS的要求。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="674" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-132" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="674" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-133" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="687" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-134" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="674" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-135" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="686" as="geometry" />
-        </mxCell>
         <mxCell id="p14-new-136" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="风险" vertex="1">
-          <mxGeometry height="32" width="1038" x="312" y="778" as="geometry" />
+          <mxGeometry height="32" width="1038" x="312" y="560.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-137" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="题号" vertex="1">
-          <mxGeometry height="42" width="65" x="312" y="822" as="geometry" />
+          <mxGeometry height="42" width="65" x="312" y="604.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-138" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="问题" vertex="1">
-          <mxGeometry height="42" width="410" x="377" y="822" as="geometry" />
+          <mxGeometry height="42" width="410" x="377" y="604.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-139" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="回答" vertex="1">
-          <mxGeometry height="42" width="125" x="787" y="822" as="geometry" />
+          <mxGeometry height="42" width="125" x="787" y="604.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-140" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="备注" vertex="1">
-          <mxGeometry height="42" width="438" x="912" y="822" as="geometry" />
+          <mxGeometry height="42" width="438" x="912" y="604.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-141" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="5" vertex="1">
-          <mxGeometry height="108" width="65" x="312" y="864" as="geometry" />
+          <mxGeometry height="108" width="65" x="312" y="646.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-142" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更是否引入新的危害(Hazard)或危险情景(Hazardous Situation)？是否改变了引发危险情景的原因(Causes)，或改变了风险缓和措施(Mitigations)？如果回答“否”，请说明理由。" vertex="1">
-          <mxGeometry height="108" width="410" x="377" y="864" as="geometry" />
+          <mxGeometry height="108" width="410" x="377" y="646.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-143" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="108" width="125" x="787" y="864" as="geometry" />
+          <mxGeometry height="108" width="125" x="787" y="646.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-144" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="877" as="geometry" />
+          <mxGeometry height="35" width="111" x="794" y="659.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-145" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="108" width="438" x="912" y="864" as="geometry" />
+          <mxGeometry height="108" width="438" x="912" y="646.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-146" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="876" as="geometry" />
+          <mxGeometry height="47" width="420" x="921" y="658.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-147" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;" value="条件提示：答“否”且未填备注时，请说明未引入新危害、未改变危险情景原因或风险缓和措施的理由" vertex="1">
-          <mxGeometry height="36" width="420" x="921" y="929" as="geometry" />
+          <mxGeometry height="36" width="420" x="921" y="711.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-148" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="研发" vertex="1">
-          <mxGeometry height="32" width="1038" x="312" y="998" as="geometry" />
+          <mxGeometry height="32" width="1038" x="312" y="790.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-149" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="题号" vertex="1">
-          <mxGeometry height="42" width="65" x="312" y="1042" as="geometry" />
+          <mxGeometry height="42" width="65" x="312" y="834.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-150" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="问题" vertex="1">
-          <mxGeometry height="42" width="410" x="377" y="1042" as="geometry" />
+          <mxGeometry height="42" width="410" x="377" y="834.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-151" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="回答" vertex="1">
-          <mxGeometry height="42" width="125" x="787" y="1042" as="geometry" />
+          <mxGeometry height="42" width="125" x="787" y="834.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-152" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="备注" vertex="1">
-          <mxGeometry height="42" width="438" x="912" y="1042" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-153" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="6" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1084" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-154" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更对现有物料号（包括软件）进行升版，或者该变更创建新的物料号。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1084" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-155" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1084" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-156" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1097" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-157" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1084" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-158" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1096" as="geometry" />
+          <mxGeometry height="42" width="438" x="912" y="834.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-159" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="7" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1162" as="geometry" />
+          <mxGeometry height="78" width="65" x="312" y="876.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-160" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响EMC。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1162" as="geometry" />
+          <mxGeometry height="78" width="410" x="377" y="876.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-161" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1162" as="geometry" />
+          <mxGeometry height="78" width="125" x="787" y="876.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-162" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1175" as="geometry" />
+          <mxGeometry height="35" width="111" x="794" y="889.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-163" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1162" as="geometry" />
+          <mxGeometry height="78" width="438" x="912" y="876.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-164" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1174" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-165" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="8" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1240" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-166" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更需要建立新的可销售单元(Commercial Item)，或需要申请新的UDI。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1240" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-167" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1240" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-168" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1253" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-169" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1240" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-170" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1252" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-171" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="9" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1318" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-172" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响产品外观。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1318" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-173" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1318" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-174" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1331" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-175" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1318" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-176" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1330" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-177" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="10" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1396" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-178" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响产品彩页和产品数据手册中的内容。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1396" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-179" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1396" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-180" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1409" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-181" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1396" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-182" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1408" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-183" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="11" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1474" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-184" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响用户手册。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1474" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-185" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1474" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-186" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1487" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-187" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1474" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-188" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1486" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-189" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="12" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1552" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-190" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响其他产品。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1552" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-191" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1552" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-192" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1565" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-193" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1552" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-194" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1564" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-195" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="13" vertex="1">
-          <mxGeometry height="108" width="65" x="312" y="1630" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-196" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更是否影响DHF的充分性和适宜性，是否需要设计评审。&#10;如果不影响DHF的充分性和适宜性，则说明理由" vertex="1">
-          <mxGeometry height="108" width="410" x="377" y="1630" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-197" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="108" width="125" x="787" y="1630" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-198" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1643" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-199" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="108" width="438" x="912" y="1630" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-200" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1642" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-201" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;" value="条件提示：答“否”且未填备注时，请说明 DHF 的充分性和适宜性不受影响的理由" vertex="1">
-          <mxGeometry height="36" width="420" x="921" y="1695" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-202" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="14" vertex="1">
-          <mxGeometry height="108" width="65" x="312" y="1738" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-203" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更是否需要设计验证来保证变更后产品能满足设计输入的要求？&#10;如果不需要设计验证，请备注理由。" vertex="1">
-          <mxGeometry height="108" width="410" x="377" y="1738" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-204" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="108" width="125" x="787" y="1738" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-205" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1751" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-206" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="108" width="438" x="912" y="1738" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-207" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1750" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-208" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;" value="条件提示：答“否”且未填备注时，请说明不需要设计验证的理由" vertex="1">
-          <mxGeometry height="36" width="420" x="921" y="1803" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-209" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="15" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1846" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-210" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更是否需要设计确认来保证变更后产品能满足用户需求、可用性以及警示标签等的要求？" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1846" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-211" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1846" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-212" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1859" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-213" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1846" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-214" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1858" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-215" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="16" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="1924" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-216" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更是否影响关键零部件或可追溯零部件？" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="1924" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-217" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="1924" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-218" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="1937" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-219" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="1924" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-220" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="1936" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-221" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="生产" vertex="1">
-          <mxGeometry height="32" width="1038" x="312" y="2028" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-222" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="题号" vertex="1">
-          <mxGeometry height="42" width="65" x="312" y="2072" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-223" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="问题" vertex="1">
-          <mxGeometry height="42" width="410" x="377" y="2072" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-224" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="回答" vertex="1">
-          <mxGeometry height="42" width="125" x="787" y="2072" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-225" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="备注" vertex="1">
-          <mxGeometry height="42" width="438" x="912" y="2072" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-226" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="17" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="2114" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-227" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="被变更的是否外购零件或属于外购组件的一部分？" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="2114" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-228" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="2114" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-229" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2127" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-230" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="2114" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-231" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2126" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-232" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="18" vertex="1">
-          <mxGeometry height="81" width="65" x="312" y="2192" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-233" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响内部的生产装配过程、生产测试过程、质量控制计划、进货检验、SOP、生产工具、生产工装、生产仪器设备、操作员培训材料或工时。" vertex="1">
-          <mxGeometry height="81" width="410" x="377" y="2192" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-234" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="81" width="125" x="787" y="2192" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-235" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2205" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-236" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="81" width="438" x="912" y="2192" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-237" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2204" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-238" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="19" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="2273" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-239" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更涉及包装运输或货架期。包括包装、运输、搬运和存储的要求；货架期的变更；标签的更新。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="2273" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-240" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="2273" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-241" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2286" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-242" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="2273" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-243" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2285" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-244" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="20" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="2351" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-245" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更需要暂停发货或让步接收。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="2351" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-246" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="2351" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-247" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2364" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-248" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="2351" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-249" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2363" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-250" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="EHS" vertex="1">
-          <mxGeometry height="32" width="1038" x="312" y="2455" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-251" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="题号" vertex="1">
-          <mxGeometry height="42" width="65" x="312" y="2499" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-252" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="问题" vertex="1">
-          <mxGeometry height="42" width="410" x="377" y="2499" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-253" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="回答" vertex="1">
-          <mxGeometry height="42" width="125" x="787" y="2499" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-254" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="备注" vertex="1">
-          <mxGeometry height="42" width="438" x="912" y="2499" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-255" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="21" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="2541" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-256" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响EHS。例如提举重量超过20kg、需要新的PPE等。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="2541" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-257" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="2541" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-258" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答 " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2554" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-259" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="2541" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-260" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2553" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-261" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="售后" vertex="1">
-          <mxGeometry height="32" width="1038" x="312" y="2645" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-262" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="题号" vertex="1">
-          <mxGeometry height="42" width="65" x="312" y="2689" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-263" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="问题" vertex="1">
-          <mxGeometry height="42" width="410" x="377" y="2689" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-264" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="回答" vertex="1">
-          <mxGeometry height="42" width="125" x="787" y="2689" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-265" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="备注" vertex="1">
-          <mxGeometry height="42" width="438" x="912" y="2689" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-266" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="22" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="2731" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-267" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响维修备件。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="2731" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-268" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="2731" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-269" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2744" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-270" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="2731" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-271" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2743" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-272" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="23" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="2809" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-273" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更需要实施现场变更。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="2809" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-274" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="2809" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-275" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2822" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-276" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="2809" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-277" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2821" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-278" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="24" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="2887" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-279" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更影响维修手册。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="2887" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-280" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="2887" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-281" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2900" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-282" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="2887" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-283" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2899" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-284" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="25" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="2965" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-285" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="该变更需要技术公告(Technical Bulletin)。" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="2965" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-286" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="2965" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-287" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="2978" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-288" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="2965" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-289" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="2977" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-290" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="QA" vertex="1">
-          <mxGeometry height="32" width="1038" x="312" y="3069" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-291" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="题号" vertex="1">
-          <mxGeometry height="42" width="65" x="312" y="3113" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-292" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="问题" vertex="1">
-          <mxGeometry height="42" width="410" x="377" y="3113" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-293" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="回答" vertex="1">
-          <mxGeometry height="42" width="125" x="787" y="3113" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-294" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="备注" vertex="1">
-          <mxGeometry height="42" width="438" x="912" y="3113" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-295" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="26" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="3155" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-296" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="注册人制度：该变更影响委托方（注册人）或受托方（受托生产企业）" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="3155" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-297" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="3155" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-298" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="3168" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-299" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="3155" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-300" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="3167" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-301" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="27" vertex="1">
-          <mxGeometry height="78" width="65" x="312" y="3233" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-302" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="委托研发：该变更活动是否需要受托研发方或原设计方的参与？" vertex="1">
-          <mxGeometry height="78" width="410" x="377" y="3233" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-303" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="125" x="787" y="3233" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-304" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="未回答   " vertex="1">
-          <mxGeometry height="35" width="111" x="794" y="3246" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-305" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
-          <mxGeometry height="78" width="438" x="912" y="3233" as="geometry" />
-        </mxCell>
-        <mxCell id="p14-new-306" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=14;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="[备注，可多行]" vertex="1">
-          <mxGeometry height="47" width="420" x="921" y="3245" as="geometry" />
+          <mxGeometry height="47" width="420" x="921" y="888.0" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-307" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;" value="保存状态：[已保存／等待保存…]&#10;最近保存：[时间]" vertex="1">
-          <mxGeometry height="50" width="480" x="312" y="3346" as="geometry" />
+          <mxGeometry height="50" width="480" x="312" y="1070" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-308" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=center;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="上一页" vertex="1">
-          <mxGeometry height="35" width="150" x="850" y="3351" as="geometry" />
+          <mxGeometry height="35" width="150" x="850" y="1075" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-309" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=center;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="保存草稿" vertex="1">
-          <mxGeometry height="35" width="150" x="1015" y="3351" as="geometry" />
+          <mxGeometry height="35" width="150" x="1015" y="1075" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-310" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=center;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="下一页" vertex="1">
-          <mxGeometry height="35" width="170" x="1180" y="3351" as="geometry" />
+          <mxGeometry height="35" width="170" x="1180" y="1075" as="geometry" />
         </mxCell>
         <mxCell id="p14-new-311" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;" value="每题回答下拉：未回答／是／否。ECO可独立调整继承的答案，不回写来源ECR；锁定后只读，批量与保存按钮禁用。" vertex="1">
-          <mxGeometry height="45" width="1038" x="312" y="3423" as="geometry" />
+          <mxGeometry height="45" width="1038" x="312" y="1144" as="geometry" />
         </mxCell>
-      </root>
+      <mxCell id="p14-sample-note" parent="1" style="text;html=0;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=15;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=0;spacingRight=0;fontStyle=1;" value="本图仅示例第1、5、7题，其他问题的回答、备注和保存形式类似。系统共27题，提交前须全部回答。" vertex="1">
+          <mxGeometry height="55" width="1038" x="312" y="985" as="geometry" />
+        </mxCell>
+        </root>
     </mxGraphModel>
   </diagram>
   <diagram id="p04" name="09 ECR-ECO行动分配与处理">
@@ -3519,7 +3024,7 @@
         <mxCell id="p10-new-122" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=center;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="确定" vertex="1">
           <mxGeometry height="35" width="147" x="751" y="1188" as="geometry" />
         </mxCell>
-        <mxCell id="p10-new-123" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="提交后／只读状态&#10;&#10;显示阶段处理中、已批准待发布或已发布提示，以及已选发布人、批准人；不可代为修改或重复提交。" vertex="1">
+        <mxCell id="p10-new-123" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#F4F4F4;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;fontStyle=1;" value="提交后／只读状态&#10;&#10;显示阶段审核中、已批准待发布或已发布提示，以及已选发布人、批准人；不可代为修改或重复提交。" vertex="1">
           <mxGeometry height="220" width="400" x="950" y="1028" as="geometry" />
         </mxCell>
         <mxCell id="p10-new-124" parent="1" style="rectangle;rounded=0;html=0;whiteSpace=wrap;strokeColor=#222222;fillColor=#FFFFFF;strokeWidth=1;align=left;verticalAlign=middle;fontSize=13;fontFamily=Microsoft YaHei;fontColor=#222222;spacingLeft=7;spacingRight=7;" value="" vertex="1">
