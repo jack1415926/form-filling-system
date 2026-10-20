@@ -1,5 +1,7 @@
 # ECR／ECO 测试数据
 
+更新日期：2026-10-20。业务规则见[MVP](MVP.md)，自动化范围见[测试说明](testing/README.md)。
+
 从项目根目录运行，使用现有账号，不需要 Django 管理员或 Windows 管理员权限。数据库应已启动并迁移至当前版本，`.local/development.json` 中 `DJANGO_DEBUG` 为 `1`。
 
 ## 网页操作（推荐）
@@ -52,5 +54,7 @@ ECR不启用ECO Sheet；ECO的ECR Sheet始终只读引用来源已发布结果�
 ```powershell
 pwsh -NoProfile -File scripts/backend.ps1 seed_workflow --stage ecr --state reviewing --applicant user1
 ```
+
+异常处理优先运行自动化；生成用例用于准备需要人工审阅的业务状态，不需要为每个错误重复新增申请。[故障索引](testing/FAULT-INJECTION.md)中的network／timeout不会把匹配写入发送到后端，after-network／after-timeout则会真实执行，恢复预期不同。验证发布入口可用approved场景，以指定发布人分别从消息、待我发布和工程变更进入；系统反馈与管理不依赖ECR／ECO样例。
 
 数据库及内网服务启动见[开发说明](DEVELOPMENT.md)和[内网说明](COMPANY-LAN.md)。
