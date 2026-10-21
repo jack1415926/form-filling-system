@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>layout capture harness</title>
+<style>html,body{margin:0;padding:0}#out{display:none}iframe{border:0;width:1440px;height:900px;display:block}</style>
+</head>
+<body>
+<iframe id="app" src="__TARGET__"></iframe>
+<pre id="out">PENDING</pre>
+<script>
+/*
+ * Measures the real running app inside a same-origin iframe and writes a
+ * JSON snapshot into #out, so `chrome --dump-dom` can be parsed without CDP.
+ * Same-origin is guaranteed: this harness is served from localhost:5173 too.
+ */
+const KEEP = /^(topbar|brand|brand-mark|login-layout|login-intro|login-panel|panel|eyebrow|login-flow|ant-btn|ant-input|ant-form-item|ant-alert|muted|question-text)$/
+const KEEP_TAGS = new Set(['H1','H2','H3','P','LABEL','BUTTON','INPUT','TABLE','THEAD','TBODY','TR','TH','TD','SECTION','HEADER','ASIDE','FORM','NAV','FOOTER'])
+const isKept = (el) => el.tagName.toLowerCase() === 'section' || el.tagName.toLowerCase() === 'header'
+  || [...el.classList].some((c) => KEEP.test(c))
+  || (KEEP_TAGS.has(el.tagName) && (el.children.length === 0 || ['BUTTON','INPUT','H1','H2','H3','LABEL','TH'].includes(el.tagName)))
+
+function measure() {
+  const doc = document.getElementById('app').contentDocument
+  const win = document.getElementById('app').contentWindow
+  const root = doc.querySelector('#root')
+  if (!root || !doc.querySelector('.login-layout')) return null
+  const view = { width: win.innerWidth, height: win.innerHeight, scrollHeight: doc.documentElement.scrollHeight }
+  const round = (n) => Math.round(n * 10) / 10
+  const rows = []
+  const walk = (el, depth) => {
+    if (depth > 14) return
+    const r = el.getBoundingClientRect()
+    if (r.width < 2 || r.height < 2) return
+    if (isKept(el)) {
+      const cs = win.getComputedStyle(el)
+      const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join(' ').trim()
+      rows.push({
+        path: el.tagName.toLowerCase() + (el.className ? '.' + [...el.classList].filter((c) => !c.startsWith('css-') && c !== 'ant-css-var').join('.') : ''),
+        x: round(r.x), y: round(r.y), w: round(r.width), h: round(r.height),
+        tag: el.tagName, text: (own || (['BUTTON','H1','H2','H3','P','LABEL','TH','TD'].includes(el.tagName) ? el.textContent.trim() : '')).slice(0, 90),
+        display: cs.display, bg: cs.backgroundColor, color: cs.color, border: cs.borderTopWidth,
+        radius: cs.borderTopLeftRadius, fs: cs.fontSize, fw: cs.fontWeight,
+        type: el.tagName === 'INPUT' ? (el.getAttribute('type') || 'text') : undefined,
+        placeholder: el.getAttribute('placeholder') || undefined,
+        href: el.getAttribute('href') || undefined,
+      })
+    }
+    for (const child of el.children) walk(child, depth + 1)
+  }
+  walk(root, 0)
+  return { url: win.location.href, view, count: rows.length, rows }
+}
+
+let tries = 0
+const tick = () => {
+  tries += 1
+  let data = null
+  try { data = measure() } catch (e) { document.getElementById('out').textContent = 'ERROR ' + e.message; return }
+  if (data) { document.getElementById('out').textContent = JSON.stringify(data); return }
+  if (tries > 60) { document.getElementById('out').textContent = 'TIMEOUT'; return }
+  setTimeout(tick, 250)
+}
+setTimeout(tick, 800)
+</script>
+</body>
+</html>

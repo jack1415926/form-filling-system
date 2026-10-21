@@ -54,6 +54,25 @@ class DraftFlowTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["title"], "")
 
+    def test_creation_request_replays_without_overwriting_edits_and_is_account_scoped(self):
+        payload = {'request_id': str(uuid.uuid4()), 'title': 'Original create'}
+        first = self.client.post('/api/changes/', payload, format='json')
+        self.assertEqual(first.status_code, 201)
+        pk = first.json()['id']
+        self.assertEqual(first.json()['creation_request_id'], payload['request_id'])
+        self.client.patch(f'/api/changes/{pk}/', {'title': 'Later edit'}, format='json')
+        replay = self.client.post('/api/changes/', payload, format='json')
+        self.assertEqual(replay.status_code, 200)
+        self.assertEqual((replay.json()['id'], replay.json()['title']), (pk, 'Later edit'))
+        self.assertEqual(self.client.post('/api/changes/', {**payload, 'title': 'Different create'}, format='json').status_code, 409)
+        self.client.force_authenticate(self.other)
+        other = self.client.post('/api/changes/', payload, format='json')
+        self.assertEqual(other.status_code, 201)
+        self.assertNotEqual(other.json()['id'], pk)
+        self.assertEqual(ChangeRequest.objects.count(), 2)
+        for invalid in [None, True, 123, 'invalid']:
+            self.assertEqual(self.client.post('/api/changes/', {'request_id': invalid}, format='json').status_code, 400)
+
     def test_nonempty_numbers_are_unique_across_users_on_create_and_patch(self):
         existing = ChangeRequest.objects.create(applicant=self.other, ecr_no="ECR-UNIQUE", eco_no="ECO-UNIQUE", title="另一人的申请")
         candidate = ChangeRequest.objects.create(applicant=self.owner, title="原内容")
@@ -293,6 +312,18 @@ class ConcurrentDraftTests(TransactionTestCase):
         self.assertEqual(sorted(code for code, _ in responses), [201, 400])
         self.assertEqual(set(next(data for code, data in responses if code == 400)), {"ecr_no"})
         self.assertEqual(ChangeRequest.objects.filter(ecr_no="RACE-CREATE").count(), 1)
+
+    def test_concurrent_creation_retries_return_one_application(self):
+        payload = {'request_id': str(uuid.uuid4())}
+        barrier = Barrier(2)
+        def create():
+            barrier.wait(timeout=10)
+            return self.create_from_connection(payload)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = [future.result(timeout=15) for future in [executor.submit(create), executor.submit(create)]]
+        self.assertEqual(sorted(code for code, _ in responses), [200, 201])
+        self.assertEqual(len({data['id'] for _, data in responses}), 1)
+        self.assertEqual(ChangeRequest.objects.count(), 1)
 
     def test_concurrent_patches_with_same_number_roll_back_loser(self):
         original_validate = ChangeRequestSerializer.validate

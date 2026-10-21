@@ -68,7 +68,7 @@ def login_view(request):
     if user is None:
         return JsonResponse({"detail": "用户名或密码错误。"}, status=400)
     login(request, user)
-    # Login rotates the token. Return the new token for subsequent write requests.
+    # 登录会轮换CSRF令牌，必须把新令牌交给后续写请求。
     return JsonResponse({"user": user_data(user), "csrfToken": get_token(request)})
 
 
@@ -92,15 +92,34 @@ class ChangeList(generics.ListCreateAPIView):
     serializer_class = ChangeRequestSerializer
 
     def create(self, request, *args, **kwargs):
+        if not isinstance(request.data, dict):
+            raise serializers.ValidationError({'detail': '请求内容必须是对象。'})
+        payload = dict(request.data)
+        request_id = payload.pop('request_id', None)
+        if 'request_id' in request.data:
+            if not isinstance(request_id, str):
+                raise serializers.ValidationError({'request_id': '创建请求标识必须为UUID文字。'})
+            request_id = serializers.UUIDField().run_validation(request_id)
         with transaction.atomic():
-            return super().create(request, *args, **kwargs)
+            # 对带UUID的同账号新建请求串行化，避免并发重试生成两份草稿。
+            if request_id is not None:
+                from django.contrib.auth import get_user_model
+                from .request_values import canonical, conflict
+                get_user_model().objects.select_for_update().get(pk=request.user.pk)
+                existing = ChangeRequest.objects.filter(applicant=request.user, creation_request_id=request_id).first()
+                if existing:
+                    # 比较原创建载荷而非当前正文；重试只确认结果，不覆盖后来的编辑。
+                    if existing.creation_payload != canonical(payload):
+                        conflict('同一创建请求的内容不同，请核对原申请。')
+                    return Response(self.get_serializer(existing).data)
+            serializer = self.get_serializer(data=payload)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(applicant=request.user, stage='ecr', status=ChangeRequest.Status.DRAFT,
+                            creation_request_id=request_id, creation_payload=payload if request_id else {})
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=self.get_success_headers(serializer.data))
 
     def get_queryset(self):
         return ChangeRequest.objects.filter(applicant=self.request.user, stage__in=['ecr', 'eco'])
-
-    def perform_create(self, serializer):
-        serializer.save(applicant=self.request.user, stage='ecr', status=ChangeRequest.Status.DRAFT)
-
 
 class ChangeDetail(generics.RetrieveUpdateAPIView):
     allow_review_read = True
@@ -150,7 +169,7 @@ class ChangeDetail(generics.RetrieveUpdateAPIView):
 class MaterialList(APIView):
     allow_review_read = True
     def get(self, request, pk):
-        # ponytail: serialize this application's reads/writes; use a snapshot if contention becomes measurable.
+        # ponytail: 本申请读写共用父记录锁；若出现可测量的锁等待，再优化读取方式。
         with transaction.atomic():
             record = readable_change(request, pk)
             return Response(MaterialChangeSerializer(record.materials.prefetch_related("dispositions"), many=True).data)
@@ -256,7 +275,7 @@ class EcrActionList(APIView):
     @staticmethod
     def data(record):
         answers = dict(record.question_responses.values_list("number", "answer"))
-        responses = {row.action_key: row for row in record.ecr_responses.select_related('owner_user').all()}
+        responses = {row.action_key: row for row in record.ecr_responses.prefetch_related('owners').all()}
         results = {}
         if record.stage == 'ecr' and record.status == 'published':
             round = record.review_rounds.filter(number=record.current_review_round).first()
@@ -270,7 +289,7 @@ class EcrActionList(APIView):
         return {"updated_at": record.updated_at.isoformat(), "actions": [
             {**definition, "question_answer": answers.get(definition["number"], ""),
              "task_results": results.get(definition["id"], []),
-             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "owner_user_ids": [], "owner_users": [], "extra_required": False, "result": "", "status": "", "date": None})}
+             **(EcrActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner_user_ids": [], "owner_users": [], "extra_required": False, "result": "", "status": "", "date": None})}
             for definition in ECR_ACTIONS
         ]}
 
@@ -294,7 +313,7 @@ class EcrActionDetail(APIView):
                 return Response({"detail": "行动不存在。"}, status=404)
             if record.status not in [ChangeRequest.Status.DRAFT, ChangeRequest.Status.RETURNED]:
                 return Response({"detail": "申请已锁定，不能修改 ECR 评估。"}, status=409)
-            if record.stage == 'ecr' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'owner_user_ids', 'extra_required'}):
+            if record.stage == 'ecr' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_ids', 'extra_required'}):
                 return Response({'detail': '发起人仅可分配负责人和补充任务；结果由负责人在处理中填写。'}, status=400)
             if isinstance(request.data, dict) and 'extra_required' in request.data and type(request.data['extra_required']) is not bool:
                 return Response({'detail': '补充任务标记必须为布尔值。'}, status=400)
@@ -313,10 +332,10 @@ class EcoActionList(APIView):
     @staticmethod
     def data(record):
         answers = dict(record.question_responses.values_list("number", "answer"))
-        responses = {row.action_key: row for row in record.eco_responses.select_related('owner_user').all()}
+        responses = {row.action_key: row for row in record.eco_responses.prefetch_related('owners').all()}
         return {"updated_at": record.updated_at.isoformat(), "actions": [
             {**definition, "question_answer": answers.get(definition["number"], ""),
-             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner": "", "owner_user_id": None, "owner_user": None, "owner_user_ids": [], "owner_users": [], "extra_required": False, "result": "", "status": "", "date": None})}
+             **(EcoActionSerializer(responses[definition["id"]]).data if definition["id"] in responses else {"owner_user_ids": [], "owner_users": [], "extra_required": False, "result": "", "status": "", "date": None})}
             for definition in ECO_ACTIONS
         ]}
 
@@ -334,7 +353,7 @@ class EcoActionDetail(APIView):
             record = editable_change(request, pk)
             if record.stage == 'ecr':
                 return Response({'detail': 'ECO阶段尚未启动。'}, status=409)
-            if record.stage == 'eco' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_id', 'owner_user_ids', 'extra_required'}):
+            if record.stage == 'eco' and (not isinstance(request.data, dict) or set(request.data) - {'owner_user_ids', 'extra_required'}):
                 return Response({'detail': '草稿／退回时仅可分配ECO负责人及补充任务，结果由提交后的负责人填写。'}, status=400)
             if isinstance(request.data, dict) and 'extra_required' in request.data and type(request.data['extra_required']) is not bool:
                 return Response({'detail': '补充任务标记必须为布尔值。'}, status=400)

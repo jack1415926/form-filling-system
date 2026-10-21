@@ -1,4 +1,4 @@
-%% Current schema 0027; verified against local MySQL on 2026-10-16.
+%% Current schema 0029; verified against local MySQL on 2026-10-21.
 erDiagram
     direction TB
 
@@ -31,6 +31,8 @@ erDiagram
         datetime(6) published_at "NULL allowed"
         int published_by_id FK "NULL allowed; auth_user; ORM PROTECT"
         bigint source_ecr_id FK,UK "NULL allowed; change_request; ORM PROTECT"
+        json creation_payload "NOT NULL; original create payload"
+        char(32) creation_request_id "NULL allowed; unique with applicant_id"
     }
 
     eco_filler_event {
@@ -73,10 +75,8 @@ erDiagram
     review_record {
         bigint id PK "NOT NULL; auto increment"
         datetime(6) approved_at "NULL allowed"
-        bigint change_id FK "NOT NULL; change_request; ORM CASCADE"
         int reviewer_id FK "NOT NULL; auth_user; ORM PROTECT"
-        tinyint(1) assigned "NOT NULL"
-        bigint round_id FK "NULL allowed; review_round; ORM CASCADE"
+        bigint round_id FK "NOT NULL; review_round; ORM CASCADE"
         tinyint(1) approval_required "NOT NULL"
     }
 
@@ -208,24 +208,20 @@ erDiagram
     ecr_action_response {
         bigint id PK "NOT NULL; auto increment"
         varchar(7) action_key "NOT NULL"
-        varchar(255) owner "NOT NULL"
         longtext result "NOT NULL"
         varchar(16) status "NOT NULL"
         date date "NULL allowed"
         bigint change_id FK "NOT NULL; change_request; ORM CASCADE"
-        int owner_user_id FK "NULL allowed; auth_user; ORM PROTECT"
         tinyint(1) extra_required "NOT NULL"
     }
 
     eco_action_response {
         bigint id PK "NOT NULL; auto increment"
         varchar(7) action_key "NOT NULL"
-        varchar(255) owner "NOT NULL"
         longtext result "NOT NULL"
         varchar(24) status "NOT NULL"
         date date "NULL allowed"
         bigint change_id FK "NOT NULL; change_request; ORM CASCADE"
-        int owner_user_id FK "NULL allowed; auth_user; ORM PROTECT"
         tinyint(1) extra_required "NOT NULL"
     }
 
@@ -347,8 +343,7 @@ erDiagram
     change_request ||--o{ review_issue_event : "change_id"
     review_issue |o--o{ review_issue_event : "issue_id"
     review_round ||--o{ review_issue_event : "round_id"
-    change_request ||--o{ review_record : "change_id"
-    review_round |o--o{ review_record : "round_id"
+    review_round ||--o{ review_record : "round_id"
     change_request ||--o{ review_round : "change_id"
     change_request ||--o| significant_assessment : "change_id"
     change_request ||--o{ significant_chart_response : "change_id"

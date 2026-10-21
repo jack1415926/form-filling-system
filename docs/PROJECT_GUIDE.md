@@ -1,6 +1,6 @@
 # 表单填报系统技术文档：架构、数据与处理流程
 
-更新日期：2026-10-20。本文作为技术审阅入口，覆盖系统架构、代码模块、数据结构、保存链路和历史权限；2026-10-20只读核对，本机changes迁移已应用至0027；0027移除旧普通留言表review_feedback。功能与验证状态见[README](../README.md)，业务规则见[MVP](MVP.md)，安装／启动／迁移见[开发说明](DEVELOPMENT.md)，原Excel坐标见[字段映射](FIELD_MAP.md)。
+更新日期：2026-10-21。本文作为技术审阅入口，覆盖系统架构、代码模块、数据结构、保存链路和历史权限；本机changes迁移已应用至0029，已清理单负责人及旧审核兼容字段；0027已移除旧普通留言表review_feedback。功能与验证状态见[README](../README.md)，业务规则见[MVP](MVP.md)，安装／启动／迁移见[开发说明](DEVELOPMENT.md)，原Excel坐标见[字段映射](FIELD_MAP.md)。
 
 ## 系统架构
 
@@ -50,13 +50,13 @@ flowchart LR
 | --- | --- |
 | ECO交接 | eco_filler_event记录创建、历史基线及填写人交接；行动负责人及批准人集合另有三张关联表 |
 | 申请与基础 | change_request保存阶段、来源、编号和发布证据；material_change／material_disposition按物料与位置独立保存；question_response保存27题 |
-| 行动与轮次 | ecr_action_response／eco_action_response保存当前值；review_round冻结轮次；review_record保存参与关系；action_task按轮保存负责人／结果／确认；task_operation保存原请求回执 |
+| 行动与轮次 | ecr_action_response／eco_action_response保存当前行动配置及结果投影，负责人只保存在owners集合；review_round冻结轮次；review_record通过必填round保存参与关系，不重复保存change或assigned；action_task按轮保存负责人／结果／确认；task_operation保存原请求回执 |
 | 意见与提醒 | review_issue／review_issue_event保留原提出者、回应与解决过程；旧普通留言表review_feedback已在0027移除；review_inbox_read按账号／轮次保存消息签名 |
 | 评估 | execution_plan_response保存11条计划；significant_assessment／significant_chart_response／significant_question_response分开保存人工总论、组论和逐题填写 |
 | EMC | emc_reference及row／test／cell四表保存本单定义和交叉格，复合外键防止跨参考关联 |
 | 系统反馈 | system_feedback／system_feedback_event／system_feedback_read保存独立双向沟通和入站已读版本 |
 
-2026-10-16只读核验：当前0027为26个业务模型及3张人员关联表，共29张业务表、230个实际字段，58条外键约束涉及60个外键列；0025增加ECO填写权限提醒的已读表，0026在review_round增加完整表单JSON快照。[完整字段与关系](design/DATABASE-ER-FULL.md)及其Mermaid源已更新到0027，包含多人关联、交接、提醒及完整快照；旧图片仍为历史结构；当前结构以models.py和迁移文件为准。用户、会话、组、权限、迁移记录是系统表。八张Excel不等于八张数据库表，也不等于八个网页页签：概述／物料拆开，实质性主表／子表合为分组抽屉。
+2026-10-21核验：当前0029为26个业务模型及3张人员关联表，共29张业务表、226个实际字段，55条外键约束涉及57个外键列；0025增加ECO填写权限提醒的已读表，0026在review_round增加完整表单JSON快照。[完整字段与关系](design/DATABASE-ER-FULL.md)及其Mermaid源已更新到0029，包含创建回执、多人关联、交接、提醒及完整快照；旧图片仍为历史结构；当前结构以models.py和迁移文件为准。用户、会话、组、权限、迁移记录是系统表。八张Excel不等于八张数据库表，也不等于八个网页页签：概述／物料拆开，实质性主表／子表合为分组抽屉。
 
 ## 一次保存怎样到达数据库
 
@@ -66,7 +66,7 @@ flowchart LR
 | --- | --- |
 | 归属／轮次／任务授权 | 决定谁能读取或处理；staff／superuser不绕过业务授权 |
 | X-Expected-User | 拒绝页面账号与Cookie不一致的写入；它不是授权凭据 |
-| request_id | 确认原请求、避免重复新增；同UUID不同载荷409，物料号不用于新增去重 |
+| request_id | ECR新建按账号与UUID去重，重试不覆盖后续修改；确认原请求、避免重复新增；同UUID不同载荷409，物料号不用于新增去重 |
 | 局部PATCH、串行队列 | 只保存差异，显式空值清空；停顿2秒、有限重试、手动保存等待在途请求 |
 | updated_at缓存顺序 | 保留较新响应，包括微秒精度；干净编辑器同步，脏／在途／未知输入保留 |
 | version | 行动任务另有版本和UUID保护；基础表同字段仍是后保存者生效，没有通用多人冲突控制 |

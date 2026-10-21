@@ -31,7 +31,7 @@ def round_data(round):
             'approved_at': round.approved_at.isoformat() if round.approved_at else None,
             'returned_at': round.returned_at.isoformat() if round.returned_at else None,
             'returned_by': person(round.returned_by) if round.returned_by_id else None, 'return_reason': round.return_reason,
-            'reviewers': [person(row.reviewer) for row in records if row.assigned],
+            'reviewers': [person(row.reviewer) for row in records],
             'required_approvers': [person(row.reviewer) for row in records if row.approval_required],
             'approvals': [{**person(row.reviewer), 'approved_at': row.approved_at.isoformat()} for row in records if row.approved_at]}
 
@@ -66,7 +66,7 @@ class ReviewList(APIView):
 
     def get(self, request):
         kind = request.query_params.get('kind', 'designated')
-        if kind not in ['designated', 'public', 'handled', 'returned']:
+        if kind not in ['designated', 'handled', 'returned']:
             raise serializers.ValidationError({'kind': '列表类型不合法。'})
         own_approved = ReviewRecord.objects.filter(round_id=OuterRef('pk'), reviewer=request.user, approved_at__isnull=False)
         pending_task = ActionTask.objects.filter(round_id=OuterRef('pk'), owner=request.user, confirmed_at__isnull=True)
@@ -126,7 +126,7 @@ class ReviewDetail(APIView):
             if replay(record, request.user, action, values):
                 return Response(review_data(record, round, request.user))
             if action == 'approve':
-                existing = round.records.filter(reviewer=request.user).first()
+                existing = round.records.get(reviewer=request.user)
                 if existing and existing.approved_at and record.status in ['pending', 'approved']:
                     event(record, round, request.user, action, values)
                     record.updated_at = timezone.now(); record.save(update_fields=['updated_at'])
@@ -135,7 +135,7 @@ class ReviewDetail(APIView):
                     return Response({'detail': '本轮已结束，不能再通过。'}, status=409)
                 if record.review_issues.exclude(state='resolved').exists():
                     return Response({'detail': '存在未解决正式意见，不能批准。'}, status=409)
-                row = existing or ReviewRecord(change=record, round=round, reviewer=request.user, assigned=False)
+                row = existing
                 row.approved_at = timezone.now(); row.save()
                 event(record, round, request.user, action, values)
             elif action == 'return':

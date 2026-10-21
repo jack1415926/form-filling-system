@@ -26,7 +26,7 @@ import EcoFillerInbox from './EcoFillerInbox'
 import InactiveEcoSheet from './InactiveEcoSheet'
 import { processMenu, processStates, type ProcessFilter, type EngineeringChange } from './engineeringChangeData'
 import DeleteEngineeringChangeDialog from './DeleteEngineeringChangeDialog'
-import { submissionChoiceWarning, checkedChange } from './submission'
+import { submissionChoiceWarning, checkedChange, checkedCreatedChange } from './submission'
 import SaveBeforeSwitch, { type SaveHandle } from './SaveBeforeSwitch'
 import { newestResponse } from './latestResponse'
 import useAutosave, { discardSavedWarning } from './useAutosave'
@@ -35,7 +35,6 @@ import SystemFeedbackPanel, { type FeedbackHandle } from './SystemFeedbackPanel'
 import { inboxNavigationEvent, type InboxNavigation } from './reviewInboxData'
 import { openReviewDrawer } from './systemFeedback'
 
-const stateLabels = { draft: '草稿', pending: '待审核', approved: '已批准', returned: '待修订', published: '已发布' }
 const stateColors = { draft: 'default', pending: 'gold', approved: 'green', returned: 'orange', published: 'blue' }
 const reviewReadOnlyTheme = { components: {
   Input: { colorTextDisabled: '#243731', colorBgContainerDisabled: '#f8faf9' },
@@ -48,7 +47,7 @@ function Login({ onLogin, compact = false, onBusy }: { onLogin: (user: User) => 
   const [passwordVisible, setPasswordVisible] = useState(false)
   const clearPassword = () => { loginForm.resetFields(['password']); setPasswordVisible(false) }
   const mutation = useMutation({
-    // Read credentials only for this request; mutation variables outlive the login form.
+    // 密码只在发请求时读取，避免被存活时间更长的mutation变量保留。
     mutationFn: () => api<{ user: User }>('/api/auth/login/', 'POST', loginForm.getFieldsValue()),
     onSuccess: (result) => { clearPassword(); onLogin(result.user) },
     onError: clearPassword,
@@ -112,7 +111,7 @@ export function OverviewEditor({ record, onDirty, onSaved, onBusy, leaving, onNe
     { key: 'change_owner', label: '设计负责人／变更发起人' },
   ]
   return <>
-    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{['ecr', 'eco'].includes(record.stage ?? '') && record.status === 'pending' ? '处理中' : stateLabels[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div></div>
+    <div className="page-heading"><div><span className="eyebrow">申请 #{record.id}</span><h1>变更概述 <Tag color={stateColors[record.status]}>{processStates[record.status]}</Tag></h1><p className="muted">先记录基本信息，草稿可保存尚未填完整的内容。</p></div></div>
     <section className="panel overview-panel">
       <div className="section-heading"><div><h2>概述基本信息</h2><p className="muted">{record.stage === 'eco' ? 'ECO填写人由创建或交接时指定，业务负责人单独填写。' : '申请者由登录账号确定，业务负责人单独填写。'}</p></div><span className={dirty ? 'save-status unsaved' : 'save-status'}>{save.status}</span></div>
       {locked && <Alert type="info" title={['draft', 'returned'].includes(record.status) ? '当前由指定填写人编辑，概述仅供查看。' : '申请已锁定，概述仅供查看。'} className="form-alert" />}
@@ -193,7 +192,7 @@ function ChangeEditor(props: Parameters<typeof OverviewEditor>[0] & { onLeaveMes
       : <Alert type="info" title={record.current_review_round ? props.reviewOnly ? '本流程审核与意见请使用上方审核面板。' : '本流程的轮次、意见回应及原提出者复核见下方。' : '本流程尚未提交，没有审核轮次或正式意见。'} />
   return <>
     {record.body_access === false && preserveInput && <Alert type="warning" className="form-alert" title="正文权限已收回，未保存输入和未确认操作暂时保留。" description="请先核对原操作结果或复制需要保留的输入；离开仍需确认，修订中的正文不会重新开放。" />}
-    <div className="process-heading"><div><span className="eyebrow">独立{label}流程</span><h1>{(stage === 'eco' ? record.eco_no : record.ecr_no) || '编号待填写'} · {record.title || '未命名工程变更'} <Tag color={stateColors[record.status]}>{processStates[record.status]}</Tag></h1>{stage === 'eco' && <p className="muted">来源ECR：{record.source_ecr_no} · 已发布结果只读，本ECO独立填写、审核及发布。</p>}</div>{!props.reviewOnly && (props.returnTarget ? createPortal(<Button disabled={blocked} onClick={props.onBack}>{backLabel(client)}</Button>, props.returnTarget) : <Button disabled={blocked} onClick={props.onBack}>{backLabel(client)}</Button>)}</div>
+    <div className="process-heading"><div className="process-title"><span className="eyebrow">独立{label}流程</span><div className="process-title-row"><h1>{(stage === 'eco' ? record.eco_no : record.ecr_no) || '编号待填写'} · {record.title || '未命名工程变更'}</h1><Tag color={stateColors[record.status]}>{processStates[record.status]}</Tag></div>{stage === 'eco' && <p className="muted">来源ECR：{record.source_ecr_no} · 已发布结果只读，本ECO独立填写、审核及发布。</p>}</div>{!props.reviewOnly && (props.returnTarget ? createPortal(<Button disabled={blocked} onClick={props.onBack}>{backLabel(client)}</Button>, props.returnTarget) : <Button disabled={blocked} onClick={props.onBack}>{backLabel(client)}</Button>)}</div>
     <div className="process-layout"><aside className="panel process-sidebar"><Menu selectedKeys={[tab]} mode="inline" items={items} onClick={({ key }) => switchTab(key)} /></aside><section className="process-body">{content}
       {!props.reviewOnly && !!record.current_review_round && <div style={{ display: ['summary', 'history'].includes(tab) || record.body_access === false && !preserveInput ? undefined : 'none' }}><ReviewPanel compact={tab !== 'history' && record.body_access !== false} initialOpen={props.initialReviewOpen} key={`${record.id}:${record.current_review_round}`} changeId={record.id} number={record.current_review_round} leaving={props.leaving || busy || confirming || publicationBusy || fillerBusy} onReauthenticate={props.onReauthenticate} onBusy={value => { setIssueBusy(value); props.onBusy(value || busy || publicationBusy || fillerBusy) }} onDirty={value => { setIssueDirty(value); props.onDirty(value || dirty) }} /></div>}
     </section></div>
@@ -292,9 +291,14 @@ function UserWorkspace({ user, sessionNeedsLogin, sessionError, retrySession, se
     const result = checkedChange(await api<unknown>('/api/changes/' + selectedId + '/', 'GET', undefined, user.id), { id: selectedId! })
     return newestResponse(queryClient.getQueryData<ChangeRequest>(['change', user.id, selectedId]), result)
   }, enabled: section === 'mine' && selectedId !== null, refetchOnWindowFocus: false })
+  // 只有收到匹配的创建回执才换UUID；断网或残缺响应后的重试仍属于原创建意图。
+  const creationRequest = useRef<string | null>(null)
   const create = useMutation({
-    mutationFn: () => api<ChangeRequest>('/api/changes/', 'POST', {}, user.id),
-    onSuccess: (record) => { queryClient.setQueryData(['change', user.id, record.id], record); setInboxTargetId(null); setSelectedId(record.id); setDirty(false); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) },
+    mutationFn: async () => {
+      const requestId = creationRequest.current ??= crypto.randomUUID()
+      return checkedCreatedChange(await api('/api/changes/', 'POST', { request_id: requestId }, user.id), user.id, requestId)
+    },
+    onSuccess: (record) => { creationRequest.current = null; queryClient.setQueryData(['change', user.id, record.id], record); setInboxTargetId(null); setSelectedId(record.id); setDirty(false); void queryClient.invalidateQueries({ queryKey: ['changes', user.id] }) },
   })
   const exit = useMutation({
     mutationFn: () => api('/api/auth/logout/', 'POST', undefined, user.id),

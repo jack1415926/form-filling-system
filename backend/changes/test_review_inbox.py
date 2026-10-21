@@ -73,7 +73,7 @@ class InboxReadConcurrencyTests(TransactionTestCase):
         group, _ = Group.objects.get_or_create(name=REVIEWER_GROUP); reviewer.groups.add(group)
         change = ChangeRequest.objects.create(applicant=owner, title='Race', ecr_no='RACE-INBOX', status='pending', current_review_round=1)
         round = ReviewRound.objects.create(change=change, number=1, review_mode='designated', submitted_at=timezone.now(), title=change.title, ecr_no=change.ecr_no)
-        ReviewRecord.objects.create(change=change, round=round, reviewer=reviewer)
+        ReviewRecord.objects.create(round=round, reviewer=reviewer)
         ActionTask.objects.create(round=round, action_key='ecr_001', owner=reviewer)
         issue = ReviewIssue.objects.create(change=change, source_round=round, author=reviewer, tab='overview', text='Revise')
         client = APIClient(); client.force_authenticate(reviewer)

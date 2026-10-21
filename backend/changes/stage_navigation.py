@@ -1,4 +1,4 @@
-"""Stage summaries do not grant access to a neighbouring application's body."""
+"""阶段导航只展示已授权摘要，不因此开放关联流程的正文。"""
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound
@@ -20,7 +20,7 @@ def stage_summary(record, stage, actor, source_brief=False):
         return hidden
     round = record.review_rounds.filter(number=record.current_review_round).first() if can_open else None
     tasks = round.tasks.all() if round else None
-    # Returned snapshots remain history, not progress of the new revision.
+    # 退回轮次保留为历史，不把旧轮任务完成数当作当前修订的进度。
     return {'stage': stage, 'id': record.pk, 'status': record.status,
             'number': record.ecr_no if stage == 'ecr' else record.eco_no,
             'current_round': record.current_review_round if can_open else None,

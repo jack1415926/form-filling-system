@@ -59,7 +59,7 @@ def blockers(record):
 def issue_data(record, viewed_round, user, owner, reviewer, current):
     rows = []
     round_numbers = {round.pk: round.number for round in record.review_rounds.filter(number__lte=viewed_round.number) if can_read_round(user, round)}
-    # Old-round viewers must not receive responses or decisions from later rounds.
+    # 查看旧轮时，只返回截至该轮的意见事件，不能泄露后来轮次的回应与处理。
     for issue in record.review_issues.filter(source_round_id__in=round_numbers).select_related('author', 'source_round').prefetch_related('events__author').order_by('id'):
         events = sorted((event for event in issue.events.all() if event.round_id in round_numbers), key=lambda event: event.pk)
         if not events:
@@ -104,7 +104,7 @@ def checked_issue(record, user, values, owner=False):
 
 
 def return_issues(record, round, user, values):
-    # Validate all existing items before creating any item; caller also holds the transaction.
+    # 先验证所有原意见，再写入整批退回清单；调用方事务保证全部成功或全部回滚。
     existing = {row['issue_id']: checked_issue(record, user, row) for row in values['issues'] if 'issue_id' in row}
     for index, row in enumerate(values['issues']):
         if 'issue_id' in row:

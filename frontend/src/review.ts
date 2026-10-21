@@ -6,7 +6,7 @@ export type RoundInfo = {
   stage?: 'legacy' | 'ecr' | 'eco'
   required_approvers?: Reviewer[]
   tasks?: { action_key: string; owner: Reviewer; result: string; status: string; date: string | null; confirmed_at: string | null }[]
-  number: number; title: string; ecr_no: string; eco_no: string; review_mode: 'designated' | 'public'; state: 'pending' | 'approved' | 'returned'
+  number: number; title: string; ecr_no: string; eco_no: string; review_mode: 'designated'; state: 'pending' | 'approved' | 'returned'
   submitted_at: string; approved_at: string | null; returned_at: string | null; returned_by: Reviewer | null; return_reason: string
   reviewers: Reviewer[]; approvals: (Reviewer & { approved_at: string })[]
 }
@@ -26,10 +26,10 @@ export function reviewChangeSnapshot(current: ChangeRequest | undefined, data: R
 export type ReviewAction = { kind: 'approve' | 'return' | 'respond' | 'resolve'; request_id: string; issues?: IssueInput[]; issue_id?: number; version?: number; text?: string }
 export const issueTabs = { overview: '概述', materials: '物料明细', questions: '问题评估', ecr: 'ECR 评估', eco: 'ECO 执行', emc: 'EMC 参考', 'execution-plan': '执行计划', 'significant-change': '实质性变更评估' }
 export const issueStateLabels = { awaiting_reply: '待回应', awaiting_review: '待复核', resolved: '已解决' }
-export const reviewStateLabels = { pending: '待审核', returned: '已退回', approved: '已批准' }
+export const reviewStateLabels = { pending: '审核中', returned: '已退回', approved: '已批准' }
 export function approvalProgress(round: RoundInfo): string {
   if (['ecr', 'eco'].includes(round.stage ?? '')) return `${round.stage?.toUpperCase()}行动已确认 ${round.tasks?.filter(task => task.confirmed_at).length ?? 0}/${round.tasks?.length ?? 0} 项 · 已批准 ${round.approvals.length}/${round.required_approvers?.length ?? 0} 人 · ${reviewStateLabels[round.state]}`
-  const required = round.review_mode === 'public' ? 2 : round.reviewers.length
+  const required = round.required_approvers?.length ?? round.reviewers.length
   const count = round.approvals.length
   if (round.state === 'approved') return `已批准 ${count}/${required} 人，本流程审核已通过。`
   if (round.state === 'returned') return '本轮已退回；重新提交后，个人批准重新计算。'
@@ -55,7 +55,7 @@ function validRound(value: unknown): boolean {
     && (!['ecr', 'eco'].includes(String(value.stage)) || Array.isArray(value.tasks) && value.tasks.every(task => object(task) && typeof task.action_key === 'string' && new RegExp(`^${value.stage}_\\d{3}$`).test(task.action_key) && person(task.owner) && typeof task.result === 'string' && ['', 'completed', 'not_applicable', ...(value.stage === 'eco' ? ['implementation_stage'] : [])].includes(String(task.status)) && (task.date === null || date(task.date)) && (task.confirmed_at === null || date(task.confirmed_at))))
     && Number.isSafeInteger(value.number) && Number(value.number) > 0
     && ['title', 'ecr_no', 'eco_no', 'return_reason'].every((key) => typeof value[key] === 'string')
-    && typeof value.review_mode === 'string' && ['public', 'designated'].includes(value.review_mode) && typeof value.state === 'string' && ['pending', 'approved', 'returned'].includes(value.state)
+    && typeof value.review_mode === 'string' && ['designated'].includes(value.review_mode) && typeof value.state === 'string' && ['pending', 'approved', 'returned'].includes(value.state)
     && date(value.submitted_at) && (value.approved_at === null || date(value.approved_at)) && (value.returned_at === null || date(value.returned_at))
     && (value.returned_by === null || person(value.returned_by)) && Array.isArray(value.reviewers) && value.reviewers.every(person)
     && Array.isArray(value.approvals) && value.approvals.every((row) => person(row) && date(row.approved_at))

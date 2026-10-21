@@ -25,11 +25,13 @@ export function checkedActionData(value: unknown, prefix: 'ecr' | 'eco'): EcrDat
     || !data.actions.every(row => row && typeof row.id === 'string' && new RegExp(`^${prefix}_\\d{3}$`).test(row.id)
       && Number(row.id.slice(-3)) >= 1 && Number(row.id.slice(-3)) <= 61
       && Number.isInteger(row.number) && row.number >= 1 && row.number <= 27 && typeof row.function === 'string' && typeof row.text === 'string'
-      && ['', 'Y', 'N'].includes(row.question_answer) && typeof row.owner === 'string' && typeof row.result === 'string' && states.includes(row.status)
+      && ['', 'Y', 'N'].includes(row.question_answer) && typeof row.result === 'string' && states.includes(row.status)
       && (row.date === null || typeof row.date === 'string' && Number.isFinite(Date.parse(row.date)))
-      && (row.owner_user_id === null ? row.owner_user === null : Number.isSafeInteger(row.owner_user_id) && row.owner_user_id > 0
-        && row.owner_user && row.owner_user.id === row.owner_user_id && typeof row.owner_user.username === 'string'
-        && typeof row.owner_user.display_name === 'string' && typeof row.owner_user.is_active === 'boolean'))) {
+      && Array.isArray(row.owner_user_ids) && new Set(row.owner_user_ids).size === row.owner_user_ids.length
+      && row.owner_user_ids.every(id => Number.isSafeInteger(id) && id > 0)
+      && Array.isArray(row.owner_users) && row.owner_users.length === row.owner_user_ids.length
+      && row.owner_users.every((owner, index) => owner && owner.id === row.owner_user_ids[index]
+        && typeof owner.username === 'string' && typeof owner.display_name === 'string' && typeof owner.is_active === 'boolean'))) {
     throw new ApiError(200, '行动响应不完整，保存结果未确认；填写内容仍保留，请刷新或重试。')
   }
   if (prefix === 'ecr') {

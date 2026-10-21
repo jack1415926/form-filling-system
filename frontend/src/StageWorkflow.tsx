@@ -24,7 +24,8 @@ function useStage(record: ChangeRequest) {
     const latest = newestResponse(client.getQueryData<StageData>(key), incoming)
     client.setQueryData(key, latest)
     if (latest.change) client.setQueryData<ChangeRequest>(['change', actor, record.id], current => newestResponse(current, latest.change!))
-    for (const resource of ['changes', 'review-list', 'review-inbox', 'review-round', 'publication', 'publications', 'stage-navigation']) void client.invalidateQueries({ queryKey: [resource, actor] })
+    // 历史正文虽已冻结，但本轮任务结果仍会变化，须一并刷新历史查询。
+    for (const resource of ['changes', 'review-list', 'review-inbox', 'review-round', 'round-form-snapshot', 'publication', 'publications', 'stage-navigation']) void client.invalidateQueries({ queryKey: [resource, actor] })
     return latest
   }
   const read = async () => accept(await api<unknown>(`/api/changes/${record.id}/stage-workflow/`, 'GET', undefined, actor))
@@ -36,7 +37,7 @@ function Assignment({ record, action, leaving, accept, ...callbacks }: Callbacks
   const client = useQueryClient(), actor = actorUser(client).id
   const editable = canEdit(record, actorUser(client)) && !leaving
   const people = useQuery({ queryKey: ['action-owners', actor], enabled: editable, queryFn: async () => checkedReviewers(await api<unknown>('/api/action-owners/', 'GET', undefined, actor)) })
-  const save = useAutosave({ ...callbacks, fields: { owner_user_ids: JSON.stringify(action.owner_user_ids ?? (action.owner_user_id ? [action.owner_user_id] : [])), extra_required: action.extra_required ? 'Y' : 'N' }, enabled: editable,
+  const save = useAutosave({ ...callbacks, fields: { owner_user_ids: JSON.stringify(action.owner_user_ids), extra_required: action.extra_required ? 'Y' : 'N' }, enabled: editable,
     send: async patch => {
       await api(`/api/changes/${record.id}/${record.stage}-actions/${action.id}/`, 'PATCH', {
         ...('owner_user_ids' in patch ? { owner_user_ids: JSON.parse(String(patch.owner_user_ids)) } : {}),
@@ -119,7 +120,7 @@ function TaskEditor({ record, task, leaving, accept, read, onReauthenticate, ...
   return <>
     <p>第{task.round}轮 · 负责人：{task.owner_name} · {task.confirmed_at ? '已确认' : '待处理'}</p>
     {task.round > 1 && !task.confirmed_at && <Alert type="info" title="旧轮结果仅作为待复核初值，本轮仍须重新确认。" />}
-    <label>评估结果／不适用原因</label><Input.TextArea aria-label="任务评估结果" disabled={disabled} value={String(save.values.result)} autoSize={{ minRows: 4 }} onChange={event => save.update({ result: event.target.value })} />
+    <label>评估结果／不适用原因</label><Input.TextArea aria-label="任务评估结果" readOnly={!task.can_edit} disabled={leaving || busy || !!unknown || save.manual} value={String(save.values.result)} autoSize={{ minRows: 4 }} onChange={event => save.update({ result: event.target.value })} />
     <label>业务状态</label><Select aria-label="任务业务状态" style={{ width: '100%' }} disabled={disabled} value={save.values.status} options={[{ value: '', label: '未填写' }, { value: 'completed', label: '完成' }, { value: 'not_applicable', label: '不适用' }, ...(record.stage === 'eco' ? [{ value: 'implementation_stage', label: '在实施阶段完成' }] : [])]} onChange={value => save.update({ status: value })} />
     <label>业务日期</label><DateInput id="task-date" disabled={disabled} value={String(save.values.date ?? '')} onChange={event => { const invalid = !event.target.validity.valid; setDateInvalid(invalid); if (!invalid) save.update({ date: event.target.value || null }) }} />
     {save.values.status === 'implementation_stage' && <Alert type="info" title="在实施阶段完成可保存；改为完成或不适用且说明、日期完整后才能确认。" />}
@@ -131,11 +132,11 @@ function TaskEditor({ record, task, leaving, accept, read, onReauthenticate, ...
 
 export function StageActions({ record, leaving, onPrevious, onNext, onEditorOpen, onReauthenticate, ...callbacks }: Callbacks & { record: ChangeRequest; leaving: boolean; onBack: () => void; onPrevious: () => void; onNext: () => void; onEditorOpen: (value: boolean) => void; onReauthenticate: () => void }) {
   const { actor, query, accept, read } = useStage(record), client = useQueryClient(), { modal } = App.useApp()
-  const [selected, setSelected] = useState<string | null>(null), [range, setRange] = useState({ context: '', all: false }), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false)
+  const [selected, setSelected] = useState<{ action: StageAction; task: StageTask | null } | null>(null), [range, setRange] = useState({ context: '', all: false }), [dirty, setDirty] = useState(false), [busy, setBusy] = useState(false)
   const callbackRef = useRef(callbacks)
   useEffect(() => { callbackRef.current = callbacks }, [callbacks])
   useEffect(() => () => { callbackRef.current.onBusy(false); callbackRef.current.onDirty(false) }, [])
-  const data = query.data, currentRecord = data?.change ?? record
+  const data = query.data, currentRecord = data?.change ?? { ...record, status: data?.status ?? record.status }
   const editingAssignment = canEdit(currentRecord, actorUser(client))
   const assignmentPhase = ['draft', 'returned'].includes(currentRecord.status)
   const rangeContext = `${currentRecord.status}:${data?.current_round ?? record.current_review_round}:${editingAssignment}`
@@ -143,21 +144,23 @@ export function StageActions({ record, leaving, onPrevious, onNext, onEditorOpen
   const tasks = data?.tasks.filter(task => task.round === data.current_round) ?? []
   useEffect(() => { onEditorOpen(!!selected); return () => onEditorOpen(false) }, [selected, onEditorOpen])
   const close = () => { if (busy || leaving) return; const finish = () => { setSelected(null); setDirty(false); callbacks.onDirty(false) }; if (dirty) modal.confirm({ title: '放弃未保存的输入？', content: '已保存内容不会撤销。', onOk: finish }); else finish() }
-  const action = data?.actions.find(row => row.id === selected), task = tasks.find(row => row.action_key === selected && row.owner_id === actor) ?? tasks.find(row => row.action_key === selected)
+  const action = data?.actions.find(row => row.id === selected?.action.id) ?? selected?.action
+  // 按打开时的任务ID保留编辑器；退回、换轮或正文权限收回都不能直接丢弃草稿。
+  const task = selected?.task ? data?.tasks.find(row => row.id === selected.task!.id) ?? { ...selected.task, can_edit: false } : null
   return <>
     <div className="page-heading"><h1>{record.stage?.toUpperCase()}行动分配与处理</h1></div>
     <Alert type="info" title={assignmentPhase ? editingAssignment ? '草稿／修订时仅分配负责人和补充任务；结果由提交后的负责人填写。' : '当前ECO由指定填写人编辑，此处只读查看行动分配。' : `第${data?.current_round ?? record.current_review_round}轮：已确认 ${tasks.filter(task => task.confirmed_at).length}/${tasks.length} 项；基础内容锁定。`} className="form-alert" />
     {query.error && <Alert type="error" title={query.error.message} action={<Button onClick={() => void query.refetch()}>重试</Button>} />}
     <Select aria-label="行动范围" disabled={!!selected} value={all ? 'all' : 'required'} options={[{ value: 'required', label: record.stage === 'eco' && !editingAssignment ? '已选行动' : '本轮行动' }, { value: 'all', label: '全部行动' }]} onChange={value => setRange({ context: rangeContext, all: value === 'all' })} />
     <Table rowKey="id" pagination={false} loading={query.isPending} dataSource={(data?.actions ?? []).filter(row => all || (assignmentPhase ? row.required : tasks.some(task => task.action_key === row.id)))} columns={[
-      { title: '行动', render: (_, row) => <><Tag>{row.id} · 问题{row.number}</Tag><p>{row.text}</p></> },
+      { title: '行动', render: (_, row) => <><Tag>关联问题{row.number}</Tag><p>{row.text}</p></> },
       { title: '负责人', render: (_, row) => (assignmentPhase ? row.owner_name : tasks.filter(task => task.action_key === row.id).map(task => task.owner_name).join('、') || row.owner_name) || '未分配' },
       { title: '状态', render: (_, row) => { const assigned = assignmentPhase ? [] : tasks.filter(task => task.action_key === row.id); return assigned.length ? `已确认 ${assigned.filter(task => task.confirmed_at).length}/${assigned.length} 人` : row.extra_required ? '手工补充' : row.required ? '问题触发' : '不纳入' } },
-      { title: '操作', render: (_, row) => <Button disabled={!!selected || busy || leaving} onClick={() => setSelected(row.id)}>{assignmentPhase ? editingAssignment ? '分配' : '查看分配' : tasks.some(task => task.action_key === row.id && task.can_edit && task.owner_id === actor) ? '处理任务' : '查看'}</Button> },
+      { title: '操作', render: (_, row) => <Button disabled={!!selected || busy || leaving} onClick={() => setSelected({ action: row, task: assignmentPhase ? null : tasks.find(task => task.action_key === row.id && task.owner_id === actor) ?? tasks.find(task => task.action_key === row.id) ?? null })}>{assignmentPhase ? editingAssignment ? '分配' : '查看分配' : tasks.some(task => task.action_key === row.id && task.can_edit && task.owner_id === actor) ? '处理任务' : '查看'}</Button> },
     ]} />
     <div className="form-footer"><Button disabled={!!selected || busy || leaving} onClick={onPrevious}>上一页</Button><Button disabled={!!selected || busy || leaving} onClick={onNext}>下一页</Button></div>
     <Drawer open={!!selected} title={action?.text ?? `${record.stage?.toUpperCase()}行动`} size={720} onClose={close} closable={!busy && !leaving} maskClosable={!busy && !leaving} keyboard={!busy && !leaving}>
-      {action && (assignmentPhase ? <Assignment key={action.id} record={currentRecord} action={action} leaving={leaving} accept={accept} onDirty={value => { setDirty(value); callbacks.onDirty(value) }} onBusy={value => { setBusy(value); callbacks.onBusy(value) }} /> : task ? <><p>本行动负责人：{tasks.filter(row => row.action_key === selected).map(row => `${row.owner_name}（${row.confirmed_at ? '已确认' : '待处理'}）`).join('、')}</p><TaskEditor key={task.id} record={currentRecord} task={task} leaving={leaving} onReauthenticate={onReauthenticate} accept={accept} read={read} onDirty={value => { setDirty(value); callbacks.onDirty(value) }} onBusy={value => { setBusy(value); callbacks.onBusy(value) }} /></> : <p>本行动没有在当前轮次派发。</p>)}
+      {task ? <>{!task.can_edit && dirty && <Alert type="warning" title="任务已锁定，未保存输入仍保留；请核对记录或复制文字后再离开。" />}<p>本行动负责人：{data?.tasks.filter(row => row.round === task.round && row.action_key === task.action_key).map(row => `${row.owner_name}（${row.confirmed_at ? '已确认' : '待处理'}）`).join('、') || task.owner_name}</p><TaskEditor key={task.id} record={currentRecord} task={task} leaving={leaving} onReauthenticate={onReauthenticate} accept={accept} read={read} onDirty={value => { setDirty(value); callbacks.onDirty(value) }} onBusy={value => { setBusy(value); callbacks.onBusy(value) }} /></> : action && assignmentPhase ? <Assignment key={action.id} record={currentRecord} action={action} leaving={leaving} accept={accept} onDirty={value => { setDirty(value); callbacks.onDirty(value) }} onBusy={value => { setBusy(value); callbacks.onBusy(value) }} /> : <p>本行动没有在当前轮次派发。</p>}
     </Drawer>
   </>
 }
@@ -229,7 +232,7 @@ export function StageSubmission({ record, leaving, onPrevious, onReauthenticate,
       <p className="muted">提交后冻结行动、负责人和批准人；每位负责人独立填写并确认任务，正式意见解决后，还须全部指定批准人同意才能发布。</p>
       <Button type="primary" disabled={blocked || busy || !!unknown || leaving || publisher.dirty || publisher.pending} onClick={() => modal.confirm({ title: `提交本轮${record.stage?.toUpperCase()}任务？`, content: '基础内容将锁定，每位负责人确认各自任务后，全部指定批准人需同意批准。', onOk: () => send({ expected_round: current.current_review_round, request_id: crypto.randomUUID(), acknowledge_no_tasks: acknowledge }) })}>提交{record.stage?.toUpperCase()}审核</Button>
     </> : <>
-      <Alert className="form-alert" type={['approved', 'published'].includes(current.status) ? 'success' : 'info'} title={['draft', 'returned'].includes(current.status) ? `当前由${current.applicant_name || '指定填写人'}填写或修订，你仅可查看，不能代为提交。` : current.status === 'published' ? `${record.stage?.toUpperCase()}已发布，基线只读。` : current.status === 'approved' ? `${record.stage?.toUpperCase()}阶段已批准，等待指定发布人发布。` : `阶段处理中，基础内容已锁定。负责人进入${record.stage?.toUpperCase()}行动页处理任务。`} />
+      <Alert className="form-alert" type={['approved', 'published'].includes(current.status) ? 'success' : 'info'} title={['draft', 'returned'].includes(current.status) ? `当前由${current.applicant_name || '指定填写人'}填写或修订，你仅可查看，不能代为提交。` : current.status === 'published' ? `${record.stage?.toUpperCase()}已发布，基线只读。` : current.status === 'approved' ? `${record.stage?.toUpperCase()}阶段已批准，等待指定发布人发布。` : `阶段审核中，基础内容已锁定。负责人进入${record.stage?.toUpperCase()}行动页处理任务。`} />
       <Descriptions column={1} items={[
         { key: 'publisher', label: '已选发布人', children: current.publisher_id ? `${publisherDetails?.publisher_name || '姓名尚未读取'}（账号 #${current.publisher_id}）${publisherDetails && !publisherDetails.publisher_active ? ' · 已停用' : ''}` : '未指定' },
         { key: 'approvers', label: '已选批准人', children: approverNames.join('、') || '未指定' },

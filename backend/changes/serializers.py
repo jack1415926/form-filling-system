@@ -41,13 +41,13 @@ class ChangeRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChangeRequest
         fields = [
-            "id", "applicant", "applicant_name", "stage", "publisher_id", "stage_approver_ids", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round",
+            "id", "applicant", "applicant_name", "creation_request_id", "stage", "publisher_id", "stage_approver_ids", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round",
             "source_ecr_id", "source_ecr_no", "eco_creation_request_id", "published_by_id", "published_at", "publication_request_id",
             "title", "ecr_no", "eco_no", "affected_products", "affected_region",
             "initiating_factory", "affected_factories", "ccb_owner", "change_owner",
             "planned_eco_date", "change_reason",
         ]
-        read_only_fields = ["id", "applicant", "applicant_name", "stage", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round", "source_ecr_id", "source_ecr_no", "eco_creation_request_id", "published_by_id", "published_at", "publication_request_id"]
+        read_only_fields = ["id", "applicant", "applicant_name", "creation_request_id", "stage", "status", "created_at", "updated_at", "review_mode", "submitted_at", "current_review_round", "source_ecr_id", "source_ecr_no", "eco_creation_request_id", "published_by_id", "published_at", "publication_request_id"]
 
     def validate_publisher_id(self, value):
         if self.instance is None or self.instance.stage not in ['ecr', 'eco']:
@@ -80,7 +80,7 @@ class ChangeRequestSerializer(serializers.ModelSerializer):
             with transaction.atomic():
                 return super().save(**kwargs)
         except IntegrityError as error:
-            # The database remains authoritative if another request wins the race.
+            # 并发请求可能同时通过应用校验，最终仍由数据库唯一约束阻止重复编号。
             if len(error.args) > 1 and error.args[0] == 1062:
                 key = str(error.args[1]).rsplit(" for key ", 1)[-1].strip("'`").rsplit(".", 1)[-1]
                 for field, message in NUMBER_ERRORS.items():
@@ -117,7 +117,7 @@ class QuestionValueSerializer(serializers.Serializer):
         forbidden = set(data) - {"answer", "remark"}
         if forbidden:
             raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
-        # CharField normally coerces numbers to strings; remarks must be text.
+        # DRF默认会把数字转成文本，这里要求备注必须由调用方明确提交文字。
         if "remark" in data and data["remark"] is not None and not isinstance(data["remark"], str):
             raise serializers.ValidationError({"remark": "备注必须是文本。"})
         return super().to_internal_value(data)
@@ -133,50 +133,20 @@ class EcrActionSerializer(serializers.ModelSerializer):
     def validate_owner_user_ids(self, users):
         return validate_people(users)
 
-    def validate(self, attrs):
-        if 'owners' in attrs and 'owner_user_id' in attrs:
-            raise serializers.ValidationError('请只使用一种负责人选择方式。')
-        return attrs
-
-    def update(self, instance, validated_data):
-        if 'owner_user_id' in validated_data:
-            owner_id = validated_data['owner_user_id']
-            validated_data['owners'] = list(get_user_model().objects.filter(pk=owner_id)) if owner_id else []
-        elif 'owners' in validated_data:
-            validated_data['owner_user_id'] = validated_data['owners'][0].pk if validated_data['owners'] else None
-        return super().update(instance, validated_data)
     date = BusinessDateField(required=False, allow_null=True)
-    owner_user_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
-    owner_user = serializers.SerializerMethodField()
 
     class Meta:
         model = EcrActionResponse
-        fields = ["owner", "owner_user_id", "owner_user", "owner_user_ids", "owner_users", "extra_required", "result", "status", "date"]
-        read_only_fields = ["owner", "owner_user", "owner_users"]
-
-    def get_owner_user(self, instance):
-        user = instance.owner_user
-        return {"id": user.pk, "username": user.username, "display_name": user.get_full_name() or user.username, "is_active": user.is_active} if user else None
-
-    def validate_owner_user_id(self, value):
-        if value is None:
-            return None
-        user = get_user_model().objects.select_for_update().filter(pk=value).first()
-        if user is None or not user.is_active and value != getattr(self.instance, 'owner_user_id', None):
-            raise serializers.ValidationError('请选择有效用户；停用用户仅保留已有关联。')
-        return value
+        fields = ["owner_user_ids", "owner_users", "extra_required", "result", "status", "date"]
+        read_only_fields = ["owner_users"]
 
     def to_internal_value(self, data):
         if not isinstance(data, dict):
             raise serializers.ValidationError({"detail": "请求内容必须是对象。"})
-        if 'owner' in data:
-            raise serializers.ValidationError({'owner': '原负责人文字只读，请刷新页面并选择负责人用户。'})
-        if 'owner_user_id' in data and data['owner_user_id'] is not None and type(data['owner_user_id']) is not int:
-            raise serializers.ValidationError({'owner_user_id': '负责人账号ID必须为整数或null。'})
         forbidden = set(data) - (set(self.Meta.fields) - set(self.Meta.read_only_fields))
         if forbidden:
             raise serializers.ValidationError({key: "此字段不允许修改。" for key in forbidden})
-        for field in ("owner", "result"):
+        for field in ("result",):
             if field in data and data[field] is not None and not isinstance(data[field], str):
                 raise serializers.ValidationError({field: "必须是文本。"})
         return super().to_internal_value(data)

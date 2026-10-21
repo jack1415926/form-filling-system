@@ -1,4 +1,4 @@
-"""ECR/ECO round tasks: callers hold the parent application lock for every write."""
+"""ECR/ECO按轮处理任务；所有写入必须先锁定所属申请。"""
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -19,6 +19,7 @@ from .stage_actions import action_data, stage_parts, task_data
 
 
 def approve_if_complete(record):
+    # 任务、意见和全部批准条件共同决定是否获批；发布仍须指定发布人另行操作。
     if record.stage not in ['ecr', 'eco'] or record.status != 'pending':
         return
     round = record.review_rounds.get(number=record.current_review_round)
@@ -36,7 +37,7 @@ def stage_data(record, actor):
     round = record.review_rounds.filter(number=record.current_review_round).first()
     visible_rounds = [row.pk for row in record.review_rounds.all() if can_read_round(actor, row)]
     tasks = [task_data(task, actor, record) for task in ActionTask.objects.filter(round_id__in=visible_rounds).select_related('round', 'owner').prefetch_related('operations').order_by('round__number', 'action_key')]
-    # Revision body is private. Old task snapshots remain available to participants.
+    # 退回修订中的正文不向审核参与者开放，但已授权的历史任务仍可查看。
     body_visible = can_read_body(actor, record)
     actions = action_data(record, answers) if body_visible else []
     return {'actor_id': actor.pk, 'stage': record.stage, 'change': ChangeRequestSerializer(record).data if body_visible else None,
@@ -93,7 +94,7 @@ class StageSubmission(APIView):
             required = [row for row in data['actions'] if row['required']]
             if any(not row['owner_active'] for row in required): errors['owners'] = '所有本轮行动都须指定有效负责人。'
             if not required and not values['acknowledge_no_tasks']: errors['tasks'] = '请明确确认本阶段无行动需处理。'
-            # Keep account checks under row locks until the round has been created.
+            # 锁住相关账号直到新轮次创建完成，避免校验有效后账号又被并发停用。
             approvers = set(record.stage_approvers.values_list('pk', flat=True))
             if not approvers: errors['stage_approver_ids'] = '请至少选择一位有效批准人。'
             ids = {pk for row in required for pk in row['owner_user_ids']} | approvers | {record.publisher_id}
@@ -106,13 +107,13 @@ class StageSubmission(APIView):
             round = ReviewRound.objects.create(change=record, number=record.current_review_round + 1, review_mode='designated',
                 request_id=values['request_id'], submission_payload=canonical(values), title=record.title, ecr_no=record.source_ecr.ecr_no if record.stage == 'eco' else record.ecr_no, eco_no=record.eco_no if record.stage == 'eco' else '', submitted_at=now)
             participants = {pk for row in required for pk in row['owner_user_ids']} | approvers
-            # Unresolved original authors retain opinion-only responsibility after reassignment.
+            # 人员改派后，原意见提出者仍负责复核本人未解决意见，不因此获得新任务权限。
             participants.update(record.review_issues.exclude(state='resolved').values_list('author_id', flat=True))
-            ReviewRecord.objects.bulk_create([ReviewRecord(change=record, round=round, reviewer_id=pk, approval_required=pk in approvers) for pk in participants])
+            ReviewRecord.objects.bulk_create([ReviewRecord(round=round, reviewer_id=pk, approval_required=pk in approvers) for pk in participants])
             tasks = []
             for row in required:
                 for owner_id in row['owner_user_ids']:
-                    # Retain this person's previous result, never another owner's projection.
+                    # 只继承同一负责人的旧轮结果作为初值，不继承确认状态或其他人的结果。
                     previous = previous_tasks.get((row['id'], owner_id)) if record.current_review_round else rows[row['id']]
                     tasks.append(ActionTask(round=round, action_key=row['id'], owner_id=owner_id,
                         result=previous.result if previous else '', status=previous.status if previous else '',
@@ -122,6 +123,7 @@ class StageSubmission(APIView):
             record.submitted_at = record.updated_at = now
             record.save(update_fields=['status', 'current_review_round', 'review_mode', 'submitted_at', 'updated_at'])
             from .round_snapshots import capture_form
+            # 与任务创建同一事务内冻结完整表单，新一轮不能覆盖旧轮快照。
             round.form_snapshot = capture_form(record, round, request.user)
             round.save(update_fields=['form_snapshot'])
             approve_if_complete(record)

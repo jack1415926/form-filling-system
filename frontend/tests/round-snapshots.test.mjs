@@ -14,7 +14,7 @@ test('historical navigation follows all eight sheets and returns to overview aft
   assert.equal(adjacentSnapshotTab('unknown', 1), 'overview')
 })
 const overview = { id: 5, applicant: 1, publisher_id: null, stage: 'ecr', status: 'pending', current_review_round: 1, review_mode: 'designated', submitted_at: '2026-10-14T00:00:00Z', created_at: '2026-10-14T00:00:00Z', updated_at: '2026-10-14T00:00:00Z', planned_eco_date: null, title: 'Original', ecr_no: 'ECR-5', eco_no: '', affected_products: '', affected_region: '', initiating_factory: '', affected_factories: '', ccb_owner: '', change_owner: '', change_reason: '' }
-const actions = Array.from({ length: 61 }, (_, i) => ({ id: `ecr_${String(i + 1).padStart(3, '0')}`, number: 1, text: 'Action', function: 'Function', question_answer: 'N', required: false, extra_required: false, owner_user_id: null, owner_name: '', owner_active: false }))
+const actions = Array.from({ length: 61 }, (_, i) => ({ id: `ecr_${String(i + 1).padStart(3, '0')}`, number: 1, text: 'Action', function: 'Function', question_answer: 'N', required: false, extra_required: false, owner_user_ids: [], owner_users: [], owner_name: '', owner_active: false }))
 const data = { actor_id: 2, change_id: 5, number: 1, tasks: [], snapshot: { version: 1, change_id: 5, number: 1, captured_at: overview.submitted_at, overview, actions, source_overview: null, sheets: { materials: [], questions: { questions: [] }, ecr: {}, eco: {}, emc: {}, execution_plan: {}, significant_change: {} } } }
 
 test('snapshot responses bind identity, change, round, supported version and read-only tasks', () => {

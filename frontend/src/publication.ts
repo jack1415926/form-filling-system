@@ -49,7 +49,7 @@ export function publicationCanRetry(data: PublicationData, operation: Publicatio
 
 export function newestPublication(current: PublicationData | undefined, incoming: PublicationData): PublicationData {
   if (!current) return incoming
-  // Creating an ECO does not mutate the immutable source timestamp. Its link only grows.
+  // 创建ECO不更新来源ECR时间戳；同时间戳的迟到响应也不能抹掉已确认的ECO关联。
   if (current.change.updated_at === incoming.change.updated_at) {
     const ecoId = current.eco_id ?? incoming.eco_id
     const link = incoming.eco_id === null && current.eco_id !== null ? current : incoming

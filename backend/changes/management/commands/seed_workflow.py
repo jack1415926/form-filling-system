@@ -145,7 +145,7 @@ class Command(BaseCommand):
         for definition in definitions:
             if definition['number'] not in yes:
                 continue
-            row = model.objects.create(change=record, action_key=definition['id'], owner_user=reviewers[0],
+            row = model.objects.create(change=record, action_key=definition['id'],
                                        result=SAMPLE_ACTION_RESULTS.get(definition['id'][-3:], '测试：已完成本题对应行动的核对。'),
                                        status='not_applicable' if record.stage == 'eco' and definition['id'] != 'eco_009' else 'completed',
                                        date=timezone.localdate())

@@ -5,16 +5,17 @@ export type Overview = {
   ccb_owner: string; change_owner: string; planned_eco_date: string | null; change_reason: string
 }
 export type ChangeRequest = Overview & {
-  // Local cache marker: review access can be revoked without discarding protected input.
+  // 本地缓存标记：正文权限收回时保留尚未确认的输入，不代表仍有写入权限。
   body_access?: boolean
   applicant_name?: string
+  creation_request_id?: string | null
   stage_approver_ids?: number[]
   stage?: 'legacy' | 'ecr' | 'eco'; publisher_id?: number | null
   source_ecr_id?: number | null; source_ecr_no?: string | null; eco_creation_request_id?: string | null
   published_by_id?: number | null; published_at?: string | null; publication_request_id?: string | null
   id: number; applicant: number; status: 'draft' | 'pending' | 'approved' | 'returned' | 'published'; created_at: string; updated_at: string
   current_review_round: number
-  review_mode: '' | 'designated' | 'public'; submitted_at: string | null
+  review_mode: '' | 'designated'; submitted_at: string | null
 }
 export type QuestionAnswer = '' | 'Y' | 'N'
 export type Question = {
@@ -23,13 +24,13 @@ export type Question = {
   answer: QuestionAnswer; remark: string
 }
 export type QuestionData = { updated_at: string; questions: Question[] }
-export type EcrValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable'; date: string | null }
+export type EcrValues = { result: string; status: '' | 'completed' | 'not_applicable'; date: string | null }
 export type ActionOwner = { id: number; username: string; display_name: string; is_active: boolean }
 export type PublishedEcrResult = { id: number; round: number; owner: ActionOwner; result: string; status: 'completed' | 'not_applicable'; date: string; confirmed_at: string }
-export type EcrAction = EcrValues & { task_results?: PublishedEcrResult[]; extra_required?: boolean; owner_user_id: number | null; owner_user: ActionOwner | null; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
+export type EcrAction = EcrValues & { task_results?: PublishedEcrResult[]; extra_required?: boolean; owner_user_ids: number[]; owner_users: ActionOwner[]; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
 export type EcrData = { source_ecr_id?: number; updated_at: string; actions: EcrAction[] }
-export type EcoValues = { owner: string; result: string; status: '' | 'completed' | 'not_applicable' | 'implementation_stage'; date: string | null }
-export type EcoAction = EcoValues & { owner_user_id: number | null; owner_user: ActionOwner | null; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
+export type EcoValues = { result: string; status: '' | 'completed' | 'not_applicable' | 'implementation_stage'; date: string | null }
+export type EcoAction = EcoValues & { owner_user_ids: number[]; owner_users: ActionOwner[]; id: string; number: number; function: string; text: string; question_answer: QuestionAnswer }
 export type EcoData = { updated_at: string; actions: EcoAction[] }
 export class ApiError extends Error {
   status: number
@@ -54,7 +55,7 @@ export async function api<T>(path: string, method = 'GET', body?: unknown, expec
     timer = setTimeout(() => { reject(timeoutError); controller.abort() }, 30_000)
   })
   try {
-    // The deadline also covers CSRF acquisition and a stalled response body.
+    // 总超时包含CSRF获取和响应正文读取，避免只收到响应头后一直卡住。
     return await Promise.race([request<T>(path, method, body, expectedUserId, controller.signal, sessionVersion), deadline])
   } finally { clearTimeout(timer!) }
 }
@@ -83,6 +84,7 @@ async function request<T>(path: string, method: string, body: unknown, expectedU
     const detail = typeof data?.detail === 'string' ? data.detail : ''
     const unauthenticated = response.status === 401 || response.status === 403 && (data?.code === 'not_authenticated' || detail === 'Authentication credentials were not provided.')
     const csrfFailed = response.status === 403 && (data?.code === 'csrf_failed' || /^CSRF\b/i.test(detail))
+    // 旧会话的迟到错误不能再次触发新登录会话的失效或权限恢复提示。
     if (version === sessionVersion) {
       if (data?.code === 'account_changed') window.dispatchEvent(new Event('account-changed'))
       if (data?.code === 'feedback_permission_changed') window.dispatchEvent(new CustomEvent('feedback-permission-changed', { detail: { expectedUserId } }))

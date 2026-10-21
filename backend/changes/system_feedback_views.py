@@ -109,7 +109,7 @@ class FeedbackList(FeedbackBase):
         values = CreateInput(data=request.data)
         values.is_valid(raise_exception=True)
         values = values.validated_data
-        # The unique key serializes concurrent retries without locking any application row.
+        # 用反馈自身的唯一键处理并发重试，不占用工程变更申请的记录锁。
         with transaction.atomic():
             row, created = SystemFeedback.objects.get_or_create(submitter=request.user, request_id=values['request_id'],
                 defaults={'category': values['category'], 'content': values['content']})
@@ -161,6 +161,7 @@ class ManagedAction(ManagedDetail):
                     or (self.event_kind == 'manager' and existing.to_status != values['status']) or existing.base_version != values['expected_version']):
                     conflict('同一请求的操作者或内容不同，请查询原处理记录。')
                 return Response(feedback_data(row, True))
+            # 原请求重放已在前面确认；其他写入必须基于当前版本，避免覆盖新回复。
             if row.version != values['expected_version']:
                 conflict('反馈已被更新，请刷新记录并核对后再处理；输入仍可保留。')
             target = values['status'] if self.event_kind == 'manager' else ('processing' if row.status == 'closed' else row.status)

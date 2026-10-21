@@ -3,9 +3,12 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
-from .models import ActionTask, ChangeRequest, EcrActionResponse, QuestionResponse
+from .models import ActionTask, ChangeRequest, EcrActionResponse, QuestionResponse, ReviewRound, ReviewRecord, TaskOperation
+from .ecr import ECR_ACTION_IDS
+from .stage_workflow import stage_data
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -22,7 +25,33 @@ class EcrStageTests(TestCase):
         self.path = f'/api/changes/{self.change.pk}/'
 
     def assign(self, key, owner, extra=True):
-        return self.client.patch(self.path + f'ecr-actions/{key}/', {'owner_user_id': owner.pk, 'extra_required': extra}, format='json')
+        return self.client.patch(self.path + f'ecr-actions/{key}/', {'owner_user_ids': [owner.pk], 'extra_required': extra}, format='json')
+
+    def test_stage_history_queries_stay_bounded_and_receipts_remain_private(self):
+        EcrActionResponse.objects.bulk_create([EcrActionResponse(change=self.change, action_key=key, extra_required=True) for key in ECR_ACTION_IDS])
+        for row in self.change.ecr_responses.all():
+            row.owners.add(self.b)
+        counts = []
+        receipt_id = uuid.uuid4()
+        for number in range(1, 6):
+            round = ReviewRound.objects.create(change=self.change, number=number, review_mode='designated', submitted_at=self.change.created_at)
+            ReviewRecord.objects.create(round=round, reviewer=self.b)
+            ActionTask.objects.bulk_create([ActionTask(round=round, owner=self.b, action_key=key) for key in ECR_ACTION_IDS])
+            if number == 1:
+                TaskOperation.objects.create(task=round.tasks.order_by('pk').first(), author=self.b, request_id=receipt_id, kind='save', payload={})
+            self.change.current_review_round = number
+            self.change.status = 'pending'
+            self.change.save()
+            if number in [1, 5]:
+                with CaptureQueriesContext(connection) as queries:
+                    data = stage_data(self.change, self.a)
+                counts.append(len(queries))
+                self.assertEqual(len(data['tasks']), number * len(ECR_ACTION_IDS))
+                self.assertTrue(all(not task['confirmed_requests'] for task in data['tasks']))
+        self.assertLessEqual(counts[1], counts[0] + 1)
+        self.assertLess(counts[1], 20)
+        owner_data = stage_data(self.change, self.b)
+        self.assertEqual(owner_data['tasks'][0]['confirmed_requests'], [str(receipt_id)])
 
     def submit(self, number=0, **extra):
         payload = {'expected_round': number, 'request_id': str(uuid.uuid4()), **extra}

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900" role="img" aria-labelledby="autoTitle">
+<title id="autoTitle">WIRE-01 登录页 · 自动量取生成</title>
+<defs><style>text{font-family:"Microsoft YaHei","Segoe UI",sans-serif}
+.t{fill:#2f3a44}.tm{fill:#6b7683}.tl{fill:#8e99a4}.cap{font-size:10.5px;fill:#8e99a4}.lbl{font-size:12px;fill:#6b7683}</style></defs>
+<rect width="1440" height="900" fill="#f5f7f9"/>
+<rect x="0.5" y="0.5" width="1439" height="899" fill="none" stroke="#c9cfd6"/>
+<rect x="195" y="82" width="1050" height="607.5" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="225" y="234.2" width="496.4" height="303.1" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="225" y="234.2" width="496.4" height="18.8" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="225" y="263.1" width="496.4" height="121.6" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="225" y="394.7" width="350" height="60.8" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="225" y="493.4" width="496.4" height="43.8" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="836.4" y="209" width="343.6" height="37.7" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="836.4" y="254.7" width="343.6" height="23.8" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="836.4" y="304.5" width="343.6" height="80" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="836.4" y="408.5" width="343.6" height="80" fill="none" stroke="#c9cfd6" stroke-dasharray="4 4"/>
+<rect x="0" y="0" width="1440" height="82" rx="0" fill="#fff" stroke="#c9cfd6"/>
+<rect x="160" y="19.5" width="42" height="42" rx="10" fill="rgb(23, 107, 91)" stroke="#c9cfd6"/>
+<rect x="801.4" y="174" width="413.6" height="423.5" rx="12" fill="#fff" stroke="#c9cfd6"/>
+<rect x="836.4" y="334.5" width="343.6" height="50" rx="10" fill="#eef1f4" stroke="#c9cfd6"/>
+<rect x="848.4" y="451.5" width="299.6" height="24" rx="0" fill="#eef1f4" stroke="#c9cfd6"/>
+<rect x="836.4" y="512.5" width="343.6" height="50" rx="10" fill="#e3e7eb" stroke="#7e8994"/>
+<text x="160" y="49.1" class="tm" font-size="24" font-weight="400">变</text>
+<text x="225" y="247.9" class="tm" font-size="12" font-weight="600">设计变更管理</text>
+<text x="225" y="333.3" class="t" font-size="26" font-weight="600">每一项变更， 从清晰的记录开始。</text>
+<text x="225" y="430.9" class="tm" font-size="16" font-weight="400">填写概述，保存草稿。随时重新打开，继续上一次的工作。</text>
+<text x="836.4" y="236.5" class="t" font-size="24" font-weight="600">登录工作台</text>
+<text x="836.4" y="271.6" class="tm" font-size="14" font-weight="400">使用已有账号登录</text>
+<text x="836.4" y="320.5" class="tm" font-size="14" font-weight="400">用户名</text>
+<text x="850.4" y="365.3" class="tl" font-size="13" font-weight="400">（占位）请输入用户名</text>
+<text x="836.4" y="424.5" class="tm" font-size="14" font-weight="400">密码</text>
+<text x="862.4" y="469.3" class="tl" font-size="13" font-weight="400">（占位）请输入密码</text>
+<text x="1008.2" y="542.5" class="t" font-size="14" font-weight="600" text-anchor="middle">登 录</text>
+<text x="6" y="-5" class="cap">顶栏 1440×82 @ 0,0</text>
+<text x="807.4" y="169" class="cap">面板 414×424 @ 801,174</text>
+<text x="8" y="892" class="cap">自动量取自 http://localhost:5173/ · 视口 1440×900 · 元素 19 个 · 未做语义编号</text>
+</svg>

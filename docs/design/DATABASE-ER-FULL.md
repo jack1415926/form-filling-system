@@ -1,16 +1,16 @@
-# 当前数据库完整字段与关系（0027）
+# 当前数据库完整字段与关系（0029）
 
-更新／只读核验日期：2026-10-16。本机开发库已应用迁移至`0027_remove_reviewfeedback`，没有待应用迁移。本页按当前0027结构维护；0027移除旧普通审核留言表review_feedback。
+更新／核验日期：2026-10-21。本机开发库已应用迁移至`0029_remove_legacy_compat`，没有待应用迁移。本页按当前0029结构维护；0029删除6个旧兼容字段并收紧审核约束；0028新增ECR创建请求标识与原始载荷，0027已移除旧普通审核留言表review_feedback。
 
 ## 核验范围与计数
 
-当前包含**26张业务模型表＋3张人员关联表，共29张业务表、230个实际字段**：业务模型表221列、人员关联表9列。全部实际表及列均与当前Django模型逐表核对，包括隐式主键、外键、UUID、JSON及存储生成列。共58条外键约束（60个外键列）：业务表之间36条，指向auth_user的22条。EMC的两条复合外键按约束计为2条、按列计为4列，避免混用数量。
+当前包含**26张业务模型表＋3张人员关联表，共29张业务表、226个实际字段**：业务模型表217列、人员关联表9列。全部实际表及列均与当前Django模型逐表核对，包括隐式主键、外键、UUID、JSON及存储生成列。共55条外键约束（57个外键列）：业务表之间35条，指向auth_user的20条。EMC的两条复合外键按约束计为2条、按列计为4列，避免混用数量。
 
-本页不展开Django账号、组、权限、会话、迁移记录等系统表；图中每个指向auth_user的字段均标为FK并注明目标。核验只执行结构和迁移记录查询，没有执行迁移或修改业务数据，不代表其他设备也已升级。
+本页不展开Django账号、组、权限、会话、迁移记录等系统表；图中每个指向auth_user的字段均标为FK并注明目标。结构核验只读取数据库；本机已单独执行0029，并逐表核对剩余字段与记录一致。其他设备仍须自行迁移。
 
 ## 完整字段与关系图
 
-完整字段只在[Mermaid源文件](DATABASE-ER-FULL.mmd)维护。源文件包含全部230列、PK／FK／单列UK、实际SQL类型、可空性、生成列，以及业务表之间的普通和复合外键。联合唯一约束见下表。NOT NULL文字字段仍可能允许空字符串；`_unsigned`表示MySQL无符号类型。字段注释的ORM CASCADE／PROTECT为Django删除策略，不等同于MySQL外键直接配置了ON DELETE CASCADE。
+完整字段只在[Mermaid源文件](DATABASE-ER-FULL.mmd)维护。源文件包含全部226列、PK／FK／单列UK、实际SQL类型、可空性、生成列，以及业务表之间的普通和复合外键。联合唯一约束见下表。NOT NULL文字字段仍可能允许空字符串；`_unsigned`表示MySQL无符号类型。字段注释的ORM CASCADE／PROTECT为Django删除策略，不等同于MySQL外键直接配置了ON DELETE CASCADE。
 
 图按ECR／ECO申请来源、轮次和行动、多人关联、填写交接及提醒、评估、物料和独立反馈分组理解；结构职责见[项目指南](../PROJECT_GUIDE.md#先理解业务数据组)。
 
@@ -24,12 +24,15 @@
 | 0025 | 新增eco_filler_inbox_read，按用户及填写人事件保存已读记录 |
 | 0026 | review_round新增可空JSON字段form_snapshot；新提交冻结完整表单，旧轮不补造快照 |
 | 0027 | 删除已停用且本机为空的review_feedback旧普通留言表（6列、2条外键），业务表总数30→29 |
+| 0028 | change_request新增creation_request_id与creation_payload；按申请人和创建UUID去重，业务表仍为29张、字段增至232列 |
+| 0029 | 删除行动表owner／owner_user、review_record.change／assigned；round改为必填，停用公开审核。保留29张表，字段减至226列 |
 
 0027删除review_feedback旧表，当前正式修改意见、独立系统反馈及其他业务表不变；旧普通留言接口与页面兼容已移除。
 
 ## 关键关系
 
 - ECR与ECO均保存在change_request，通过source_ecr_id建立一对一来源关系；ECO只能关联一份来源ECR，同一ECR最多一个ECO。该外键保留PROTECT；整项删除由应用事务先删ECO再删ECR，不改变来源约束。
+- review_record只通过必填round关联申请；旧单人负责人字段已移除，分配仅使用owners。账号仍被当前行动分配引用时禁止删除，可停用或先调整分配。
 - review_round属于申请；action_task属于轮次，以轮次、行动键、负责人唯一；task_operation保存每人每次请求的操作回执。
 - ecr_action_response_owners及eco_action_response_owners保存当前行动的负责人集合；change_request_stage_approvers保存当前指定批准人集合。review_record.approval_required标记冻结到具体轮次的批准职责，两者不能互相替代。
 - eco_filler_event属于ECO，actor／previous_filler／filler关联账号；eco_filler_inbox_read按接收用户及事件保存已读状态。
@@ -39,11 +42,11 @@
 
 | 表 | 字段数 | 类型 |
 | --- | --- | --- |
-| `change_request` | 28 | 业务模型表 |
+| `change_request` | 30 | 业务模型表 |
 | `eco_filler_event` | 9 | 业务模型表 |
 | `eco_filler_inbox_read` | 3 | 业务模型表 |
 | `review_round` | 16 | 业务模型表 |
-| `review_record` | 7 | 业务模型表 |
+| `review_record` | 5 | 业务模型表 |
 | `action_task` | 9 | 业务模型表 |
 | `task_operation` | 6 | 业务模型表 |
 | `review_inbox_read` | 5 | 业务模型表 |
@@ -55,8 +58,8 @@
 | `material_change` | 15 | 业务模型表 |
 | `material_disposition` | 6 | 业务模型表 |
 | `question_response` | 5 | 业务模型表 |
-| `ecr_action_response` | 9 | 业务模型表 |
-| `eco_action_response` | 9 | 业务模型表 |
+| `ecr_action_response` | 7 | 业务模型表 |
+| `eco_action_response` | 7 | 业务模型表 |
 | `execution_plan_response` | 7 | 业务模型表 |
 | `significant_assessment` | 4 | 业务模型表 |
 | `significant_chart_response` | 6 | 业务模型表 |
@@ -71,6 +74,7 @@
 
 ## 唯一约束（不含主键）
 
+- `change_request`：`(applicant_id, creation_request_id)`；空UUID兼容已有记录，非空创建请求在同一账号下唯一。
 - `change_request`：`(eco_no_unique)`。
 - `change_request`：`(ecr_no_unique)`。
 - `change_request`：`(source_ecr_id)`。
@@ -113,4 +117,4 @@
 
 ## 历史图像
 
-[0017 Mermaid快照](DATABASE-ER-0017.mmd)、[旧SVG](images/DATABASE-ER-FULL.svg)、[旧PNG](images/DATABASE-ER-FULL.png)仍保留当时23表／186字段结构，**不是当前0027图**；当前完整结构见本页及上述Mermaid源文件。旧日期验证记录继续表示当时的事实，不作为当前迁移终点。
+[0017 Mermaid快照](DATABASE-ER-0017.mmd)、[旧SVG](images/DATABASE-ER-FULL.svg)、[旧PNG](images/DATABASE-ER-FULL.png)仍保留当时23表／186字段结构，**不是当前0029图**；当前完整结构见本页及上述Mermaid源文件。旧日期验证记录继续表示当时的事实，不作为当前迁移终点。

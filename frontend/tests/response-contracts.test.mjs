@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { checkedChange, checkedReviewers } from '../src/submission.ts'
+import { checkedChange, checkedReviewers, checkedCreatedChange } from '../src/submission.ts'
 
 test('change responses validate current ECR/ECO identity, metadata and approver IDs', () => {
   const stamp = '2026-10-16T00:00:00Z'
@@ -15,6 +15,11 @@ test('change responses validate current ECR/ECO identity, metadata and approver 
     assert.throws(() => checkedChange({ ...change, ...patch }, { id: 1 }))
   }
   assert.throws(() => checkedChange(change, { id: 1, applicant: 9 }))
+  const created = { ...change, creation_request_id: 'original-creation' }
+  assert.equal(checkedCreatedChange(created, 4, 'original-creation'), created)
+  for (const invalid of [{}, change, { ...created, creation_request_id: 'other' }, { ...created, applicant: 9 }, { ...created, id: 0 }, { ...created, stage: 'eco' }]) {
+    assert.throws(() => checkedCreatedChange(invalid, 4, 'original-creation'))
+  }
 })
 
 test('people lists validate identity, types and uniqueness', () => {

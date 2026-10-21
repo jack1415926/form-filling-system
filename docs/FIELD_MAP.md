@@ -6,7 +6,7 @@
 
 ## 当前阶段接口与来源
 
-stage-workflow／stage-submission／action-tasks／publication支持ECR和ECO，响应stage决定行动键及状态；ECO提交使用本单eco_no，轮次记录来源ecr_no。草稿／退回行动PATCH只允许owner_user_id或owner_user_ids及extra_required，结果由提交后本人任务接口保存；implementation_stage可保存但不能确认。
+stage-workflow／stage-submission／action-tasks／publication支持ECR和ECO，响应stage决定行动键及状态；ECO提交使用本单eco_no，轮次记录来源ecr_no。草稿／退回行动PATCH只允许owner_user_ids及extra_required，结果由提交后本人任务接口保存；implementation_stage可保存但不能确认。
 
 概述只读字段为stage／status、source_ecr_id／source_ecr_no／eco_creation_request_id和published_by_id／published_at／publication_request_id。ECO的ecr_no保持空，来源编号关联显示；非空ECR／ECO编号分别全局唯一。
 
@@ -113,13 +113,13 @@ PATCH 接受 `{"responses":{"5":{"answer":"N","remark":"理由"}}}`，题号键�
 
 ### ECR／ECO源字段与当前任务填写接口
 
-当前ECR／ECO在draft／returned的行动PATCH仅分配负责人（owner_user_id或多人owner_user_ids）及extra_required补充标记；提交后每人通过自己的任务接口填写并确认result／status／date。旧owner文字只作字段来源，不自动匹配账号；提交时所选负责人必须有效，不能以关联账号代替任务确认。
+当前ECR／ECO在draft／returned的行动PATCH仅分配负责人（多人owner_user_ids）及extra_required补充标记；提交后每人通过自己的任务接口填写并确认result／status／date。原表负责人对应系统用户集合，不自动按姓名文字匹配账号；提交时所选负责人必须有效，不能以关联账号代替任务确认。
 
-ECR 已正式接入：固定定义存于 `backend/changes/ecr_actions.json`，61 条完整行动与源 ECR!A3:C63 及主清单一致，独立标识 ecr_001—ecr_061 与来源问题号分开。正式后端使用该配置；数据库 `ecr_action_response` 保存所属申请、行动标识、owner、owner_user外键、extra_required、result、status、date。
+ECR 已正式接入：固定定义存于 `backend/changes/ecr_actions.json`，61 条完整行动与源 ECR!A3:C63 及主清单一致，独立标识 ecr_001—ecr_061 与来源问题号分开。正式后端使用该配置；数据库 `ecr_action_response` 保存所属申请、行动标识、owners多人关联、extra_required、result、status、date。
 
-GET `/api/changes/{id}/ecr-actions/` 返回 `{updated_at, actions}`，每项含 id、number、function、text、question_answer、owner、owner_user_id、owner_user、result、status、date。question_answer 从已保存问题回答计算，不由客户端填写；默认未回答、文字为空、日期 null。按用户最新选择，页面默认只显示来源问题为是的行动；否或未回答时隐藏，已有填写保留，再次触发时恢复显示。全部列表可查看未触发行动；通过extra_required明确补充。不自动把否解释为不适用。
+GET `/api/changes/{id}/ecr-actions/` 返回 `{updated_at, actions}`，每项含 id、number、function、text、question_answer、owner_user_ids、owner_users、result、status、date。question_answer 从已保存问题回答计算，不由客户端填写；默认未回答、文字为空、日期 null。按用户最新选择，页面默认只显示来源问题为是的行动；否或未回答时隐藏，已有填写保留，再次触发时恢复显示。全部列表可查看未触发行动；通过extra_required明确补充。不自动把否解释为不适用。
 
-ECR的draft／returned行动PATCH仅owner_user_id／owner_user_ids／extra_required；提交后负责人通过action-tasks填写result／status／date并确认。原owner是最多255字的只读姓名，结果多行文本，状态空／completed／not_applicable，日期ISO或null。局部省略不变，显式空值清空，重复原UUID确认原请求；归属、阶段、版本和账号校验以阶段接口为准。
+ECR的draft／returned行动PATCH仅owner_user_ids／extra_required；提交后负责人通过action-tasks填写result／status／date并确认。原owner是最多255字的只读姓名，结果多行文本，状态空／completed／not_applicable，日期ISO或null。局部省略不变，显式空值清空，重复原UUID确认原请求；归属、阶段、版本和账号校验以阶段接口为准。
 
 ECO 固定定义存于 `backend/changes/eco_actions.json`，61 条行动逐项对应 ECO!A3:C63 和主清单 G:I，标识 eco_001—eco_061。D:G 为 owner（负责人）、result（行动完成情况）、status（状态）、date（日期）；完成情况提示保留“需要注明变动文件编号、ECO相对ECR变化点等”。数据库 `eco_action_response` 保存申请、稳定行动标识、原owner文字、owner_user外键、extra_required及result／status／date，同申请／行动唯一、合法行动及状态 CHECK，删除申请级联。
 

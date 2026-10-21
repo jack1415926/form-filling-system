@@ -1,4 +1,4 @@
-"""Group linked processes for navigation; grouping never grants body access."""
+"""将关联流程分组展示；列表分组本身不授予任何正文权限。"""
 from django.db import transaction
 from django.db.models import F, Q
 from rest_framework import serializers
@@ -28,11 +28,11 @@ class EngineeringChanges(APIView):
                 | Q(stage='eco', source_ecr__status='published', source_ecr__published_by=actor)
                 | Q(publisher=actor, status__in=['approved', 'published'])
                 | Q(status__in=['pending', 'approved', 'published'], review_rounds__number=F('current_review_round'),
-                    review_rounds__records__reviewer=actor, review_rounds__records__assigned=True)
+                    review_rounds__records__reviewer=actor)
             ).distinct().select_related('source_ecr')
             readable = [row for row in candidates if can_read_body(actor, row)]
             source_ids = {row.source_ecr_id if row.stage == 'eco' else row.pk for row in readable}
-            # Lock both instances in ID order before checking the permission and status summaries.
+            # 按ID顺序锁住ECR/ECO后再核对摘要，避免权限或状态变化造成列表不一致。
             pairs = list(ChangeRequest.objects.select_for_update().filter(
                 Q(pk__in=source_ids) | Q(source_ecr_id__in=source_ids)
             ).order_by('pk'))

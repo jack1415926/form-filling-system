@@ -44,7 +44,7 @@ function snapshotStage(data: SnapshotData) {
 
 export function snapshotClient(data: SnapshotData, user: User): QueryClient {
   const snapshot = data.snapshot!
-  // This client belongs only to this actor/round. Historical editors never fetch the live body.
+  // 历史表单使用独立账号/轮次缓存并禁止自动查询，避免误读正在修订的当前正文。
   const client = new QueryClient({ defaultOptions: { queries: { enabled: false, staleTime: Infinity, gcTime: Infinity, retry: false } } })
   client.setQueryData(['me'], user)
   client.setQueryData(['workspace-section'], 'review')

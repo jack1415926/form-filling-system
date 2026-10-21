@@ -18,7 +18,7 @@ const overviewLabels: Record<string, string> = { title: '标题', ecr_no: 'ECR�
 
 function FrozenForm({ data }: { data: SnapshotData }) {
   const user = actorUser(useQueryClient())
-  // Keep seeded data through StrictMode's effect replay; this client is local to the mounted snapshot.
+  // StrictMode会重放effect；不能在清理回调中清空此历史表单的预置数据。
   const client = useMemo(() => snapshotClient(data, user), [data, user])
   const [tab, setTab] = useState('overview')
   const snapshot = data.snapshot!, record = snapshot.overview

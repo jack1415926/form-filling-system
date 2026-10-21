@@ -3,6 +3,7 @@ from rest_framework.permissions import BasePermission
 
 
 def account_changed(request):
+    # 此请求头只检测页面与Cookie账号是否一致，不能替代真正的业务授权。
     expected = request.headers.get("X-Expected-User")
     return request.user.is_authenticated and expected is not None and expected != str(request.user.pk)
 

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>登录页线框图 · 四种画法对比</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{width:1560px;padding:30px 40px 24px;background:#f0f2f5;color:#2b3540;
+    font-family:"Microsoft YaHei","Segoe UI",sans-serif}
+  h1{font-size:21px;font-weight:700;margin-bottom:4px}
+  .sub{color:#6b7683;font-size:12.5px;margin-bottom:18px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  figure{background:#fff;border:1px solid #d4d9df;border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+  .shotwrap{position:relative;background:#f7f8fa}
+  .shot{display:block;width:100%;aspect-ratio:16/9.4;object-fit:cover;border-bottom:1px solid #e4e8ec}
+  .badge{position:absolute;top:10px;left:10px;font-size:11px;font-weight:700;color:#fff;background:#2b3540cc;
+    border-radius:4px;padding:3px 8px;letter-spacing:.04em}
+  figcaption{padding:12px 15px 13px}
+  .name{display:flex;align-items:baseline;gap:9px;margin-bottom:5px}
+  .name strong{font-size:14.5px}
+  .verdict{font-size:11px;padding:2px 7px;border-radius:10px;margin-left:auto;white-space:nowrap}
+  .v-no{background:#fdecec;color:#a33a3a}
+  .v-mid{background:#fff5e5;color:#8a5b16}
+  .v-ok{background:#e8f4ec;color:#1f6b45}
+  .v-best{background:#1f6b45;color:#fff}
+  p{font-size:11.5px;line-height:1.7;color:#556170}
+  .meta{margin-top:6px;font-size:10.5px;color:#8a959f;font-variant-numeric:tabular-nums}
+  footer{margin-top:16px;font-size:12px;color:#4a5561;border-top:1px solid #d4d9df;padding-top:12px;line-height:1.7}
+  b{color:#1f6b45}
+</style>
+</head>
+<body>
+  <h1>登录页（未登录）· 四种线框画法对比</h1>
+  <p class="sub">同一视口 1440×900、同一倍率 2x、同一渲染器 Chrome 155 无头模式。文案与尺寸取自 frontend/src/App.tsx 与 App.css 实测值（顶栏 82、容器 1050、双栏 1.2:1、间距 80、面板 441）。</p>
+
+  <div class="grid">
+    <figure>
+      <div class="shotwrap"><img class="shot" src="raw/A-hand-sketch.png" alt="A 手绘风 SVG"><span class="badge">A · 手绘风 SVG</span></div>
+      <figcaption>
+        <div class="name"><strong>A 手绘风 SVG</strong><span class="verdict v-no">不建议进正式文档</span></div>
+        <p>网格 + 灰块 + 手绘抖动描边，能表达"这是草稿"。但粗线条和斜体占位字缩小后糊成一团，也不便逐块标编号。适合讨论阶段，不适合当需求基线。</p>
+        <div class="meta">138 KB · 单文件矢量 · 需 SVG 查看器</div>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="shotwrap"><img class="shot" src="raw/B-clean-wireframe.png" alt="B 干净灰度线框"><span class="badge">B · 干净灰度线框</span></div>
+      <figcaption>
+        <div class="name"><strong>B 干净灰度线框（HTML→PNG）</strong><span class="verdict v-ok">可用</span></div>
+        <p>真实文案、真实间距，去掉品牌色。信息清楚、可加尺寸标注。缺点：源文件是 HTML，看图和入库都多一步渲染。</p>
+        <div class="meta">186 KB · 源 HTML · 一次性渲成 PNG 后可长期引用</div>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="shotwrap"><img class="shot" src="raw/C-real-page.png" alt="C 真实页面"><span class="badge">C · 真实页面</span></div>
+      <figcaption>
+        <div class="name"><strong>C 真实页面截图</strong><span class="verdict v-mid">只做附录，不做线框</span></div>
+        <p>带品牌绿、真实字体与组件，可信度最高。但它记录的是"当时长这样"而不是"应该长这样"；改一次配色就过期，也无法在图上表达校验、禁用、报错等状态。</p>
+        <div class="meta">122 KB · 真实截图需服务运行 + 登录态</div>
+      </figcaption>
+    </figure>
+
+    <figure>
+      <div class="shotwrap"><img class="shot" src="raw/D-traceable.png" alt="D 可追溯编号线框"><span class="badge">D · 可追溯编号线框</span></div>
+      <figcaption>
+        <div class="name"><strong>D 可追溯编号线框（推荐）</strong><span class="verdict v-best">建议采用</span></div>
+        <p>在 B 的基础上加编号 ①—⑤，每条对应一句可验收的界面行为（必填、提示文案、加载禁用、成功跳转）。纯 SVG，矢量、可 diff、不依赖构建，插入文档再配一张编号表即可。</p>
+        <div class="meta">275 KB PNG / 同源 SVG · 编号与需求条目一一对应</div>
+      </figcaption>
+    </figure>
+  </div>
+
+  <footer><b>结论：</b>正式线框用 D 的格式（每页一张 SVG ＋ 一张编号表）；C 的真实截图另存附录作为"当前实现"证据；A 只在早期讨论时用；B 的 HTML 源保留，作为 D 的母版——改版时改 HTML/CSS 重新导出，比手改矢量稳。</footer>
+</body>
+</html>

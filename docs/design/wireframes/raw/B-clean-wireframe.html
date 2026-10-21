@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>WIRE-01 登录页 · 干净灰度线框</title>
+<style>
+  :root{
+    --ink:#2f3a44; --mid:#6b7683; --light:#8e99a4; --hair:#c9cfd6;
+    --fill:#eef1f4; --fill2:#e3e7eb; --paper:#ffffff; --bg:#f5f7f9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    width:1440px;height:900px;background:var(--bg);color:var(--ink);
+    font-family:"Microsoft YaHei","Segoe UI",sans-serif;
+    background-image:linear-gradient(#e6eaee 1px,transparent 1px),linear-gradient(90deg,#e6eaee 1px,transparent 1px);
+    background-size:24px 24px;background-position:-1px -1px;
+  }
+  .sheet{position:relative;width:1440px;height:900px}
+  .sheet::before{content:"";position:absolute;inset:0;background:
+    linear-gradient(#dfe4e9 1px,transparent 1px) 0 0/120px 120px,
+    linear-gradient(90deg,#dfe4e9 1px,transparent 1px) 0 0/120px 120px;
+    opacity:.5;pointer-events:none}
+  .frame{position:absolute;inset:8px;border:1px solid var(--hair);border-radius:4px;pointer-events:none}
+
+  .topbar{position:relative;height:82px;background:var(--paper);border-bottom:1px solid var(--hair);
+    display:flex;align-items:center;justify-content:space-between;padding:0 max(32px,calc((100vw - 1120px)/2))}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand-mark{width:42px;height:42px;border-radius:10px;background:var(--fill2);
+    display:grid;place-items:center;font-size:22px;color:var(--mid)}
+  .brand strong{display:block;font-size:17px}
+  .brand small{display:block;font-size:12px;color:var(--light);margin-top:3px}
+  .who{color:var(--light);font-size:12px}
+
+  .login-layout{position:relative;max-width:1050px;margin:0 auto;padding:92px 30px;
+    display:grid;grid-template-columns:1.2fr 1fr;gap:80px;align-items:center}
+  .eyebrow{color:var(--light);font-size:12px;letter-spacing:.08em}
+  .intro h1{font-size:38px;line-height:1.6;font-weight:650;letter-spacing:-.5px;margin:10px 0 14px}
+  .intro p{color:var(--mid);font-size:16px;line-height:1.9;max-width:350px}
+  .flow{display:flex;gap:24px;border-top:1px solid var(--hair);padding-top:24px;margin-top:38px;
+    font-size:12px;color:var(--light)}
+
+  .panel{background:var(--paper);border:1px solid var(--hair);border-radius:12px;padding:34px;align-self:start}
+  .panel h2{font-size:24px;font-weight:600}
+  .panel .sub{color:var(--mid);font-size:14px;margin:6px 0 26px}
+  .field{margin-bottom:22px}
+  .field label{display:block;font-size:13px;color:var(--mid);margin-bottom:8px}
+  .input{height:42px;border:1px solid var(--hair);border-radius:8px;background:var(--fill);
+    display:flex;align-items:center;padding:0 12px;color:var(--light);font-size:14px}
+  .input .eye{margin-left:auto;width:18px;height:14px;border:1px solid var(--light);border-radius:2px}
+  .submit{height:44px;border-radius:8px;background:var(--fill2);border:1px solid #7e8994;
+    display:grid;place-items:center;font-size:15px;font-weight:600;color:var(--mid)}
+
+  .tag{position:absolute;font-size:11px;color:var(--mid);background:var(--bg);padding:2px 6px;
+    border:1px solid var(--hair);border-radius:3px;white-space:nowrap}
+  .ruler-v{position:absolute;top:110px;height:660px;width:0;border-left:1px dashed #8e99a4}
+  .ruler-h{position:absolute;height:0;border-top:1px dashed #8e99a4}
+  .legend{position:absolute;left:32px;bottom:20px;font-size:11px;color:var(--light)}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="frame"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">变</span>
+      <div><strong>表单填报系统</strong><small>设计变更工作台</small></div>
+    </div>
+    <span class="who">（未登录：不显示账号区）</span>
+  </header>
+
+  <div class="login-layout">
+    <section class="intro">
+      <span class="eyebrow">设计变更管理</span>
+      <h1>每一项变更，<br>从清晰的记录开始。</h1>
+      <p>填写概述，保存草稿。随时重新打开，继续上一次的工作。</p>
+      <div class="flow"><span>01 填写概述</span><span>02 保存草稿</span><span>03 继续填写</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>登录工作台</h2>
+      <p class="sub">使用已有账号登录</p>
+      <div class="field"><label>用户名</label><div class="input">请输入用户名</div></div>
+      <div class="field"><label>密码</label><div class="input">请输入密码<span class="eye"></span></div></div>
+      <div class="submit">登 录</div>
+    </section>
+  </div>
+
+  <!-- measurement layer -->
+  <div class="ruler-v" style="left:195px"></div>
+  <div class="ruler-v" style="left:1245px"></div>
+  <span class="tag" style="left:206px;top:104px">内容容器 max-width 1050 · 居中</span>
+  <div class="ruler-h" style="left:635px;width:80px;top:250px"></div>
+  <span class="tag" style="left:644px;top:232px">gap 80</span>
+  <span class="tag" style="left:32px;top:96px">顶栏 82px</span>
+  <span class="tag" style="left:635px;top:704px">登录面板 441 宽 · 内边距 34 · 圆角 12</span>
+  <span class="tag" style="left:32px;top:640px">标题 38px / 行高 1.6</span>
+  <div class="ruler-h" style="left:32px;width:120px;top:658px"></div>
+
+  <div class="legend">WIRE-01 登录页（未登录）· 灰度线框 · 保留真实文案与实测间距，去除品牌色与图标细节</div>
+</div>
+</body>
+</html>

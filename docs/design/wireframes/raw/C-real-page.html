@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>真实页面重建 · 未登录登录页</title>
+<style>
+  /* copied values from frontend/src/index.css + App.css */
+  :root{font-family:"Segoe UI","Microsoft YaHei",sans-serif;color:#243731;background:#f3f6f4}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{min-width:360px}
+  h1,h2,p{margin-top:0}
+  h1{font-size:30px;line-height:1.4;margin-bottom:10px;font-weight:650;letter-spacing:-.5px}
+  h2{font-size:18px;font-weight:600;margin-bottom:8px}
+  .app-shell{min-height:100vh}
+  .topbar{height:82px;background:#fff;border-bottom:1px solid #e1e9e4;display:flex;align-items:center;justify-content:space-between;padding:0 max(32px,calc((100vw - 1120px)/2))}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand-mark{background:#176b5b;color:#fff;border-radius:10px;width:42px;height:42px;display:grid;place-items:center;font-size:24px}
+  .brand strong{display:block;font-size:17px}
+  .brand div>span{display:block;font-size:12px;color:#73817a;margin-top:3px}
+  .login-layout{max-width:1050px;margin:0 auto;padding:92px 30px;display:grid;grid-template-columns:1.2fr 1fr;gap:80px;align-items:center}  .login-intro h1{font-size:38px;line-height:1.6}
+  .login-intro p{color:#65756d;font-size:16px;line-height:1.9;max-width:350px}
+  .login-flow{display:flex;gap:24px;border-top:1px solid #dce6df;padding-top:24px;margin-top:38px;font-size:12px;color:#66786e}
+  .panel{background:#fff;border:1px solid #e1e9e4;border-radius:12px;box-shadow:0 3px 15px #203b2b04}
+  .login-panel{padding:34px}
+  .login-panel>h2{font-size:24px}
+  .login-panel>p{margin-bottom:26px}
+  .muted{color:#6a7a72;font-size:14px}
+  .field{display:flex;flex-direction:column;margin-bottom:18px}
+  .field label{font-size:14px;margin-bottom:8px;color:#243731}
+  .ctrl{height:40px;border:1px solid #d9d9d9;border-radius:8px;background:#fff;display:flex;align-items:center;padding:0 11px;color:#bfbfbf;font-size:14px}
+  .ctrl:focus-within{border-color:#176b5b}
+  .eye{margin-left:auto;width:16px;height:13px;border:1px solid #8c8c8c;border-radius:2px;position:relative}
+  .eye::after{content:"";position:absolute;inset:3px 5px;border:1px solid #8c8c8c;border-radius:50%}
+  .btn{width:100%;height:40px;border:none;border-radius:8px;background:#176b5b;color:#fff;font-size:14px;font-family:inherit;cursor:pointer}
+  /* capture framing only: shrink the 92px top padding so a 900px-tall shot shows the whole form */
+  .login-layout{padding-top:44px;padding-bottom:24px}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">变</span><div><strong>表单填报系统</strong><span>设计变更工作台</span></div></div>
+  </header>
+  <div class="login-layout">
+    <section class="login-intro">
+      <span class="eyebrow">设计变更管理</span>
+      <h1>每一项变更，<br>从清晰的记录开始。</h1>
+      <p>填写概述，保存草稿。随时重新打开，继续上一次的工作。</p>
+      <div class="login-flow"><span>01 填写概述</span><span>02 保存草稿</span><span>03 继续填写</span></div>
+    </section>
+    <section class="panel login-panel">
+      <h2>登录工作台</h2>
+      <p class="muted">使用已有账号登录</p>
+      <div class="field"><label>用户名</label><div class="ctrl">请输入用户名</div></div>
+      <div class="field"><label>密码</label><div class="ctrl">请输入密码<span class="eye"></span></div></div>
+      <button class="btn" type="button">登录</button>
+    </section>
+  </div>
+</div>
+</body>
+</html>

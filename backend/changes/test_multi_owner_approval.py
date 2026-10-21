@@ -115,14 +115,13 @@ class MultiOwnerApprovalTests(TestCase):
                 self.assertEqual(record.updated_at, assigned_time)
                 self.assertEqual(self.client.patch(path, {'owner_user_ids': [], 'extra_required': False}, format='json').status_code, 200)
                 self.assertFalse(relation.exists())
-                self.assertEqual(self.client.patch(path, {'owner_user_id': self.first.pk}, format='json').status_code, 200)
+                self.assertEqual(self.client.patch(path, {'owner_user_ids': [self.first.pk]}, format='json').status_code, 200)
                 row = relation.get()
                 self.assertSetEqual(set(row.owners.values_list('pk', flat=True)), {self.first.pk})
                 row.result = 'Previously saved result'; row.save(update_fields=['result'])
-                self.assertEqual(self.client.patch(path, {'owner_user_id': None}, format='json').status_code, 200)
+                self.assertEqual(self.client.patch(path, {'owner_user_ids': []}, format='json').status_code, 200)
                 row.refresh_from_db()
                 self.assertEqual(row.result, 'Previously saved result')
-                self.assertIsNone(row.owner_user_id)
                 self.assertFalse(row.owners.exists())
 
     def test_resubmission_retains_each_owners_results_and_clears_reassigned_initial_values(self):

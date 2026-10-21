@@ -18,6 +18,8 @@ class ChangeRequest(models.Model):
         PUBLISHED = "published", "已发布"
 
     applicant = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    creation_request_id = models.UUIDField(null=True, blank=True)
+    creation_payload = models.JSONField(default=dict, blank=True)
     stage = models.CharField(max_length=8, default='ecr', choices=[('legacy', '停用的旧流程标记'), ('ecr', 'ECR'), ('eco', 'ECO')])
     publisher = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
     stage_approvers = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+')
@@ -27,7 +29,7 @@ class ChangeRequest(models.Model):
     source_ecr = models.OneToOneField('self', null=True, blank=True, on_delete=models.PROTECT, related_name='linked_eco')
     eco_creation_request_id = models.UUIDField(null=True, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
-    review_mode = models.CharField(max_length=16, blank=True, db_collation="utf8mb4_bin", choices=[("designated", "指定审核"), ("public", "公开审核")])
+    review_mode = models.CharField(max_length=16, blank=True, db_collation="utf8mb4_bin", choices=[("designated", "指定审核")])
     submitted_at = models.DateTimeField(null=True, blank=True)
     current_review_round = models.PositiveIntegerField(default=0)
     title = models.CharField(max_length=255, blank=True)
@@ -58,10 +60,11 @@ class ChangeRequest(models.Model):
         db_table = "change_request"
         ordering = ["-updated_at", "-id"]
         constraints = [
+            models.UniqueConstraint(fields=['applicant', 'creation_request_id'], name='change_creation_request'),
             models.CheckConstraint(condition=models.Q(stage__in=['legacy', 'ecr', 'eco']), name='change_valid_stage'),
             models.CheckConstraint(condition=(models.Q(stage='eco', source_ecr__isnull=False, eco_creation_request_id__isnull=False, ecr_no='') | (~models.Q(stage='eco') & models.Q(source_ecr__isnull=True, eco_creation_request_id__isnull=True))), name='change_eco_source'),
             models.CheckConstraint(condition=(models.Q(stage__in=['ecr', 'eco'], status='published', published_at__isnull=False, published_by__isnull=False, publication_request_id__isnull=False) | (~models.Q(status='published') & models.Q(published_at__isnull=True, published_by__isnull=True, publication_request_id__isnull=True))), name='change_publication_evidence'),
-            models.CheckConstraint(condition=models.Q(review_mode__in=["", "designated", "public"]), name="change_valid_review_mode"),
+            models.CheckConstraint(condition=models.Q(review_mode__in=["", "designated"]), name="change_valid_review_mode"),
             models.UniqueConstraint(fields=["ecr_no_unique"], name="change_request_ecr_no_unique"),
             models.UniqueConstraint(fields=["eco_no_unique"], name="change_request_eco_no_unique"),
             models.CheckConstraint(
@@ -118,16 +121,14 @@ class ReviewRound(models.Model):
             models.UniqueConstraint(fields=["change", "number"], name="review_unique_round"),
             models.UniqueConstraint(fields=["change", "request_id"], name="review_unique_submission"),
             models.CheckConstraint(condition=models.Q(number__gt=0), name="review_round_positive"),
-            models.CheckConstraint(condition=models.Q(review_mode__in=["designated", "public"]), name="review_round_mode"),
+            models.CheckConstraint(condition=models.Q(review_mode="designated"), name="review_round_mode"),
             models.CheckConstraint(condition=models.Q(state__in=["pending", "approved", "returned"]), name="review_round_state"),
         ]
 
 
 class ReviewRecord(models.Model):
-    change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="review_records")
-    round = models.ForeignKey(ReviewRound, null=True, blank=True, on_delete=models.CASCADE, related_name="records")
+    round = models.ForeignKey(ReviewRound, on_delete=models.CASCADE, related_name="records")
     reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
-    assigned = models.BooleanField(default=True)
     approval_required = models.BooleanField(default=False)
     approved_at = models.DateTimeField(null=True, blank=True)
 
@@ -339,8 +340,6 @@ class EcrActionResponse(models.Model):
     owners = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+')
     change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="ecr_responses")
     action_key = models.CharField(max_length=7)
-    owner = models.CharField(max_length=255, blank=True)
-    owner_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
     extra_required = models.BooleanField(default=False)
     result = models.TextField(blank=True)
     status = models.CharField(max_length=16, blank=True, choices=[("completed", "完成"), ("not_applicable", "不适用")])
@@ -359,8 +358,6 @@ class EcoActionResponse(models.Model):
     owners = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+')
     change = models.ForeignKey(ChangeRequest, on_delete=models.CASCADE, related_name="eco_responses")
     action_key = models.CharField(max_length=7)
-    owner = models.CharField(max_length=255, blank=True)
-    owner_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
     extra_required = models.BooleanField(default=False)
     result = models.TextField(blank=True)
     status = models.CharField(max_length=24, blank=True, choices=[("completed", "完成"), ("not_applicable", "不适用"), ("implementation_stage", "在实施阶段完成")])

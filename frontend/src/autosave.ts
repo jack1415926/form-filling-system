@@ -5,10 +5,11 @@ export type Fields = Record<string, string | null>
 type Clock = { now: () => number; set: (fn: () => void, ms: number) => unknown; clear: (id: unknown) => void }
 const clock: Clock = { now: Date.now, set: (fn, ms) => setTimeout(fn, ms), clear: (id) => clearTimeout(id as ReturnType<typeof setTimeout>) }
 
-// One mounted editor owns one queue. Fields use stable business keys, not row positions.
+// 一个已挂载编辑器对应一个保存队列；字段使用业务键，避免列表位置变化串写。
 export class Autosave {
   baseline: Fields
   values: Fields
+  // 结果不明的字段即使被改回旧值，也不能直接当作已经保存。
   unconfirmed = new Set<string>()
   error: Error | null = null
   pending = false
@@ -69,7 +70,7 @@ export class Autosave {
     this.baseline = { ...fields }; this.values = { ...fields }; this.publish()
   }
   resume() {
-    // A successful same-account login may resume auth/CSRF failures, not exhausted network retries.
+    // 原账号重新登录只恢复认证失败，不自动重启已耗尽次数的网络重试。
     if (this.blocked === 'manual' && this.error instanceof ApiError && [401, 403].includes(this.error.status)) {
       this.blocked = null; this.error = null; this.changedAt = this.time.now(); this.schedule(); this.publish()
     }
@@ -86,6 +87,7 @@ export class Autosave {
     const patch = force ? { ...this.values } : this.patch
     if (!Object.keys(patch).length) return
     this.cancel()
+    // 只确认本次发出时的字段版本，保存期间的新输入继续留在队列里。
     const submittedVersions = { ...this.versions }
     this.pending = true; this.publish()
     this.flight = (async () => {
@@ -108,7 +110,7 @@ export class Autosave {
         } else {
           this.retryAt = null
           this.blocked = error instanceof ApiError && error.status === 400 ? 'edit' : 'manual'
-          // A user edit made while the rejected request was in flight counts as correction.
+          // 校验失败回包前，用户可能已修正输入；这种修改也应允许继续保存。
           if (this.blocked === 'edit' && this.revision > Math.max(0, ...Object.values(submittedVersions))) this.blocked = null
         }
         throw error

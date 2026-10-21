@@ -28,7 +28,7 @@ class EcoFixture(PublicationFixture):
 
     def assign(self, key='eco_001', owner=None, extra=True):
         self.client.force_authenticate(self.a)
-        return self.client.patch(self.path + f'eco-actions/{key}/', {'owner_user_id': (owner or self.b).pk, 'extra_required': extra}, format='json')
+        return self.client.patch(self.path + f'eco-actions/{key}/', {'owner_user_ids': [(owner or self.b).pk], 'extra_required': extra}, format='json')
 
     def submit(self, round=0, **extra):
         self.client.force_authenticate(self.a)
@@ -152,7 +152,7 @@ class EcoStageTests(EcoFixture, TestCase):
         self.assertFalse(self.client.get('/api/ecr-publications/?state=published').data)
         self.assertEqual(self.client.get(self.path + 'stage-navigation/').data['stages'][1]['status'], 'published')
         self.client.force_authenticate(self.a)
-        for suffix, body in [('', {'title': 'edit'}), ('questions/', {'responses': {}}), ('eco-actions/eco_001/', {'owner_user_id': self.a.pk}),
+        for suffix, body in [('', {'title': 'edit'}), ('questions/', {'responses': {}}), ('eco-actions/eco_001/', {'owner_user_ids': [self.a.pk]}),
                              ('emc/', {}), ('execution-plan/', {}), ('significant-change/', {})]:
             self.assertEqual(self.client.patch(self.path + suffix, body, format='json').status_code, 409, suffix)
         self.assertEqual(self.client.delete(self.path).status_code, 409)

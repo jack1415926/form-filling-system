@@ -98,6 +98,10 @@
 .engineering-process .ant-tag { width: fit-content; margin: 0; }
 .process-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; margin: 0 0 22px; }
 .process-heading h1 { font-size: 26px; margin: 8px 0; }
+.process-title { flex: 1; min-width: 0; }
+.process-title-row { display: flex; align-items: center; gap: 16px; }
+.process-title-row h1 { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.process-title-row > .ant-tag { flex-shrink: 0; margin-inline-end: 0; }
 .process-layout { display: grid; grid-template-columns: 245px minmax(0, 1fr); gap: 24px; align-items: start; }
 .process-sidebar { padding: 12px 0; overflow: hidden; }
 .process-sidebar .ant-menu { border-inline-end: none !important; }

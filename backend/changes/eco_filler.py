@@ -1,4 +1,4 @@
-"""ECO ownership changes never change task ownership or published ECR evidence."""
+"""ECO移交只变更基础填写人，不改派任务，也不修改来源ECR的发布记录。"""
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -52,6 +52,7 @@ class EcoFillerDetail(APIView):
         values = serializer.validated_data
         with transaction.atomic():
             record = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk, stage='eco')
+            # 交接后原填写人可能已无正文权限，仍可核对本人原请求的交接结果。
             previous = record.filler_events.filter(request_id=values['request_id']).first()
             if previous:
                 if previous.actor_id != request.user.pk or previous.kind != 'transfer' or previous.payload != canonical(values):
@@ -61,6 +62,7 @@ class EcoFillerDetail(APIView):
                 raise NotFound('没有ECO交接权限。')
             if record.status not in ['draft', 'returned']:
                 conflict('ECO已提交或发布，不能更换填写人；退回修订后才可交接。')
+            # 同时核对原填写人和最后保存版本，拒绝基于旧页面交接新内容。
             if record.applicant_id != values['expected_filler_id'] or record.updated_at != values['expected_updated_at']:
                 conflict('ECO填写人或内容已变化，请刷新并确认最新已保存内容后交接。')
             filler = get_user_model().objects.select_for_update().filter(pk=values['filler_id'], is_active=True).first()

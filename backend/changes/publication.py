@@ -1,4 +1,4 @@
-"""Publish an immutable ECR and copy its base into one independent ECO."""
+"""发布后保持业务正文只读，并复制基础数据创建唯一关联、独立处理的ECO。"""
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
@@ -84,7 +84,7 @@ class PublicationDetail(APIView):
             round = record.review_rounds.filter(number=record.current_review_round, state='approved').first()
             if round is None or round.tasks.filter(confirmed_at__isnull=True).exists() or record.review_issues.exclude(state='resolved').exists():
                 conflict('当前轮次、任务确认或审核意见尚未满足发布条件。')
-            # Unsaved EMC is currently read from a shared template; freeze it at publication.
+            # 未填写的EMC仍来自公共模板，发布时落库，避免后续模板变化影响已发布内容。
             if not hasattr(record, 'emc_reference'):
                 persist(record, matrix_data(record))
             record.status = 'published'; record.published_by = account
@@ -113,7 +113,7 @@ def copy_base(source, eco):
         model.objects.bulk_create([model(change=eco, **copy_values(row, {'change_id'})) for row in getattr(source, relation).all()])
     if hasattr(source, 'significant_assessment'):
         SignificantAssessment.objects.create(change=eco, **copy_values(source.significant_assessment, {'change_id'}))
-    # Rebuild row/test IDs from stable keys; no foreign key points to source EMC.
+    # 按稳定业务键重建行、列ID，ECO的外键不能指回来源ECR的EMC记录。
     persist(eco, matrix_data(source))
 
 
@@ -125,6 +125,7 @@ class CreateEcoValues(StrictValues):
 class CreateEco(APIView):
     def post(self, request, pk):
         values = CreateEcoValues(data=request.data); values.is_valid(raise_exception=True)
+        # 创建ECO与复制全部基础表共用事务，任一步失败都不保留半份草稿。
         with transaction.atomic():
             source = get_object_or_404(ChangeRequest.objects.select_for_update(), pk=pk)
             if request.user.pk not in [source.applicant_id, source.published_by_id] or not request.user.is_active:

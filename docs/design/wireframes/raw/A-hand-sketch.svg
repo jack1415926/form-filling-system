@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900" role="img" aria-labelledby="wfTitle">
+  <title id="wfTitle">WIRE-01 登录页 · 手绘草图风格</title>
+  <defs>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#e3e6ea" stroke-width="0.8"/>
+    </pattern>
+    <pattern id="gridMajor" width="120" height="120" patternUnits="userSpaceOnUse">
+      <path d="M120 0H0V120" fill="none" stroke="#d3d8df" stroke-width="1.1"/>
+    </pattern>
+    <filter id="hand" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif}
+      .handtxt{font-family:"Microsoft YaHei",sans-serif;fill:#55616d}
+      .label{fill:#7b8794;font-size:12px}
+      .ph{fill:#98a3ae;font-size:13px;font-style:italic}
+      .ttl{fill:#4a5561;font-size:15px;font-weight:600}
+    </style>
+  </defs>
+
+  <!-- paper -->
+  <rect width="1440" height="900" fill="#f7f8fa"/>
+  <rect width="1440" height="900" fill="url(#grid)"/>
+  <rect width="1440" height="900" fill="url(#gridMajor)"/>
+
+  <g filter="url(#hand)">
+    <!-- topbar: real height 82 -->
+    <rect x="8" y="8" width="1424" height="80" rx="3" fill="#ffffff" stroke="#8b96a2" stroke-width="1.6" stroke-dasharray="0"/>
+    <rect x="32" y="20" width="36" height="36" rx="5" fill="#e7eaee" stroke="#8b96a2" stroke-width="1.4"/>
+    <text x="40" y="45" class="ph" font-style="normal">logo</text>
+    <rect x="84" y="22" width="120" height="10" rx="2" fill="#dfe3e8"/>
+    <rect x="84" y="40" width="80" height="8" rx="2" fill="#e8ebef"/>
+    <text x="1320" y="50" class="ph">账号 ▾</text>
+
+    <!-- content container: 1050 wide, centred, 1.2fr / 1fr, 80 gap -->
+    <line x1="195" y1="120" x2="195" y2="880" stroke="#c9cfd6" stroke-width="0.8" stroke-dasharray="4 4"/>
+    <line x1="1245" y1="120" x2="1245" y2="880" stroke="#c9cfd6" stroke-width="0.8" stroke-dasharray="4 4"/>
+    <text x="195" y="112" class="label">容器 1050 · 居中</text>
+
+    <!-- intro column -->
+    <text x="195" y="200" class="ph">eyebrow 小标签</text>
+    <text x="195" y="262" class="ttl" font-size="26">主标题两行文案</text>
+    <text x="195" y="300" class="ttl" font-size="26">（38px · 行高1.6）</text>
+    <rect x="195" y="330" width="300" height="9" rx="2" fill="#e2e6ea"/>
+    <rect x="195" y="350" width="255" height="9" rx="2" fill="#e2e6ea"/>
+    <rect x="195" y="370" width="285" height="9" rx="2" fill="#e2e6ea"/>
+    <line x1="195" y1="470" x2="560" y2="470" stroke="#8b96a2" stroke-width="1.2"/>
+    <text x="195" y="500" class="ph">01 步骤　02 步骤　03 步骤</text>
+
+    <!-- login panel: real width 441, padding 34 -->
+    <rect x="635" y="195" width="441" height="330" rx="6" fill="#ffffff" stroke="#8b96a2" stroke-width="1.8"/>
+    <text x="669" y="245" class="ttl" font-size="18">表单标题（24px）</text>
+    <text x="669" y="276" class="ph">说明文字 · muted</text>
+    <text x="669" y="318" class="label">用户名</text>
+    <rect x="669" y="328" width="373" height="42" rx="3" fill="#f2f4f6" stroke="#8b96a2" stroke-width="1.3"/>
+    <text x="681" y="356" class="ph">请输入用户名</text>
+    <text x="669" y="402" class="label">密码</text>
+    <rect x="669" y="412" width="373" height="42" rx="3" fill="#f2f4f6" stroke="#8b96a2" stroke-width="1.3"/>
+    <text x="681" y="440" class="ph">请输入密码</text>
+    <rect x="942" y="426" width="18" height="14" rx="2" fill="none" stroke="#8b96a2" stroke-width="1.2"/>
+    <rect x="669" y="474" width="373" height="44" rx="3" fill="#c9cfd6" stroke="#5f6a76" stroke-width="1.6"/>
+    <text x="836" y="502" class="ttl" font-size="15">登 录</text>
+
+    <!-- annotation note -->
+    <path d="M1085 430 q60 10 80 60" fill="none" stroke="#8b96a2" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <text x="1095" y="516" class="ph">错误提示 Alert 显示在此上方</text>
+  </g>
+
+  <text x="28" y="884" class="label">草图 · 仅表达区块与层级，不代表最终样式 · 网格 24px</text>
+</svg>

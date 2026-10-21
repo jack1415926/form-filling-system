@@ -1,4 +1,4 @@
-// LAN HTTP pages expose getRandomValues, while randomUUID requires a secure context.
+// 内网HTTP页面通常没有randomUUID，用getRandomValues生成同样格式的安全随机UUID。
 export function ensureRandomUUID(provider: Pick<Crypto, 'getRandomValues'> & { randomUUID?: Crypto['randomUUID'] } = globalThis.crypto) {
   if (provider.randomUUID) return
   provider.randomUUID = () => {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { materialFormValues, checkedMaterial } from '../src/materialSave.ts'
+import { materialFormValues, checkedMaterial, saveMaterial } from '../src/materialSave.ts'
+import { ApiError } from '../src/api.ts'
 import { materialFields, materialPayload } from '../src/autosaveFields.ts'
 import { Autosave } from '../src/autosave.ts'
 import { saveResultUnconfirmed } from '../src/questionDraft.ts'
@@ -43,4 +44,40 @@ test('malformed material success keeps draft and involved fields unconfirmed; no
   assert.equal(queue.values.description, 'must preserve'); assert.equal(queue.dirty, true); assert(queue.unconfirmed.has('description'))
   result = { ...valid, description: 'must preserve' }; await queue.flush(true)
   assert.equal(queue.dirty, false); assert.equal(queue.error, null); queue.dispose()
+})
+
+for (const failure of ['network', 'malformed']) test(`new material ${failure} recovery confirms original creation before saving newer edits`, async () => {
+  const state = {}, calls = []
+  let server, lose = true
+  const send = async (id, payload) => {
+    calls.push({ id, payload: structuredClone(payload) })
+    if (id === undefined) {
+      server ??= { ...valid, ...payload }
+      assert.deepEqual(payload, calls[0].payload)
+      if (lose) { lose = false; if (failure === 'network') throw new ApiError(0, 'lost response'); return {} }
+    } else { assert.equal(id, valid.id); server = { ...server, ...payload } }
+    return server
+  }
+  const queue = new Autosave(materialFields({ ...valid, description: '' }, keys), async patch => materialFields(await saveMaterial(state, 'addition', keys, patch, send), keys), () => {})
+  queue.configure(false, true, false)
+  queue.update({ description: 'first saved text' }); await assert.rejects(queue.flush(true))
+  queue.update({ description: 'newer local text' }); await queue.flush(true)
+  assert.equal(calls.length, 3); assert.deepEqual(calls[1], calls[0]); assert.equal(calls[2].id, valid.id)
+  assert.deepEqual(calls[2].payload, { description: 'newer local text' })
+  assert.equal(state.id, valid.id); assert.equal(server.description, 'newer local text'); assert.equal(queue.dirty, false)
+  queue.dispose()
+})
+
+test('rejected new material validation allows a corrected creation while known IDs remain PATCH-only', async () => {
+  const state = {}, calls = []
+  const send = async (id, payload) => {
+    calls.push({ id, payload })
+    if (calls.length === 1) throw new ApiError(400, 'invalid text')
+    return { ...valid, description: payload.description }
+  }
+  await assert.rejects(saveMaterial(state, 'addition', keys, { description: 'invalid' }, send))
+  await saveMaterial(state, 'addition', keys, { description: 'corrected' }, send)
+  assert.notEqual(calls[0].payload.request_id, calls[1].payload.request_id)
+  await saveMaterial(state, 'addition', keys, { description: 'later edit' }, send)
+  assert.equal(calls[2].id, valid.id); assert.equal(calls[2].payload.request_id, undefined)
 })

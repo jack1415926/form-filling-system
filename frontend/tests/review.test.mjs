@@ -4,10 +4,10 @@ import { QueryClient } from '@tanstack/react-query'
 import { canEdit, actorUser } from '../src/workflow.ts'
 import { checkedReview, reviewChangeSnapshot, actionConfirmed, actionCanRetry, approvalProgress, approvalBlockReason, editReply, reviewPath } from '../src/review.ts'
 
-const actor={id:3,username:'reviewer',display_name:'Reviewer',role:'reviewer'}
-const round={number:1,title:'Submitted title',ecr_no:'ECR-1',eco_no:'ECO-1',review_mode:'public',state:'pending',submitted_at:'2026-10-05T01:00:00Z',approved_at:null,returned_at:null,returned_by:null,return_reason:'',reviewers:[],approvals:[]}
+const actor={id:3,username:'reviewer',display_name:'Reviewer'}
+const round={number:1,title:'Submitted title',ecr_no:'ECR-1',eco_no:'ECO-1',review_mode:'designated',state:'pending',submitted_at:'2026-10-05T01:00:00Z',approved_at:null,returned_at:null,returned_by:null,return_reason:'',reviewers:[actor,{...actor,id:4}],approvals:[]}
 const data={change_id:1,updated_at:'2026-10-05T01:00:00Z',current_round:1,round,is_current:true,can_view_form:false,can_approve:true,can_return:true,form:null,history:[round],issues:[],unresolved_count:0,issue_blockers:[],confirmed_requests:[]}
-const change={id:1,applicant:2,current_review_round:1,title:'Revised',ecr_no:'ECR-1',eco_no:'ECO-1',affected_products:'',affected_region:'',initiating_factory:'',affected_factories:'',ccb_owner:'',change_owner:'',change_reason:'',planned_eco_date:null,status:'returned',review_mode:'public',submitted_at:'2026-10-05T01:00:00Z',created_at:'2026-10-05T00:00:00Z',updated_at:'2026-10-05T01:01:00Z'}
+const change={id:1,applicant:2,current_review_round:1,title:'Revised',ecr_no:'ECR-1',eco_no:'ECO-1',affected_products:'',affected_region:'',initiating_factory:'',affected_factories:'',ccb_owner:'',change_owner:'',change_reason:'',planned_eco_date:null,status:'returned',review_mode:'designated',submitted_at:'2026-10-05T01:00:00Z',created_at:'2026-10-05T00:00:00Z',updated_at:'2026-10-05T01:01:00Z'}
 
 test('non-owner return synchronizes detail status and revokes body without removing cached input context',()=>{
  const cached={...change,status:'pending',updated_at:'2026-10-05T01:00:00Z'}
@@ -31,7 +31,7 @@ test('old rounds and late review responses cannot regress a newer detail or rest
  assert.equal(restored.current_review_round,2)
 })
 
-test('approval permissions and legacy public progress remain readable without treating individual decisions as whole approval',()=>{
+test('designated approval progress remains readable without treating individual decisions as whole approval',()=>{
  assert.equal(approvalBlockReason(data,actor.id,0),null)
  assert.match(approvalProgress(round),/0\/2/)
  const one={...data,round:{...round,approvals:[{...actor,approved_at:round.submitted_at}]}}
@@ -107,7 +107,7 @@ test('an original receipt still confirms success even when the resulting state d
 })
 test('review response binds the viewed round and rejects missing permission flags or hidden forms',()=>{
  assert.equal(checkedReview(data,1,1),data)
- for(const invalid of [{}, {...data,change_id:2},{...data,round:{...round,number:2}},{...data,can_return:undefined},{...data,can_view_form:true},{...data,history:[{}]}])assert.throws(()=>checkedReview(invalid,1,1))
+ for(const invalid of [{...data,round:{...round,review_mode:'public'}},{}, {...data,change_id:2},{...data,round:{...round,number:2}},{...data,can_return:undefined},{...data,can_view_form:true},{...data,history:[{}]}])assert.throws(()=>checkedReview(invalid,1,1))
  assert.throws(()=>checkedReview({...data,can_view_form:true,form:{id:1,status:'pending'}},1,1))
  assert.throws(()=>checkedReview({...data,can_view_form:true,form:{...change,current_review_round:2}},1,1))
  assert.equal(reviewPath(1,2),'/api/changes/1/review-rounds/2/')

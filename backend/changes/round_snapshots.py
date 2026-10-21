@@ -1,4 +1,4 @@
-"""Immutable submitted body, separate from the revision and its live endpoints."""
+"""提交时冻结的历史正文独立保存，不能用正在修订的当前正文替代。"""
 import json
 
 from django.db import transaction
@@ -15,7 +15,7 @@ from .stage_actions import action_data, task_data
 
 
 def capture_form(record, round, actor):
-    # Called inside the submission transaction while holding the parent lock.
+    # 在提交事务和父申请锁内采集，确保各表内容属于同一次提交。
     from .views import QuestionList, EcrActionList, EcoActionList
     from .emc_views import matrix_data
     from .execution_plan_views import ExecutionPlanDetail
@@ -44,7 +44,7 @@ def capture_form(record, round, actor):
 
 def can_read_snapshot(user, round):
     record = round.change
-    # Metadata history may be shared with new participants; full old bodies require their own authorization.
+    # 新参与者可按规则查看历史元数据，但旧轮完整正文仍须单独校验该轮授权。
     return user.is_active and record.stage in ['ecr', 'eco'] and (
         is_owner(user, record) or eligible(user, round) or is_publication_reader(user, record)
         or is_eco_coordinator(user, record) or is_ecr_coordinator(user, record))

@@ -7,7 +7,7 @@ from django.apps import apps
 from django.test import TestCase, override_settings, tag
 from rest_framework.test import APIClient
 
-from .models import ChangeRequest, ReviewIssue, ReviewIssueEvent, QuestionResponse
+from .models import ChangeRequest, ReviewIssue, ReviewIssueEvent, QuestionResponse, ReviewRecord
 
 
 @override_settings(PASSWORD_HASHERS=['django.contrib.auth.hashers.MD5PasswordHasher'])
@@ -85,7 +85,7 @@ class ReviewIssueTests(TestCase):
         self.assertEqual(self.submit().status_code, 200)
         self.assertEqual(self.resolve(issues[0], self.clients[1]).status_code, 409)
         for issue in issues: self.assertEqual(self.resolve(issue).status_code, 200)
-        self.assertEqual(self.change.review_records.filter(approved_at__isnull=False).count(), 0)
+        self.assertEqual(ReviewRecord.objects.filter(round__change=self.change, approved_at__isnull=False).count(), 0)
         self.assertEqual(self.act(self.clients[1], 'approve').status_code, 200)
         self.change.refresh_from_db(); self.assertEqual(self.change.status, 'pending')
         self.assertEqual(self.act(self.clients[0], 'approve').status_code, 200)

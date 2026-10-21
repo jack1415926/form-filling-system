@@ -1,12 +1,12 @@
 import { actorUser, canEdit } from './workflow'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Drawer, Dropdown, Empty, Form, Input, Select, Table, Tabs, Tag } from 'antd'
 import DispositionFields from './DispositionFields'
 import { api, ApiError, type ChangeRequest, type Material, type MaterialCategory, type MaterialValues, type MaterialField } from './api'
 import useAutosave, { discardSavedWarning } from './useAutosave'
-import { materialFields, materialPayload } from './autosaveFields'
-import { checkedMaterial, checkedMaterials, materialFormValues } from './materialSave'
+import { materialFields } from './autosaveFields'
+import { checkedMaterials, materialFormValues, saveMaterial, type MaterialWriteState } from './materialSave'
 
 const categories: { key: MaterialCategory; label: string }[] = [
   { key: 'revision', label: '升版的物料或文件' },
@@ -29,7 +29,7 @@ function MaterialForm({ material, category, path, ownerId, locked, leaving, onDi
   onDirty: (value: boolean) => void; onBusy: (value: boolean) => void; onSaved: (material: Material) => void; onComplete: () => void; paused: boolean
 }) {
   const [form] = Form.useForm<MaterialValues>()
-  const [requestId] = useState(() => crypto.randomUUID())
+  const write = useRef<MaterialWriteState>({ id: material?.id })
   const fields = [...commonFields, ...categoryFields[category]]
   const keys: MaterialField[] = [...fields.map((field) => field.key), 'spare_part', 'optional_part']
   const defaults = { spare_part: '', optional_part: '', dispositions: {} } as Partial<MaterialValues>
@@ -37,9 +37,8 @@ function MaterialForm({ material, category, path, ownerId, locked, leaving, onDi
     fields: materialFields(material ?? defaults, keys), enabled: !locked && !leaving, auto: !!material, force: !material, paused, onDirty, onBusy,
     send: async (patch) => {
       try { await form.validateFields() } catch { throw new ApiError(400, '请修正表单校验提示后保存') }
-      const payload = materialPayload(patch)
-      const response = await api<unknown>(material ? path + material.id + '/' : path, material ? 'PATCH' : 'POST', material ? payload : { ...payload, category, request_id: requestId }, ownerId)
-      const result = checkedMaterial(response, category, keys, material?.id)
+      const result = await saveMaterial(write.current, category, keys, patch,
+        (id, payload) => api<unknown>(id === undefined ? path : path + id + '/', id === undefined ? 'POST' : 'PATCH', payload, ownerId))
       if (save.queue.active) onSaved(result)
       return materialFields(result, keys)
     },

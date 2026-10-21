@@ -1,0 +1,32 @@
+[
+  {
+    "page": "01 工程变更列表",
+    "editable_shapes": 71,
+    "width": "1440",
+    "height": "1290"
+  },
+  {
+    "page": "02 ECR-ECO流程总览",
+    "editable_shapes": 84,
+    "width": "1440",
+    "height": "1840"
+  },
+  {
+    "page": "03 变更概述填写",
+    "editable_shapes": 68,
+    "width": "1440",
+    "height": "1550"
+  },
+  {
+    "page": "04 ECR行动分配",
+    "editable_shapes": 86,
+    "width": "1440",
+    "height": "1600"
+  },
+  {
+    "page": "05 审核处理与历史",
+    "editable_shapes": 100,
+    "width": "1440",
+    "height": "2420"
+  }
+]

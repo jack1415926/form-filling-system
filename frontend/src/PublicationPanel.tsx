@@ -45,7 +45,7 @@ export default function PublicationPanel({ record, leaving, onBusy, onReauthenti
         const eco = checkedCreatedEco(await api(`/api/changes/${record.id}/eco/`, 'POST', { request_id: operation.request_id, filler_id: operation.filler_id }, actor), record.id, actor, operation.filler_id, operation.request_id)
         if (!active.current || client.getQueryData<User>(['me'])?.id !== actor) return
         client.setQueryData<ChangeRequest>(['change', actor, eco.id], current => newestResponse(current, eco))
-        // The complete creation response is already evidence, even if the follow-up GET fails.
+        // 完整创建回包本身已确认成功，后续读取失败不能把已创建的ECO重新当作未知。
         client.setQueryData<PublicationData>(key, current => current ? { ...current, eco_id: eco.id, eco_filler_id: eco.applicant, can_create_eco: false } : current)
         setUnknown(null); refresh()
       }

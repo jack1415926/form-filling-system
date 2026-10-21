@@ -12,7 +12,7 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from .models import (ChangeRequest, QuestionResponse, MaterialChange, MaterialDisposition,
+from .models import (ChangeRequest, QuestionResponse, MaterialChange, MaterialDisposition, ReviewRecord,
                      ExecutionPlanResponse, SignificantAssessment, SignificantChartResponse,
                      SignificantQuestionResponse, ActionTask, ReviewIssue)
 from .emc_views import matrix_data, persist
@@ -33,7 +33,7 @@ class PublicationFixture:
         self.client.force_authenticate(self.a)
         self.source.stage_approvers.set([self.a])
         if with_task:
-            self.assertEqual(self.client.patch(self.path + 'ecr-actions/ecr_001/', {'owner_user_id': self.b.pk, 'extra_required': True}, format='json').status_code, 200)
+            self.assertEqual(self.client.patch(self.path + 'ecr-actions/ecr_001/', {'owner_user_ids': [self.b.pk], 'extra_required': True}, format='json').status_code, 200)
         response = self.client.post(self.path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': 0, 'acknowledge_no_tasks': not with_task}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         if with_task:
@@ -76,7 +76,7 @@ class PublicationTests(PublicationFixture, TestCase):
             self.assertEqual(self.client.get(self.path + suffix).status_code, 200, suffix)
         review = self.client.get(self.path + 'review-rounds/1/').data
         self.assertTrue(review['can_view_form']); self.assertFalse(review['can_return']); self.assertFalse(review['can_approve'])
-        self.assertEqual(self.source.review_records.filter(reviewer=self.c).count(), 0)
+        self.assertEqual(ReviewRecord.objects.filter(round__change=self.source, reviewer=self.c).count(), 0)
         self.publish(); stamp = self.source.published_at
         self.assertEqual(self.client.post(self.path + 'publication/', self.publish_payload, format='json').status_code, 200)
         self.source.refresh_from_db(); self.assertEqual(self.source.published_at, stamp)
@@ -135,7 +135,7 @@ class PublicationTests(PublicationFixture, TestCase):
             self.assertEqual(matrix_data(self.source), matrix)
         self.client.force_authenticate(self.a)
         for suffix, body in [('', {'title': 'overwrite'}), ('questions/', {'responses': {'1': {'answer': 'Y'}}}),
-            ('ecr-actions/ecr_001/', {'owner_user_id': self.a.pk}), ('eco-actions/eco_001/', {'owner_user_id': self.a.pk}),
+            ('ecr-actions/ecr_001/', {'owner_user_ids': [self.a.pk]}), ('eco-actions/eco_001/', {'owner_user_ids': [self.a.pk]}),
             ('emc/', {'cells': {}}), ('execution-plan/', {}), ('significant-change/', {}),
             (f'materials/{material.pk}/', {'description': 'overwrite'})]:
             self.assertEqual(self.client.patch(self.path + suffix, body, format='json').status_code, 409, suffix)
@@ -170,8 +170,9 @@ class PublicationTests(PublicationFixture, TestCase):
         self.assertEqual(matrix_data(eco)['cells'], baseline['cells'])
         self.assertNotEqual(eco.emc_reference.pk, self.source.emc_reference.pk)
         cell = eco.emc_reference.cells.get(); self.assertEqual(cell.row.reference_id, eco.emc_reference.pk); self.assertEqual(cell.test.reference_id, eco.emc_reference.pk)
-        for relation in ['review_rounds', 'review_records', 'review_issues', 'ecr_responses', 'eco_responses']:
+        for relation in ['review_rounds', 'review_issues', 'ecr_responses', 'eco_responses']:
             self.assertEqual(getattr(eco, relation).count(), 0)
+        self.assertFalse(ReviewRecord.objects.filter(round__change=eco).exists())
         self.assertEqual(self.client.patch(path, {'title': 'ECO revised', 'eco_no': 'ECO-INDEPENDENT'}, format='json').status_code, 200)
         self.assertEqual(self.client.patch(path + 'questions/', {'responses': {'1': {'answer': 'Y', 'remark': 'ECO'}}}, format='json').status_code, 200)
         self.assertEqual(self.client.patch(path + f'materials/{copied_material.pk}/', {'description': 'ECO'}, format='json').status_code, 200)
@@ -203,10 +204,10 @@ class PublicationTests(PublicationFixture, TestCase):
         for payload in [self.creation_payload, {'request_id': str(uuid.uuid4()), 'filler_id': self.a.pk}]:
             again = self.client.post(self.path + 'eco/', payload, format='json')
             self.assertEqual(again.status_code, 200); self.assertFalse(again.data['created']); self.assertEqual(again.data['change']['title'], 'changed')
-        self.assertEqual(self.client.patch(path + 'eco-actions/eco_001/', {'owner_user_id': self.a.pk}, format='json').status_code, 200)
+        self.assertEqual(self.client.patch(path + 'eco-actions/eco_001/', {'owner_user_ids': [self.a.pk]}, format='json').status_code, 200)
         for body in [{'result': 'premature'}, {'status': 'completed'}, {'date': '2026-10-13'}]:
             self.assertEqual(self.client.patch(path + 'eco-actions/eco_001/', body, format='json').status_code, 400)
-        self.assertEqual(self.client.patch(path + 'ecr-actions/ecr_001/', {'owner_user_id': self.a.pk}, format='json').status_code, 409)
+        self.assertEqual(self.client.patch(path + 'ecr-actions/ecr_001/', {'owner_user_ids': [self.a.pk]}, format='json').status_code, 409)
         submission = {'review_mode': 'designated', 'reviewer_ids': [self.b.pk], 'request_id': str(uuid.uuid4())}
         self.assertEqual(self.client.post(path + 'submission/', submission, format='json').status_code, 404)
         self.assertEqual(self.client.post(path + 'stage-submission/', {'request_id': str(uuid.uuid4()), 'expected_round': 0}, format='json').status_code, 400)

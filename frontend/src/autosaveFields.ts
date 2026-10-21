@@ -4,10 +4,6 @@ import type { Cell, EmcData, EmcPatch } from './emcMatrix'
 
 export const overviewKeys: (keyof Overview)[] = ['title', 'ecr_no', 'eco_no', 'affected_products', 'affected_region', 'initiating_factory', 'affected_factories', 'ccb_owner', 'change_owner', 'planned_eco_date', 'change_reason']
 export const overviewFields = (values: Partial<Overview>): Fields => Object.fromEntries(overviewKeys.map((key) => [key, key === 'planned_eco_date' ? values[key] || null : values[key] ?? '']))
-export const actionFields = (values: { owner_user_id: number | null; result: string; status: string; date: string | null }): Fields => ({ owner_user_id: values.owner_user_id == null ? null : String(values.owner_user_id), result: values.result, status: values.status, date: values.date })
-export function actionPayload(patch: Fields) {
-  return { ...patch, ...('owner_user_id' in patch ? { owner_user_id: patch.owner_user_id === null ? null : Number(patch.owner_user_id) } : {}) }
-}
 export const questionFields = (data: QuestionData): Fields => Object.fromEntries(data.questions.flatMap((row) => [[`${row.number}.answer`, row.answer], [`${row.number}.remark`, row.remark]]))
 export const questionAnswerFields = (data: QuestionData, answer: Exclude<QuestionAnswer, ''>): Fields => Object.fromEntries(data.questions.map(row => [`${row.number}.answer`, answer]))
 export function questionPayload(patch: Fields) {

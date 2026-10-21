@@ -40,7 +40,7 @@ class ReviewInbox(APIView):
             notes = [f'{row.unanswered}条审核意见待回应' if row.unanswered else '申请已退回，待修订或重新提交']
             open_issues = bool(row.unanswered)
             if count:
-                # Only incoming messages/new rounds notify again; own replies/resolutions do not.
+                # 只有新入站消息或新轮次重新提醒；本人回应、解决意见不重复产生未读。
                 signature = hashlib.sha256(json.dumps(['filler', row.pk, row.latest_incoming or 0]).encode()).hexdigest()
                 items.append({'change_id': row.change_id, 'round': row.number, 'title': row.change.title,
                               'context': 'applicant',
@@ -52,12 +52,11 @@ class ReviewInbox(APIView):
 
     def stage_items(self, request):
         rows = ReviewRound.objects.filter(change__stage__in=['ecr', 'eco'], number=F('change__current_review_round'),
-            state=F('change__status'), state__in=['pending', 'returned'], records__reviewer=request.user, records__assigned=True).select_related('change').distinct()
+            state=F('change__status'), state__in=['pending', 'returned'], records__reviewer=request.user).select_related('change').distinct()
         reads = dict(ReviewInboxRead.objects.filter(user=request.user, round__in=rows).values_list('round_id', 'signature'))
         items = []
         for row in rows:
-            # During revision the applicant's single item already covers this round.
-            # Self-assigned authors cannot review their reply until resubmission.
+            # 修订期间由填写人的退回提醒统一展示；本人兼任审核人也须重提后才能复核。
             if row.state == 'returned' and row.change.applicant_id == request.user.pk:
                 continue
             tasks = row.tasks.filter(owner=request.user, confirmed_at__isnull=True).count() if row.state == 'pending' else 0
@@ -114,8 +113,7 @@ class MarkInboxRead(APIView):
         if not requested <= allowed:
             return Response({'detail': '消息已变化或没有权限，请刷新后再标为已读。'}, status=409)
         with transaction.atomic():
-            # Review writes lock the same parent. Serialize snapshots and receipts so an
-            # older request cannot overwrite a newer read after an incoming reply.
+            # 与审核写入共用父申请锁；校验消息版本后再记已读，避免旧请求清除新消息。
             list(ChangeRequest.objects.select_for_update().filter(pk__in=requested).order_by('pk'))
             current = ReviewInbox().get(request).data
             messages = {(item['change_id'], item['round']): item for item in current['items']}
